@@ -1,35 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Calendar as CalendarIcon, Clock, Plus, User } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Plus, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useGoogleCalendar } from "@/hooks/useGoogleCalendar";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const CalendarTab = () => {
-  const events = [
-    {
-      id: 1,
-      title: "Consulta - João Silva",
-      date: "2025-01-15",
-      time: "09:00",
-      duration: "30 min",
-      status: "confirmed",
-    },
-    {
-      id: 2,
-      title: "Reunião - Maria Santos",
-      date: "2025-01-15",
-      time: "14:00",
-      duration: "1 hora",
-      status: "pending",
-    },
-    {
-      id: 3,
-      title: "Follow-up - Pedro Costa",
-      date: "2025-01-16",
-      time: "10:30",
-      duration: "15 min",
-      status: "confirmed",
-    },
-  ];
+  const { events, loading, fetchEvents } = useGoogleCalendar();
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -41,10 +18,22 @@ const CalendarTab = () => {
               <CalendarIcon className="w-5 h-5" />
               Agenda de Atendimentos
             </CardTitle>
-            <Button className="gap-2 bg-gradient-primary">
-              <Plus className="w-4 h-4" />
-              Novo Evento
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={fetchEvents}
+                disabled={loading}
+                className="gap-2"
+              >
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                Atualizar
+              </Button>
+              <Button className="gap-2 bg-gradient-primary">
+                <Plus className="w-4 h-4" />
+                Novo Evento
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -89,7 +78,19 @@ const CalendarTab = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {events.map((event) => (
+            {loading ? (
+              <>
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-24 w-full" />
+              </>
+            ) : events.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <CalendarIcon className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>Nenhum evento encontrado</p>
+              </div>
+            ) : (
+              events.map((event) => (
               <div
                 key={event.id}
                 className="p-4 rounded-lg border bg-gradient-card hover:shadow-card transition-smooth"
@@ -114,7 +115,8 @@ const CalendarTab = () => {
                   </div>
                 </div>
               </div>
-            ))}
+              ))
+            )}
           </div>
         </CardContent>
       </Card>
