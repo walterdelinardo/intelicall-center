@@ -22,6 +22,7 @@ export default {
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
+          hover: "hsl(var(--primary-hover))",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
@@ -47,6 +48,14 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
@@ -57,6 +66,24 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        chat: {
+          "bubble-user": "hsl(var(--chat-bubble-user))",
+          "bubble-user-foreground": "hsl(var(--chat-bubble-user-foreground))",
+          "bubble-bot": "hsl(var(--chat-bubble-bot))",
+          "bubble-bot-foreground": "hsl(var(--chat-bubble-bot-foreground))",
+        },
+      },
+      backgroundImage: {
+        "gradient-primary": "var(--gradient-primary)",
+        "gradient-card": "var(--gradient-card)",
+      },
+      boxShadow: {
+        sm: "var(--shadow-sm)",
+        card: "var(--shadow-card)",
+        lg: "var(--shadow-lg)",
+      },
+      transitionProperty: {
+        smooth: "var(--transition-smooth)",
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -80,10 +107,39 @@ export default {
             height: "0",
           },
         },
+        "fade-in": {
+          from: {
+            opacity: "0",
+            transform: "translateY(10px)",
+          },
+          to: {
+            opacity: "1",
+            transform: "translateY(0)",
+          },
+        },
+        "slide-in": {
+          from: {
+            transform: "translateX(-100%)",
+          },
+          to: {
+            transform: "translateX(0)",
+          },
+        },
+        pulse: {
+          "0%, 100%": {
+            opacity: "1",
+          },
+          "50%": {
+            opacity: "0.5",
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "fade-in": "fade-in 0.3s ease-out",
+        "slide-in": "slide-in 0.3s ease-out",
+        pulse: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
       },
     },
   },
