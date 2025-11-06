@@ -27,20 +27,20 @@ const SettingsTab = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="webhook-url">URL do Webhook</Label>
+            <Label htmlFor="webhook-url">URL do Webhook N8N</Label>
             <Input
               id="webhook-url"
               placeholder="https://seu-n8n.com/webhook/..."
-              defaultValue="https://exemplo.n8n.cloud/webhook/whatsapp"
+              defaultValue="https://n8n-nw.nicwalsolutions.com.br/webhook/evo-api-nw-5511967373819"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="webhook-key">Chave de Autenticação</Label>
+            <Label htmlFor="webhook-key">API Key Evolution</Label>
             <Input
               id="webhook-key"
               type="password"
               placeholder="••••••••••••••••"
-              defaultValue="abc123def456"
+              defaultValue="E59A505A322C-47E0-9471-951A8D54F3FE"
             />
           </div>
           <div className="flex items-center space-x-2">
