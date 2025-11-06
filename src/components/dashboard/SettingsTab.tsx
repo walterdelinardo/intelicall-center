@@ -67,7 +67,7 @@ const SettingsTab = () => {
             <Input
               id="calendar-id"
               placeholder="seuemail@gmail.com"
-              defaultValue="atendimento@empresa.com"
+              defaultValue="a4b9ede547918b89a0a778f1cb35ae2ded39a87f47094089c65fd5add@group.calendar.google.com"
             />
           </div>
           <div className="space-y-2">
@@ -76,7 +76,7 @@ const SettingsTab = () => {
               id="api-key"
               type="password"
               placeholder="••••••••••••••••"
-              defaultValue="AIzaSy..."
+              defaultValue="60e835c2e73b9de0f9aab71554b1565d92374bf7"
             />
           </div>
           <div className="flex items-center space-x-2">
