@@ -25,24 +25,75 @@ serve(async (req) => {
     await client.connect();
     console.log('Connected successfully');
 
-    // Query para buscar clientes - ajuste o nome da tabela conforme necessário
-    const result = await client.queryObject(`
+    // Primeiro, listar todas as tabelas disponíveis
+    const tablesResult = await client.queryObject(`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public'
+      ORDER BY table_name
+    `);
+
+    console.log('Available tables:', JSON.stringify(tablesResult.rows));
+
+    // Tentar buscar de várias possíveis tabelas
+    const possibleTableNames = ['clientes', 'cliente', 'customers', 'users', 'contatos'];
+    let result = null;
+    let usedTable = null;
+
+    for (const tableName of possibleTableNames) {
+      try {
+        result = await client.queryObject(`
+          SELECT 
+            nome,
+            whatsapp,
+            nome_wpp,
+            email,
+            "data-nasc"
+          FROM ${tableName}
+          ORDER BY nome
+          LIMIT 1
+        `);
+        usedTable = tableName;
+        console.log(`Found table: ${tableName}`);
+        break;
+      } catch (e) {
+        console.log(`Table ${tableName} not found, trying next...`);
+      }
+    }
+
+    if (!result || !usedTable) {
+      await client.end();
+      return new Response(
+        JSON.stringify({ 
+          error: 'Client table not found',
+          availableTables: tablesResult.rows,
+          message: 'Por favor, informe o nome correto da tabela de clientes'
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 404,
+        }
+      );
+    }
+
+    // Buscar todos os registros da tabela encontrada
+    const allClients = await client.queryObject(`
       SELECT 
         nome,
         whatsapp,
         nome_wpp,
         email,
         "data-nasc"
-      FROM clientes
+      FROM ${usedTable}
       ORDER BY nome
     `);
 
     await client.end();
 
-    console.log(`Found ${result.rows.length} clients`);
+    console.log(`Found ${allClients.rows.length} clients in table ${usedTable}`);
 
     return new Response(
-      JSON.stringify(result.rows),
+      JSON.stringify(allClients.rows),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
