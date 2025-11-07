@@ -22,9 +22,20 @@ serve(async (req) => {
 
     const n8nWebhookUrl = Deno.env.get('N8N_WEBHOOK_URL');
     
+    console.log('N8N Webhook URL configured:', n8nWebhookUrl ? 'Yes' : 'No');
+    
     if (!n8nWebhookUrl) {
       throw new Error('N8N_WEBHOOK_URL not configured');
     }
+
+    const payload = {
+      phoneNumber,
+      message,
+      timestamp: new Date().toISOString(),
+    };
+
+    console.log('Sending payload to N8N:', JSON.stringify(payload));
+    console.log('N8N URL:', n8nWebhookUrl);
 
     // Send to N8N webhook
     const response = await fetch(n8nWebhookUrl, {
@@ -32,15 +43,16 @@ serve(async (req) => {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        phoneNumber,
-        message,
-        timestamp: new Date().toISOString(),
-      }),
+      body: JSON.stringify(payload),
     });
 
+    console.log('N8N Response status:', response.status);
+    console.log('N8N Response headers:', JSON.stringify([...response.headers.entries()]));
+
     if (!response.ok) {
-      throw new Error(`N8N webhook failed: ${response.status}`);
+      const errorText = await response.text().catch(() => 'No error body');
+      console.error('N8N webhook error body:', errorText);
+      throw new Error(`N8N webhook failed: ${response.status} - ${errorText}`);
     }
 
     const result = await response.json().catch(() => ({}));
