@@ -1,12 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Calendar as CalendarIcon, Clock, Plus, RefreshCw } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useGoogleCalendar } from "@/hooks/useGoogleCalendar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CreateEventDialog } from "./CreateEventDialog";
 
 const CalendarTab = () => {
-  const { events, loading, fetchEvents } = useGoogleCalendar();
+  const { events, loading, fetchEvents, createEvent } = useGoogleCalendar();
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -29,10 +30,7 @@ const CalendarTab = () => {
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                 Atualizar
               </Button>
-              <Button className="gap-2 bg-gradient-primary">
-                <Plus className="w-4 h-4" />
-                Novo Evento
-              </Button>
+              <CreateEventDialog onCreateEvent={createEvent} />
             </div>
           </div>
         </CardHeader>
