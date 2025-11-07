@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Send, User, Bot, UserCheck, MessageSquare, Phone } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useChatwootConversations } from "@/hooks/useChatwootConversations";
+import { format } from "date-fns";
 
 interface Message {
   id: number;
@@ -18,37 +20,10 @@ interface Message {
 }
 
 const ChatTab = () => {
-  const [selectedChat, setSelectedChat] = useState<number | null>(1);
+  const { conversations: chatwootConversations, loading } = useChatwootConversations();
+  const [selectedChat, setSelectedChat] = useState<string | null>(null);
   const [message, setMessage] = useState("");
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 1,
-      type: "user",
-      text: "Olá, gostaria de agendar uma consulta",
-      timestamp: "14:30",
-      sender: "João Silva",
-    },
-    {
-      id: 2,
-      type: "bot",
-      text: "Olá! Claro, terei prazer em ajudar. Qual seria o melhor dia para você?",
-      timestamp: "14:31",
-      sender: "Assistente",
-    },
-    {
-      id: 3,
-      type: "user",
-      text: "Prefiro na próxima terça-feira pela manhã",
-      timestamp: "14:32",
-      sender: "João Silva",
-    },
-  ]);
-
-  const conversations = [
-    { id: 1, name: "João Silva", lastMessage: "Prefiro na próxima terça...", time: "14:32", unread: 2, active: true },
-    { id: 2, name: "Maria Santos", lastMessage: "Obrigada pelo atendimento!", time: "13:15", unread: 0, active: false },
-    { id: 3, name: "Pedro Costa", lastMessage: "Quando posso buscar?", time: "11:20", unread: 1, active: true },
-  ];
+  const [messages, setMessages] = useState<Message[]>([]);
 
   const handleSendMessage = () => {
     if (message.trim()) {
@@ -71,22 +46,26 @@ const ChatTab = () => {
   const handleSendToWhatsApp = async () => {
     if (!selectedChat) return;
     
-    const conv = conversations.find(c => c.id === selectedChat);
-    if (!conv) return;
+    const conv = chatwootConversations.find(c => c.id === selectedChat);
+    if (!conv || !conv.contact_phone) {
+      toast.error("Número de telefone não encontrado");
+      return;
+    }
 
     try {
       toast.loading("Enviando mensagem para WhatsApp...");
       
       const { data, error } = await supabase.functions.invoke('send-whatsapp', {
         body: {
-          phoneNumber: '5511979987046', // Número configurado no N8N
-          message: `Nova mensagem de ${conv.name}: ${message || 'Sem mensagem'}`
+          phoneNumber: conv.contact_phone,
+          message: message || 'Nova mensagem via dashboard'
         }
       });
 
       if (error) throw error;
 
       toast.success("Mensagem enviada para WhatsApp!");
+      setMessage("");
     } catch (error) {
       console.error('Error sending to WhatsApp:', error);
       toast.error("Erro ao enviar para WhatsApp");
@@ -102,38 +81,52 @@ const ChatTab = () => {
           Conversas Ativas
         </h3>
         <ScrollArea className="h-[600px]">
-          <div className="space-y-2">
-            {conversations.map((conv) => (
-              <button
-                key={conv.id}
-                onClick={() => setSelectedChat(conv.id)}
-                className={`w-full p-3 rounded-lg text-left transition-smooth hover:bg-accent ${
-                  selectedChat === conv.id ? "bg-accent" : ""
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <Avatar className="w-10 h-10">
-                    <AvatarFallback>{conv.name[0]}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-medium text-sm truncate">{conv.name}</span>
-                      <span className="text-xs text-muted-foreground">{conv.time}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground truncate">{conv.lastMessage}</p>
-                    {conv.active && (
-                      <Badge variant="outline" className="mt-1 text-xs bg-success/10 text-success border-success/20">
-                        Bot Ativo
+          {loading ? (
+            <div className="flex items-center justify-center h-full text-muted-foreground">
+              <p>Carregando conversas...</p>
+            </div>
+          ) : chatwootConversations.length === 0 ? (
+            <div className="flex items-center justify-center h-full text-muted-foreground">
+              <p>Nenhuma conversa encontrada</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {chatwootConversations.map((conv) => (
+                <button
+                  key={conv.id}
+                  onClick={() => setSelectedChat(conv.id)}
+                  className={`w-full p-3 rounded-lg text-left transition-smooth hover:bg-accent ${
+                    selectedChat === conv.id ? "bg-accent" : ""
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <Avatar className="w-10 h-10">
+                      <AvatarFallback>{conv.contact_name?.[0] || 'C'}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium text-sm truncate">{conv.contact_name || 'Contato'}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {conv.last_message_at ? format(new Date(conv.last_message_at), 'HH:mm') : ''}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">{conv.last_message || 'Sem mensagens'}</p>
+                      <Badge 
+                        variant="outline" 
+                        className={`mt-1 text-xs ${
+                          conv.status === 'open' 
+                            ? 'bg-success/10 text-success border-success/20' 
+                            : 'bg-muted text-muted-foreground'
+                        }`}
+                      >
+                        {conv.status === 'open' ? 'Aberta' : conv.status === 'resolved' ? 'Resolvida' : conv.status}
                       </Badge>
-                    )}
+                    </div>
                   </div>
-                  {conv.unread > 0 && (
-                    <Badge className="bg-primary">{conv.unread}</Badge>
-                  )}
-                </div>
-              </button>
-            ))}
-          </div>
+                </button>
+              ))}
+            </div>
+          )}
         </ScrollArea>
       </Card>
 
@@ -145,11 +138,18 @@ const ChatTab = () => {
             <div className="p-4 border-b flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Avatar>
-                  <AvatarFallback>J</AvatarFallback>
+                  <AvatarFallback>
+                    {chatwootConversations.find(c => c.id === selectedChat)?.contact_name?.[0] || 'C'}
+                  </AvatarFallback>
                 </Avatar>
                 <div>
-                  <h4 className="font-semibold">João Silva</h4>
-                  <p className="text-xs text-muted-foreground">Online</p>
+                  <h4 className="font-semibold">
+                    {chatwootConversations.find(c => c.id === selectedChat)?.contact_name || 'Contato'}
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    {chatwootConversations.find(c => c.id === selectedChat)?.contact_phone || 
+                     chatwootConversations.find(c => c.id === selectedChat)?.contact_email || ''}
+                  </p>
                 </div>
               </div>
               <div className="flex gap-2">
