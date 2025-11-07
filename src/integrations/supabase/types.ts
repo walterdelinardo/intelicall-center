@@ -14,7 +14,93 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      chatwoot_conversations: {
+        Row: {
+          account_id: string
+          assignee_name: string | null
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          conversation_id: string
+          created_at: string | null
+          id: string
+          inbox_id: string | null
+          last_message: string | null
+          last_message_at: string | null
+          metadata: Json | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          account_id: string
+          assignee_name?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          conversation_id: string
+          created_at?: string | null
+          id?: string
+          inbox_id?: string | null
+          last_message?: string | null
+          last_message_at?: string | null
+          metadata?: Json | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string
+          assignee_name?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          conversation_id?: string
+          created_at?: string | null
+          id?: string
+          inbox_id?: string | null
+          last_message?: string | null
+          last_message_at?: string | null
+          metadata?: Json | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      chatwoot_messages: {
+        Row: {
+          attachments: Json | null
+          content: string | null
+          conversation_id: string
+          created_at: string | null
+          id: string
+          message_id: string
+          message_type: string | null
+          sender_name: string | null
+          sender_type: string | null
+        }
+        Insert: {
+          attachments?: Json | null
+          content?: string | null
+          conversation_id: string
+          created_at?: string | null
+          id?: string
+          message_id: string
+          message_type?: string | null
+          sender_name?: string | null
+          sender_type?: string | null
+        }
+        Update: {
+          attachments?: Json | null
+          content?: string | null
+          conversation_id?: string
+          created_at?: string | null
+          id?: string
+          message_id?: string
+          message_type?: string | null
+          sender_name?: string | null
+          sender_type?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
