@@ -19,10 +19,7 @@ export const useGoogleCalendar = () => {
   const fetchEvents = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.functions.invoke('google-calendar-events', {
-        body: {},
-        method: 'GET',
-      });
+      const { data, error } = await supabase.functions.invoke('google-calendar-events?action=list');
 
       if (error) {
         console.error('Error fetching events:', error);
@@ -48,11 +45,8 @@ export const useGoogleCalendar = () => {
     endDateTime: string;
   }) => {
     try {
-      const { data, error } = await supabase.functions.invoke('google-calendar-events', {
-        body: {
-          action: 'create',
-          ...eventData,
-        },
+      const { data, error } = await supabase.functions.invoke('google-calendar-events?action=create', {
+        body: eventData,
       });
 
       if (error) {
@@ -63,7 +57,7 @@ export const useGoogleCalendar = () => {
 
       if (data?.success) {
         toast.success('Evento criado com sucesso!');
-        await fetchEvents(); // Recarregar eventos
+        await fetchEvents();
         return true;
       }
 
