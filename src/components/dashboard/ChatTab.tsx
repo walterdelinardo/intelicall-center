@@ -5,8 +5,9 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Send, User, Bot, UserCheck, MessageSquare } from "lucide-react";
+import { Send, User, Bot, UserCheck, MessageSquare, Phone } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Message {
   id: number;
@@ -65,6 +66,31 @@ const ChatTab = () => {
 
   const handleTakeOver = () => {
     toast.success("Você assumiu a conversa!");
+  };
+
+  const handleSendToWhatsApp = async () => {
+    if (!selectedChat) return;
+    
+    const conv = conversations.find(c => c.id === selectedChat);
+    if (!conv) return;
+
+    try {
+      toast.loading("Enviando mensagem para WhatsApp...");
+      
+      const { data, error } = await supabase.functions.invoke('send-whatsapp', {
+        body: {
+          phoneNumber: '5511979987046', // Número configurado no N8N
+          message: `Nova mensagem de ${conv.name}: ${message || 'Sem mensagem'}`
+        }
+      });
+
+      if (error) throw error;
+
+      toast.success("Mensagem enviada para WhatsApp!");
+    } catch (error) {
+      console.error('Error sending to WhatsApp:', error);
+      toast.error("Erro ao enviar para WhatsApp");
+    }
   };
 
   return (
@@ -126,10 +152,16 @@ const ChatTab = () => {
                   <p className="text-xs text-muted-foreground">Online</p>
                 </div>
               </div>
-              <Button onClick={handleTakeOver} variant="outline" size="sm" className="gap-2">
-                <UserCheck className="w-4 h-4" />
-                Assumir Conversa
-              </Button>
+              <div className="flex gap-2">
+                <Button onClick={handleSendToWhatsApp} variant="outline" size="sm" className="gap-2">
+                  <Phone className="w-4 h-4" />
+                  Enviar via WhatsApp
+                </Button>
+                <Button onClick={handleTakeOver} variant="outline" size="sm" className="gap-2">
+                  <UserCheck className="w-4 h-4" />
+                  Assumir Conversa
+                </Button>
+              </div>
             </div>
 
             {/* Mensagens */}
