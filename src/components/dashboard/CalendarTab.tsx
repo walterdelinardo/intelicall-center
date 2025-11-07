@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calendar as CalendarIcon, Clock, RefreshCw } from "lucide-react";
@@ -5,9 +6,27 @@ import { Badge } from "@/components/ui/badge";
 import { useGoogleCalendar } from "@/hooks/useGoogleCalendar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CreateEventDialog } from "./CreateEventDialog";
+import { EventDetailsDialog } from "./EventDetailsDialog";
+
+interface CalendarEvent {
+  id: string;
+  title: string;
+  date: string;
+  time: string;
+  duration: string;
+  status: "confirmed" | "pending";
+  description?: string;
+}
 
 const CalendarTab = () => {
-  const { events, loading, fetchEvents, createEvent } = useGoogleCalendar();
+  const { events, loading, fetchEvents, createEvent, updateEvent, deleteEvent } = useGoogleCalendar();
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+
+  const handleEventClick = (event: CalendarEvent) => {
+    setSelectedEvent(event);
+    setDetailsOpen(true);
+  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -91,7 +110,8 @@ const CalendarTab = () => {
               events.map((event) => (
               <div
                 key={event.id}
-                className="p-4 rounded-lg border bg-gradient-card hover:shadow-card transition-smooth"
+                className="p-4 rounded-lg border bg-gradient-card hover:shadow-card transition-smooth cursor-pointer"
+                onClick={() => handleEventClick(event)}
               >
                 <div className="flex items-start justify-between mb-2">
                   <h4 className="font-medium text-sm">{event.title}</h4>
@@ -118,6 +138,14 @@ const CalendarTab = () => {
           </div>
         </CardContent>
       </Card>
+
+      <EventDetailsDialog
+        event={selectedEvent}
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
+        onUpdateEvent={updateEvent}
+        onDeleteEvent={deleteEvent}
+      />
     </div>
   );
 };

@@ -111,8 +111,91 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
 
+    } else if (action === 'update') {
+      // Atualizar evento
+      const body = await req.json();
+      const { eventId, title, description, startDateTime, endDateTime } = body;
+
+      if (!eventId || !title || !startDateTime || !endDateTime) {
+        throw new Error('Missing required fields: eventId, title, startDateTime, endDateTime');
+      }
+
+      const calendarUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${eventId}?key=${apiKey}`;
+
+      const eventData = {
+        summary: title,
+        description: description || '',
+        start: {
+          dateTime: startDateTime,
+          timeZone: 'America/Sao_Paulo',
+        },
+        end: {
+          dateTime: endDateTime,
+          timeZone: 'America/Sao_Paulo',
+        },
+      };
+
+      console.log('Updating event in Google Calendar:', eventId, eventData);
+      const response = await fetch(calendarUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(eventData),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error updating event:', errorText);
+        throw new Error(`Failed to update event: ${response.status} ${response.statusText}`);
+      }
+
+      const updatedEvent = await response.json();
+      console.log('Event updated successfully:', updatedEvent.id);
+
+      return new Response(JSON.stringify({ 
+        success: true,
+        event: {
+          id: updatedEvent.id,
+          title: updatedEvent.summary,
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+
+    } else if (action === 'delete') {
+      // Excluir evento
+      const body = await req.json();
+      const { eventId } = body;
+
+      if (!eventId) {
+        throw new Error('Missing required field: eventId');
+      }
+
+      const calendarUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${eventId}?key=${apiKey}`;
+
+      console.log('Deleting event from Google Calendar:', eventId);
+      const response = await fetch(calendarUrl, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error deleting event:', errorText);
+        throw new Error(`Failed to delete event: ${response.status} ${response.statusText}`);
+      }
+
+      console.log('Event deleted successfully:', eventId);
+
+      return new Response(JSON.stringify({ 
+        success: true,
+        eventId
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+
     } else {
-      throw new Error('Invalid action. Use ?action=list or ?action=create');
+      throw new Error('Invalid action. Use ?action=list, ?action=create, ?action=update, or ?action=delete');
     }
 
   } catch (error) {

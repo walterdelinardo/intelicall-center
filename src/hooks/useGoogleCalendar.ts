@@ -69,6 +69,64 @@ export const useGoogleCalendar = () => {
     }
   };
 
+  const updateEvent = async (eventData: {
+    eventId: string;
+    title: string;
+    description?: string;
+    startDateTime: string;
+    endDateTime: string;
+  }) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('google-calendar-events?action=update', {
+        body: eventData,
+      });
+
+      if (error) {
+        console.error('Error updating event:', error);
+        toast.error('Erro ao atualizar evento');
+        return false;
+      }
+
+      if (data?.success) {
+        toast.success('Evento atualizado com sucesso!');
+        await fetchEvents();
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Erro ao atualizar evento no Google Calendar');
+      return false;
+    }
+  };
+
+  const deleteEvent = async (eventId: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('google-calendar-events?action=delete', {
+        body: { eventId },
+      });
+
+      if (error) {
+        console.error('Error deleting event:', error);
+        toast.error('Erro ao excluir evento');
+        return false;
+      }
+
+      if (data?.success) {
+        toast.success('Evento excluído com sucesso!');
+        await fetchEvents();
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Erro ao excluir evento no Google Calendar');
+      return false;
+    }
+  };
+
   useEffect(() => {
     fetchEvents();
   }, []);
@@ -78,5 +136,7 @@ export const useGoogleCalendar = () => {
     loading,
     fetchEvents,
     createEvent,
+    updateEvent,
+    deleteEvent,
   };
 };
