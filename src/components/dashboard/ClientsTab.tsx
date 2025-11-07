@@ -3,8 +3,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { useClients } from "@/hooks/useClients";
-import { User, Phone, Mail, Calendar, Search } from "lucide-react";
+import { User, Phone, Mail, Calendar, Search, Download } from "lucide-react";
+import { toast } from "sonner";
 
 const ClientsTab = () => {
   const { data: clients, isLoading, error } = useClients();
@@ -24,6 +26,41 @@ const ClientsTab = () => {
       );
     });
   }, [clients, searchTerm]);
+
+  const exportToCSV = () => {
+    if (!filteredClients || filteredClients.length === 0) {
+      toast.error("Nenhum cliente para exportar");
+      return;
+    }
+
+    const headers = ["Nome", "WhatsApp", "Nome WhatsApp", "Email", "Data Nascimento"];
+    const csvContent = [
+      headers.join(","),
+      ...filteredClients.map((client) =>
+        [
+          `"${client.nome || ""}"`,
+          `"${client.whatsapp || ""}"`,
+          `"${client.nome_wpp || ""}"`,
+          `"${client.email || ""}"`,
+          `"${client["data-nasc"] || ""}"`,
+        ].join(",")
+      ),
+    ].join("\n");
+
+    const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute("href", url);
+    link.setAttribute("download", `clientes_${new Date().toISOString().split("T")[0]}.csv`);
+    link.style.visibility = "hidden";
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast.success(`${filteredClients.length} clientes exportados com sucesso`);
+  };
 
   if (error) {
     return (
@@ -59,20 +96,31 @@ const ClientsTab = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Clientes</h2>
-          <p className="text-muted-foreground">
-            {searchTerm ? (
-              <>
-                {filteredClients.length} de {clients?.length || 0} clientes
-              </>
-            ) : (
-              <>Total de {clients?.length || 0} clientes cadastrados</>
-            )}
-          </p>
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight">Clientes</h2>
+            <p className="text-muted-foreground">
+              {searchTerm ? (
+                <>
+                  {filteredClients.length} de {clients?.length || 0} clientes
+                </>
+              ) : (
+                <>Total de {clients?.length || 0} clientes cadastrados</>
+              )}
+            </p>
+          </div>
+          
+          <Button
+            onClick={exportToCSV}
+            disabled={!filteredClients || filteredClients.length === 0}
+            className="gap-2"
+          >
+            <Download className="w-4 h-4" />
+            Exportar CSV
+          </Button>
         </div>
-        
+
         <div className="relative w-full md:w-80">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
