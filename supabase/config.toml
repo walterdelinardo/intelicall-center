@@ -1,6 +1,9 @@
 project_id = "nlpnfkidnixphnlwhrux"
 
 [functions.google-calendar-events]
+verify_jwt = true
+
+[functions.google-oauth-callback]
 verify_jwt = false
 
 [functions.send-whatsapp]

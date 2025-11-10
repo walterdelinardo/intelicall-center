@@ -4,9 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Calendar as CalendarIcon, Clock, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useGoogleCalendar } from "@/hooks/useGoogleCalendar";
+import { useGoogleOAuth } from "@/hooks/useGoogleOAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CreateEventDialog } from "./CreateEventDialog";
 import { EventDetailsDialog } from "./EventDetailsDialog";
+import { GoogleAuthButton } from "./GoogleAuthButton";
 import { startOfMonth, endOfMonth, eachDayOfInterval, format, isSameDay, isToday, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -22,6 +24,7 @@ interface CalendarEvent {
 
 const CalendarTab = () => {
   const { events, loading, fetchEvents, createEvent, updateEvent, deleteEvent } = useGoogleCalendar();
+  const { isConnected, loading: authLoading } = useGoogleOAuth();
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -62,7 +65,25 @@ const CalendarTab = () => {
     : events;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div className="space-y-6">
+      {/* Auth Status Card */}
+      {!authLoading && !isConnected && (
+        <Card className="shadow-card border-accent">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold mb-1">Conectar Google Calendar</h3>
+                <p className="text-sm text-muted-foreground">
+                  Conecte sua conta do Google para gerenciar seus eventos
+                </p>
+              </div>
+              <GoogleAuthButton />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Calendário visual */}
       <Card className="lg:col-span-2 shadow-card">
         <CardHeader>
@@ -95,7 +116,8 @@ const CalendarTab = () => {
               </div>
             </div>
             <div className="flex gap-2">
-              <Button 
+              {isConnected && <GoogleAuthButton />}
+              <Button
                 variant="outline" 
                 size="sm"
                 onClick={fetchEvents}
@@ -224,6 +246,7 @@ const CalendarTab = () => {
         onUpdateEvent={updateEvent}
         onDeleteEvent={deleteEvent}
       />
+    </div>
     </div>
   );
 };

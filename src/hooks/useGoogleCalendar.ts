@@ -19,11 +19,26 @@ export const useGoogleCalendar = () => {
   const fetchEvents = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.functions.invoke('google-calendar-events?action=list');
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Você precisa estar logado');
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('google-calendar-events', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
 
       if (error) {
         console.error('Error fetching events:', error);
-        toast.error('Erro ao buscar eventos do Google Calendar');
+        if (error.message?.includes('not connected')) {
+          toast.error('Conecte sua conta do Google Calendar primeiro');
+        } else {
+          toast.error('Erro ao buscar eventos do Google Calendar');
+        }
         return;
       }
 
@@ -45,13 +60,26 @@ export const useGoogleCalendar = () => {
     endDateTime: string;
   }) => {
     try {
-      const { data, error } = await supabase.functions.invoke('google-calendar-events?action=create', {
-        body: eventData,
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Você precisa estar logado');
+        return false;
+      }
+
+      const { data, error } = await supabase.functions.invoke('google-calendar-events', {
+        body: { ...eventData, action: 'create' },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
       });
 
       if (error) {
         console.error('Error creating event:', error);
-        toast.error('Erro ao criar evento');
+        if (error.message?.includes('not connected')) {
+          toast.error('Conecte sua conta do Google Calendar primeiro');
+        } else {
+          toast.error('Erro ao criar evento');
+        }
         return false;
       }
 
@@ -77,13 +105,26 @@ export const useGoogleCalendar = () => {
     endDateTime: string;
   }) => {
     try {
-      const { data, error } = await supabase.functions.invoke('google-calendar-events?action=update', {
-        body: eventData,
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Você precisa estar logado');
+        return false;
+      }
+
+      const { data, error } = await supabase.functions.invoke('google-calendar-events', {
+        body: { ...eventData, action: 'update' },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
       });
 
       if (error) {
         console.error('Error updating event:', error);
-        toast.error('Erro ao atualizar evento');
+        if (error.message?.includes('not connected')) {
+          toast.error('Conecte sua conta do Google Calendar primeiro');
+        } else {
+          toast.error('Erro ao atualizar evento');
+        }
         return false;
       }
 
@@ -103,13 +144,26 @@ export const useGoogleCalendar = () => {
 
   const deleteEvent = async (eventId: string) => {
     try {
-      const { data, error } = await supabase.functions.invoke('google-calendar-events?action=delete', {
-        body: { eventId },
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Você precisa estar logado');
+        return false;
+      }
+
+      const { data, error } = await supabase.functions.invoke('google-calendar-events', {
+        body: { eventId, action: 'delete' },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
       });
 
       if (error) {
         console.error('Error deleting event:', error);
-        toast.error('Erro ao excluir evento');
+        if (error.message?.includes('not connected')) {
+          toast.error('Conecte sua conta do Google Calendar primeiro');
+        } else {
+          toast.error('Erro ao excluir evento');
+        }
         return false;
       }
 

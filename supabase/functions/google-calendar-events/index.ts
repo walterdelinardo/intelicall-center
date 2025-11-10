@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.80.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,26 +12,103 @@ serve(async (req) => {
   }
 
   try {
-    const apiKey = Deno.env.get('GOOGLE_CALENDAR_API_KEY');
-    const calendarId = Deno.env.get('GOOGLE_CALENDAR_ID');
-
-    if (!apiKey || !calendarId) {
-      throw new Error('Google Calendar credentials not configured');
+    // Get authorization header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error('Missing authorization header');
     }
 
-    const url = new URL(req.url);
-    const action = url.searchParams.get('action');
+    const token = authHeader.replace('Bearer ', '');
+
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: { Authorization: authHeader },
+      },
+    });
+
+    // Get user from token
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !user) {
+      throw new Error('Invalid or expired token');
+    }
+
+    // Get Google OAuth token from database
+    const { data: tokenData, error: tokenError } = await supabase
+      .from('google_oauth_tokens')
+      .select('access_token, refresh_token, expires_at')
+      .eq('user_id', user.id)
+      .single();
+
+    if (tokenError || !tokenData) {
+      throw new Error('Google Calendar not connected. Please connect your account first.');
+    }
+
+    // Check if token is expired and refresh if needed
+    let accessToken = tokenData.access_token;
+    const expiresAt = new Date(tokenData.expires_at);
+    const now = new Date();
+
+    if (expiresAt <= now && tokenData.refresh_token) {
+      console.log('Access token expired, refreshing...');
+      
+      const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
+      const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
+
+      const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          client_id: clientId!,
+          client_secret: clientSecret!,
+          refresh_token: tokenData.refresh_token,
+          grant_type: 'refresh_token',
+        }),
+      });
+
+      if (!refreshResponse.ok) {
+        throw new Error('Failed to refresh access token');
+      }
+
+      const refreshData = await refreshResponse.json();
+      accessToken = refreshData.access_token;
+
+      // Update token in database
+      const newExpiresAt = new Date(Date.now() + refreshData.expires_in * 1000).toISOString();
+      await supabase
+        .from('google_oauth_tokens')
+        .update({
+          access_token: accessToken,
+          expires_at: newExpiresAt,
+        })
+        .eq('user_id', user.id);
+
+      console.log('Token refreshed successfully');
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const action = body.action || 'list';
 
     if (action === 'list') {
-      // Buscar eventos
-      const timeMin = new Date().toISOString();
-      const timeMax = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // próximos 30 dias
-
-      const calendarUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?key=${apiKey}&timeMin=${timeMin}&timeMax=${timeMax}&orderBy=startTime&singleEvents=true&maxResults=50`;
-
       console.log('Fetching events from Google Calendar');
-      const response = await fetch(calendarUrl);
-      
+      const timeMin = new Date().toISOString();
+      const timeMax = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+      const response = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime&maxResults=50`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Google Calendar API error:', errorText);
@@ -38,8 +116,8 @@ serve(async (req) => {
       }
 
       const data = await response.json();
-      
-      // Formatar eventos para o formato do app
+
+      // Format events for the app
       const events = data.items?.map((event: any) => ({
         id: event.id,
         title: event.summary || 'Sem título',
@@ -59,15 +137,11 @@ serve(async (req) => {
       });
 
     } else if (action === 'create') {
-      // Criar evento
-      const body = await req.json();
       const { title, description, startDateTime, endDateTime } = body;
 
       if (!title || !startDateTime || !endDateTime) {
         throw new Error('Missing required fields: title, startDateTime, endDateTime');
       }
-
-      const calendarUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?key=${apiKey}`;
 
       const eventData = {
         summary: title,
@@ -83,13 +157,18 @@ serve(async (req) => {
       };
 
       console.log('Creating event in Google Calendar:', eventData);
-      const response = await fetch(calendarUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(eventData),
-      });
+
+      const response = await fetch(
+        'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(eventData),
+        }
+      );
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -112,15 +191,11 @@ serve(async (req) => {
       });
 
     } else if (action === 'update') {
-      // Atualizar evento
-      const body = await req.json();
       const { eventId, title, description, startDateTime, endDateTime } = body;
 
       if (!eventId || !title || !startDateTime || !endDateTime) {
         throw new Error('Missing required fields: eventId, title, startDateTime, endDateTime');
       }
-
-      const calendarUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${eventId}?key=${apiKey}`;
 
       const eventData = {
         summary: title,
@@ -136,13 +211,18 @@ serve(async (req) => {
       };
 
       console.log('Updating event in Google Calendar:', eventId, eventData);
-      const response = await fetch(calendarUrl, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(eventData),
-      });
+
+      const response = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(eventData),
+        }
+      );
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -164,20 +244,24 @@ serve(async (req) => {
       });
 
     } else if (action === 'delete') {
-      // Excluir evento
-      const body = await req.json();
       const { eventId } = body;
 
       if (!eventId) {
         throw new Error('Missing required field: eventId');
       }
 
-      const calendarUrl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${eventId}?key=${apiKey}`;
-
       console.log('Deleting event from Google Calendar:', eventId);
-      const response = await fetch(calendarUrl, {
-        method: 'DELETE',
-      });
+
+      const response = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -195,7 +279,7 @@ serve(async (req) => {
       });
 
     } else {
-      throw new Error('Invalid action. Use ?action=list, ?action=create, ?action=update, or ?action=delete');
+      throw new Error('Invalid action. Use action: list, create, update, or delete');
     }
 
   } catch (error) {
