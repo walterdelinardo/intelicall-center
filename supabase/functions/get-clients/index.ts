@@ -30,7 +30,7 @@ serve(async (req) => {
       SELECT 
         nome,
         whatsapp,
-        nome_wpp,
+        "nome-wpp",
         email,
         "data-nasc"
       FROM contatos
