@@ -1,67 +1,51 @@
 import { useState } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, MessageSquare, BarChart3, Settings, Users } from "lucide-react";
-import DashboardHeader from "@/components/dashboard/DashboardHeader";
-import ChatTab from "@/components/dashboard/ChatTab";
-import CalendarTab from "@/components/dashboard/CalendarTab";
-import ReportsTab from "@/components/dashboard/ReportsTab";
-import SettingsTab from "@/components/dashboard/SettingsTab";
-import ClientsTab from "@/components/dashboard/ClientsTab";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import AppSidebar from "@/components/dashboard/AppSidebar";
+import DashboardHome from "@/components/modules/DashboardHome";
+import AgendaModule from "@/components/modules/AgendaModule";
+import ClientesModule from "@/components/modules/ClientesModule";
+import ConversasModule from "@/components/modules/ConversasModule";
+import ProntuariosModule from "@/components/modules/ProntuariosModule";
+import ProcedimentosModule from "@/components/modules/ProcedimentosModule";
+import FinanceiroModule from "@/components/modules/FinanceiroModule";
+import EstoqueModule from "@/components/modules/EstoqueModule";
+import LeadsModule from "@/components/modules/LeadsModule";
+import UsuariosModule from "@/components/modules/UsuariosModule";
+import ConfiguracoesModule from "@/components/modules/ConfiguracoesModule";
+
+const modules: Record<string, React.ComponentType> = {
+  dashboard: DashboardHome,
+  agenda: AgendaModule,
+  clientes: ClientesModule,
+  conversas: ConversasModule,
+  prontuarios: ProntuariosModule,
+  procedimentos: ProcedimentosModule,
+  financeiro: FinanceiroModule,
+  estoque: EstoqueModule,
+  leads: LeadsModule,
+  usuarios: UsuariosModule,
+  configuracoes: ConfiguracoesModule,
+};
 
 const Dashboard = () => {
-  const [activeTab, setActiveTab] = useState("chat");
+  const [activeModule, setActiveModule] = useState("dashboard");
+  const ActiveComponent = modules[activeModule] || DashboardHome;
 
   return (
-    <div className="min-h-screen bg-background">
-      <DashboardHeader />
-      
-      <main className="container mx-auto p-6 animate-fade-in">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full max-w-3xl mx-auto grid-cols-5 mb-8 shadow-card">
-            <TabsTrigger value="chat" className="gap-2">
-              <MessageSquare className="w-4 h-4" />
-              <span className="hidden sm:inline">Chat</span>
-            </TabsTrigger>
-            <TabsTrigger value="clients" className="gap-2">
-              <Users className="w-4 h-4" />
-              <span className="hidden sm:inline">Clientes</span>
-            </TabsTrigger>
-            <TabsTrigger value="calendar" className="gap-2">
-              <Calendar className="w-4 h-4" />
-              <span className="hidden sm:inline">Agenda</span>
-            </TabsTrigger>
-            <TabsTrigger value="reports" className="gap-2">
-              <BarChart3 className="w-4 h-4" />
-              <span className="hidden sm:inline">Relatórios</span>
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="gap-2">
-              <Settings className="w-4 h-4" />
-              <span className="hidden sm:inline">Configurações</span>
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="chat">
-            <ChatTab />
-          </TabsContent>
-
-          <TabsContent value="clients">
-            <ClientsTab />
-          </TabsContent>
-
-          <TabsContent value="calendar">
-            <CalendarTab />
-          </TabsContent>
-
-          <TabsContent value="reports">
-            <ReportsTab />
-          </TabsContent>
-
-          <TabsContent value="settings">
-            <SettingsTab />
-          </TabsContent>
-        </Tabs>
-      </main>
-    </div>
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full bg-background">
+        <AppSidebar activeModule={activeModule} onModuleChange={setActiveModule} />
+        <main className="flex-1 overflow-auto">
+          <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b border-border px-4 py-3 flex items-center gap-3">
+            <SidebarTrigger />
+            <h1 className="text-lg font-semibold text-foreground capitalize">{activeModule === "dashboard" ? "Painel" : activeModule}</h1>
+          </div>
+          <div className="p-6 animate-fade-in">
+            <ActiveComponent />
+          </div>
+        </main>
+      </div>
+    </SidebarProvider>
   );
 };
 
