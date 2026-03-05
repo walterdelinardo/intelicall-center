@@ -14,6 +14,76 @@ export type Database = {
   }
   public: {
     Tables: {
+      appointments: {
+        Row: {
+          client_id: string
+          clinic_id: string
+          created_at: string
+          date: string
+          duration_minutes: number
+          estimated_price: number | null
+          id: string
+          notes: string | null
+          procedure_id: string | null
+          professional_id: string | null
+          start_time: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          clinic_id: string
+          created_at?: string
+          date: string
+          duration_minutes?: number
+          estimated_price?: number | null
+          id?: string
+          notes?: string | null
+          procedure_id?: string | null
+          professional_id?: string | null
+          start_time: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          clinic_id?: string
+          created_at?: string
+          date?: string
+          duration_minutes?: number
+          estimated_price?: number | null
+          id?: string
+          notes?: string | null
+          procedure_id?: string | null
+          professional_id?: string | null
+          start_time?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_procedure_id_fkey"
+            columns: ["procedure_id"]
+            isOneToOne: false
+            referencedRelation: "procedures"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chatwoot_conversations: {
         Row: {
           account_id: string
@@ -101,6 +171,83 @@ export type Database = {
         }
         Relationships: []
       }
+      clients: {
+        Row: {
+          address: string | null
+          average_ticket: number | null
+          birth_date: string | null
+          city: string | null
+          clinic_id: string
+          cpf: string | null
+          created_at: string
+          email: string | null
+          id: string
+          is_active: boolean
+          last_visit_at: string | null
+          lead_source: string | null
+          name: string
+          notes: string | null
+          phone: string | null
+          state: string | null
+          total_visits: number
+          updated_at: string
+          whatsapp: string | null
+          zip_code: string | null
+        }
+        Insert: {
+          address?: string | null
+          average_ticket?: number | null
+          birth_date?: string | null
+          city?: string | null
+          clinic_id: string
+          cpf?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          last_visit_at?: string | null
+          lead_source?: string | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          state?: string | null
+          total_visits?: number
+          updated_at?: string
+          whatsapp?: string | null
+          zip_code?: string | null
+        }
+        Update: {
+          address?: string | null
+          average_ticket?: number | null
+          birth_date?: string | null
+          city?: string | null
+          clinic_id?: string
+          cpf?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          last_visit_at?: string | null
+          lead_source?: string | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          state?: string | null
+          total_visits?: number
+          updated_at?: string
+          whatsapp?: string | null
+          zip_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clients_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clinics: {
         Row: {
           address: string | null
@@ -184,6 +331,50 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      procedures: {
+        Row: {
+          clinic_id: string
+          created_at: string
+          description: string | null
+          duration_minutes: number
+          id: string
+          is_active: boolean
+          name: string
+          price: number
+          updated_at: string
+        }
+        Insert: {
+          clinic_id: string
+          created_at?: string
+          description?: string | null
+          duration_minutes?: number
+          id?: string
+          is_active?: boolean
+          name: string
+          price?: number
+          updated_at?: string
+        }
+        Update: {
+          clinic_id?: string
+          created_at?: string
+          description?: string | null
+          duration_minutes?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+          price?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "procedures_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
