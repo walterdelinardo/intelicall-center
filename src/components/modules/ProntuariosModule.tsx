@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +16,7 @@ import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   FileText, Plus, Search, Eye, Calendar, User, Footprints,
-  Package, Camera, Trash2, Upload, X, Clock
+  Package, Camera, Trash2, Upload, X, Clock, Edit
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -28,8 +29,9 @@ const ProntuariosModule = () => {
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [viewRecordId, setViewRecordId] = useState<string | null>(null);
+  const [editRecordId, setEditRecordId] = useState<string | null>(null);
+  const [deleteRecordId, setDeleteRecordId] = useState<string | null>(null);
 
-  // Clients list
   const { data: clients = [] } = useQuery({
     queryKey: ["clients-list", profile?.clinic_id],
     queryFn: async () => {
@@ -43,7 +45,6 @@ const ProntuariosModule = () => {
     enabled: !!profile?.clinic_id,
   });
 
-  // Records for selected client or all
   const { data: records = [], isLoading } = useQuery({
     queryKey: ["medical-records", profile?.clinic_id, selectedClientId],
     queryFn: async () => {
@@ -59,6 +60,19 @@ const ProntuariosModule = () => {
       return data as any[];
     },
     enabled: !!profile?.clinic_id,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("medical_records").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["medical-records"] });
+      toast.success("Prontuário excluído!");
+      setDeleteRecordId(null);
+    },
+    onError: (e: any) => toast.error(e.message),
   });
 
   const filtered = records.filter((r) =>
@@ -157,9 +171,17 @@ const ProntuariosModule = () => {
                     </TableCell>
                     <TableCell className="hidden lg:table-cell">{rec.profiles?.full_name || "—"}</TableCell>
                     <TableCell>
-                      <Button size="icon" variant="ghost" onClick={() => setViewRecordId(rec.id)}>
-                        <Eye className="w-4 h-4" />
-                      </Button>
+                      <div className="flex gap-1">
+                        <Button size="icon" variant="ghost" onClick={() => setViewRecordId(rec.id)}>
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost" onClick={() => setEditRecordId(rec.id)}>
+                          <Edit className="w-4 h-4 text-primary" />
+                        </Button>
+                        <Button size="icon" variant="ghost" onClick={() => setDeleteRecordId(rec.id)}>
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -170,7 +192,7 @@ const ProntuariosModule = () => {
       </Card>
 
       {/* Create dialog */}
-      <CreateRecordDialog
+      <RecordFormDialog
         open={isCreateOpen}
         onOpenChange={setIsCreateOpen}
         clients={clients}
@@ -178,23 +200,55 @@ const ProntuariosModule = () => {
         userId={profile?.id || ""}
       />
 
+      {/* Edit dialog */}
+      {editRecordId && (
+        <RecordFormDialog
+          open={!!editRecordId}
+          onOpenChange={(o) => !o && setEditRecordId(null)}
+          clients={clients}
+          clinicId={profile?.clinic_id || ""}
+          userId={profile?.id || ""}
+          editRecordId={editRecordId}
+        />
+      )}
+
       {/* View dialog */}
       {viewRecordId && (
         <ViewRecordDialog
           recordId={viewRecordId}
           open={!!viewRecordId}
           onOpenChange={(o) => !o && setViewRecordId(null)}
-          clinicId={profile?.clinic_id || ""}
         />
       )}
+
+      {/* Delete confirmation */}
+      <AlertDialog open={!!deleteRecordId} onOpenChange={(o) => !o && setDeleteRecordId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Prontuário</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este prontuário? Esta ação não pode ser desfeita. Todos os dados relacionados (avaliações, produtos e fotos) serão removidos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteRecordId && deleteMutation.mutate(deleteRecordId)}
+            >
+              {deleteMutation.isPending ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
 
-// ===================== CREATE RECORD DIALOG =====================
-function CreateRecordDialog({ open, onOpenChange, clients, clinicId, userId }: {
+// ===================== RECORD FORM DIALOG (CREATE + EDIT) =====================
+function RecordFormDialog({ open, onOpenChange, clients, clinicId, userId, editRecordId }: {
   open: boolean; onOpenChange: (o: boolean) => void;
-  clients: any[]; clinicId: string; userId: string;
+  clients: any[]; clinicId: string; userId: string; editRecordId?: string;
 }) {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState("clinical");
@@ -203,45 +257,89 @@ function CreateRecordDialog({ open, onOpenChange, clients, clinicId, userId }: {
     chief_complaint: "", clinical_notes: "", diagnosis: "",
     treatment_performed: "", recommendations: "",
   });
-  const [leftFoot, setLeftFoot] = useState({ nail_condition: "", skin_condition: "", deformities: "", sensitivity: "", circulation: "", pain_level: "", observations: "" });
-  const [rightFoot, setRightFoot] = useState({ nail_condition: "", skin_condition: "", deformities: "", sensitivity: "", circulation: "", pain_level: "", observations: "" });
+  const emptyFoot = { nail_condition: "", skin_condition: "", deformities: "", sensitivity: "", circulation: "", pain_level: "", observations: "" };
+  const [leftFoot, setLeftFoot] = useState({ ...emptyFoot });
+  const [rightFoot, setRightFoot] = useState({ ...emptyFoot });
   const [products, setProducts] = useState<{ product_name: string; quantity: string; notes: string }[]>([]);
   const [photos, setPhotos] = useState<{ file: File; description: string; photo_type: string }[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  // Load existing record for editing
+  const { data: existingRecord } = useQuery({
+    queryKey: ["medical-record-edit", editRecordId],
+    queryFn: async () => {
+      if (!editRecordId) return null;
+      const [recRes, footRes, prodRes] = await Promise.all([
+        supabase.from("medical_records").select("*").eq("id", editRecordId).single(),
+        supabase.from("foot_assessments").select("*").eq("record_id", editRecordId),
+        supabase.from("record_products").select("*").eq("record_id", editRecordId),
+      ]);
+      if (recRes.error) throw recRes.error;
+      return { record: recRes.data, feet: footRes.data || [], products: prodRes.data || [] };
+    },
+    enabled: !!editRecordId,
+  });
+
+  // Populate form when editing
+  if (existingRecord && !loaded) {
+    const r = existingRecord.record;
+    setForm({
+      client_id: r.client_id, date: r.date,
+      chief_complaint: r.chief_complaint || "", clinical_notes: r.clinical_notes || "",
+      diagnosis: r.diagnosis || "", treatment_performed: r.treatment_performed || "",
+      recommendations: r.recommendations || "",
+    });
+    const left = existingRecord.feet.find((f: any) => f.foot === "left");
+    const right = existingRecord.feet.find((f: any) => f.foot === "right");
+    if (left) setLeftFoot({ nail_condition: left.nail_condition || "", skin_condition: left.skin_condition || "", deformities: left.deformities || "", sensitivity: left.sensitivity || "", circulation: left.circulation || "", pain_level: left.pain_level != null ? String(left.pain_level) : "", observations: left.observations || "" });
+    if (right) setRightFoot({ nail_condition: right.nail_condition || "", skin_condition: right.skin_condition || "", deformities: right.deformities || "", sensitivity: right.sensitivity || "", circulation: right.circulation || "", pain_level: right.pain_level != null ? String(right.pain_level) : "", observations: right.observations || "" });
+    setProducts(existingRecord.products.map((p: any) => ({ product_name: p.product_name, quantity: p.quantity || "", notes: p.notes || "" })));
+    setLoaded(true);
+  }
 
   const resetAll = () => {
     setForm({ client_id: "", date: format(new Date(), "yyyy-MM-dd"), chief_complaint: "", clinical_notes: "", diagnosis: "", treatment_performed: "", recommendations: "" });
-    setLeftFoot({ nail_condition: "", skin_condition: "", deformities: "", sensitivity: "", circulation: "", pain_level: "", observations: "" });
-    setRightFoot({ nail_condition: "", skin_condition: "", deformities: "", sensitivity: "", circulation: "", pain_level: "", observations: "" });
+    setLeftFoot({ ...emptyFoot });
+    setRightFoot({ ...emptyFoot });
     setProducts([]);
     setPhotos([]);
     setTab("clinical");
+    setLoaded(false);
   };
 
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!clinicId || !form.client_id) throw new Error("Selecione um paciente");
 
-      // 1. Create medical record
-      const { data: record, error: recErr } = await supabase
-        .from("medical_records")
-        .insert({
-          clinic_id: clinicId,
-          client_id: form.client_id,
-          professional_id: userId,
-          date: form.date,
-          chief_complaint: form.chief_complaint || null,
-          clinical_notes: form.clinical_notes || null,
-          diagnosis: form.diagnosis || null,
-          treatment_performed: form.treatment_performed || null,
-          recommendations: form.recommendations || null,
-        })
-        .select("id")
-        .single();
-      if (recErr) throw recErr;
+      const recordData = {
+        clinic_id: clinicId,
+        client_id: form.client_id,
+        professional_id: userId,
+        date: form.date,
+        chief_complaint: form.chief_complaint || null,
+        clinical_notes: form.clinical_notes || null,
+        diagnosis: form.diagnosis || null,
+        treatment_performed: form.treatment_performed || null,
+        recommendations: form.recommendations || null,
+      };
 
-      const recordId = record.id;
+      let recordId: string;
 
-      // 2. Foot assessments
+      if (editRecordId) {
+        const { error } = await supabase.from("medical_records").update(recordData).eq("id", editRecordId);
+        if (error) throw error;
+        recordId = editRecordId;
+
+        // Replace foot assessments and products
+        await supabase.from("foot_assessments").delete().eq("record_id", recordId);
+        await supabase.from("record_products").delete().eq("record_id", recordId);
+      } else {
+        const { data: record, error } = await supabase.from("medical_records").insert(recordData).select("id").single();
+        if (error) throw error;
+        recordId = record.id;
+      }
+
+      // Foot assessments
       const footData = [
         { ...leftFoot, foot: "left" as const, record_id: recordId, pain_level: leftFoot.pain_level ? parseInt(leftFoot.pain_level) : null },
         { ...rightFoot, foot: "right" as const, record_id: recordId, pain_level: rightFoot.pain_level ? parseInt(rightFoot.pain_level) : null },
@@ -250,21 +348,16 @@ function CreateRecordDialog({ open, onOpenChange, clients, clinicId, userId }: {
       if (footData.length > 0) {
         const { error: footErr } = await supabase.from("foot_assessments").insert(
           footData.map(f => ({
-            record_id: f.record_id,
-            foot: f.foot,
-            nail_condition: f.nail_condition || null,
-            skin_condition: f.skin_condition || null,
-            deformities: f.deformities || null,
-            sensitivity: f.sensitivity || null,
-            circulation: f.circulation || null,
-            pain_level: f.pain_level,
-            observations: f.observations || null,
+            record_id: f.record_id, foot: f.foot,
+            nail_condition: f.nail_condition || null, skin_condition: f.skin_condition || null,
+            deformities: f.deformities || null, sensitivity: f.sensitivity || null,
+            circulation: f.circulation || null, pain_level: f.pain_level, observations: f.observations || null,
           }))
         );
         if (footErr) throw footErr;
       }
 
-      // 3. Products
+      // Products
       if (products.length > 0) {
         const { error: prodErr } = await supabase.from("record_products").insert(
           products.map(p => ({ record_id: recordId, product_name: p.product_name, quantity: p.quantity || null, notes: p.notes || null }))
@@ -272,24 +365,22 @@ function CreateRecordDialog({ open, onOpenChange, clients, clinicId, userId }: {
         if (prodErr) throw prodErr;
       }
 
-      // 4. Photos
+      // Photos (only new uploads)
       for (const photo of photos) {
         const filePath = `${clinicId}/${recordId}/${Date.now()}_${photo.file.name}`;
         const { error: upErr } = await supabase.storage.from("record-photos").upload(filePath, photo.file);
         if (upErr) throw upErr;
         const { data: urlData } = supabase.storage.from("record-photos").getPublicUrl(filePath);
-        const { error: phErr } = await supabase.from("record_photos").insert({
-          record_id: recordId,
-          photo_url: urlData.publicUrl,
-          description: photo.description || null,
-          photo_type: photo.photo_type,
+        await supabase.from("record_photos").insert({
+          record_id: recordId, photo_url: urlData.publicUrl,
+          description: photo.description || null, photo_type: photo.photo_type,
         });
-        if (phErr) throw phErr;
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["medical-records"] });
-      toast.success("Prontuário salvo com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ["medical-record"] });
+      toast.success(editRecordId ? "Prontuário atualizado!" : "Prontuário salvo com sucesso!");
       onOpenChange(false);
       resetAll();
     },
@@ -355,7 +446,7 @@ function CreateRecordDialog({ open, onOpenChange, clients, clinicId, userId }: {
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <FileText className="w-5 h-5 text-primary" /> Novo Prontuário
+            <FileText className="w-5 h-5 text-primary" /> {editRecordId ? "Editar Prontuário" : "Novo Prontuário"}
           </DialogTitle>
         </DialogHeader>
 
@@ -457,9 +548,7 @@ function CreateRecordDialog({ open, onOpenChange, clients, clinicId, userId }: {
                     </div>
                     <CardContent className="p-2 space-y-1">
                       <Select value={p.photo_type} onValueChange={(v) => { const u = [...photos]; u[i].photo_type = v; setPhotos(u); }}>
-                        <SelectTrigger className="h-7 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
+                        <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="before">Antes</SelectItem>
                           <SelectItem value="during">Durante</SelectItem>
@@ -478,7 +567,7 @@ function CreateRecordDialog({ open, onOpenChange, clients, clinicId, userId }: {
         <div className="flex justify-end gap-3 pt-4">
           <Button variant="outline" onClick={() => { resetAll(); onOpenChange(false); }}>Cancelar</Button>
           <Button className="bg-gradient-primary" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || !form.client_id}>
-            {saveMutation.isPending ? "Salvando..." : "Salvar Prontuário"}
+            {saveMutation.isPending ? "Salvando..." : editRecordId ? "Atualizar Prontuário" : "Salvar Prontuário"}
           </Button>
         </div>
       </DialogContent>
@@ -487,8 +576,8 @@ function CreateRecordDialog({ open, onOpenChange, clients, clinicId, userId }: {
 }
 
 // ===================== VIEW RECORD DIALOG =====================
-function ViewRecordDialog({ recordId, open, onOpenChange, clinicId }: {
-  recordId: string; open: boolean; onOpenChange: (o: boolean) => void; clinicId: string;
+function ViewRecordDialog({ recordId, open, onOpenChange }: {
+  recordId: string; open: boolean; onOpenChange: (o: boolean) => void;
 }) {
   const { data: record } = useQuery({
     queryKey: ["medical-record", recordId],
@@ -496,8 +585,7 @@ function ViewRecordDialog({ recordId, open, onOpenChange, clinicId }: {
       const { data, error } = await supabase
         .from("medical_records")
         .select("*, clients(name, phone, whatsapp), profiles(full_name)")
-        .eq("id", recordId)
-        .single();
+        .eq("id", recordId).single();
       if (error) throw error;
       return data as any;
     },
@@ -570,16 +658,8 @@ function ViewRecordDialog({ recordId, open, onOpenChange, clinicId }: {
         </DialogHeader>
 
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <Calendar className="w-4 h-4" />
-            {format(new Date(record.date), "dd/MM/yyyy", { locale: ptBR })}
-          </span>
-          {record.profiles?.full_name && (
-            <span className="flex items-center gap-1">
-              <User className="w-4 h-4" />
-              {record.profiles.full_name}
-            </span>
-          )}
+          <span className="flex items-center gap-1"><Calendar className="w-4 h-4" />{format(new Date(record.date), "dd/MM/yyyy", { locale: ptBR })}</span>
+          {record.profiles?.full_name && <span className="flex items-center gap-1"><User className="w-4 h-4" />{record.profiles.full_name}</span>}
         </div>
 
         <Tabs defaultValue="clinical">
@@ -591,36 +671,11 @@ function ViewRecordDialog({ recordId, open, onOpenChange, clinicId }: {
           </TabsList>
 
           <TabsContent value="clinical" className="space-y-4 mt-4">
-            {record.chief_complaint && (
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-1">Queixa Principal</p>
-                <p className="text-sm">{record.chief_complaint}</p>
-              </div>
-            )}
-            {record.clinical_notes && (
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-1">Anotações Clínicas</p>
-                <p className="text-sm whitespace-pre-wrap">{record.clinical_notes}</p>
-              </div>
-            )}
-            {record.diagnosis && (
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-1">Diagnóstico</p>
-                <p className="text-sm">{record.diagnosis}</p>
-              </div>
-            )}
-            {record.treatment_performed && (
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-1">Tratamento Realizado</p>
-                <p className="text-sm whitespace-pre-wrap">{record.treatment_performed}</p>
-              </div>
-            )}
-            {record.recommendations && (
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-1">Recomendações</p>
-                <p className="text-sm whitespace-pre-wrap">{record.recommendations}</p>
-              </div>
-            )}
+            {record.chief_complaint && <div><p className="text-xs font-medium text-muted-foreground mb-1">Queixa Principal</p><p className="text-sm">{record.chief_complaint}</p></div>}
+            {record.clinical_notes && <div><p className="text-xs font-medium text-muted-foreground mb-1">Anotações Clínicas</p><p className="text-sm whitespace-pre-wrap">{record.clinical_notes}</p></div>}
+            {record.diagnosis && <div><p className="text-xs font-medium text-muted-foreground mb-1">Diagnóstico</p><p className="text-sm">{record.diagnosis}</p></div>}
+            {record.treatment_performed && <div><p className="text-xs font-medium text-muted-foreground mb-1">Tratamento Realizado</p><p className="text-sm whitespace-pre-wrap">{record.treatment_performed}</p></div>}
+            {record.recommendations && <div><p className="text-xs font-medium text-muted-foreground mb-1">Recomendações</p><p className="text-sm whitespace-pre-wrap">{record.recommendations}</p></div>}
             {!record.chief_complaint && !record.clinical_notes && !record.diagnosis && !record.treatment_performed && !record.recommendations && (
               <p className="text-muted-foreground text-sm">Nenhuma informação clínica registrada.</p>
             )}
@@ -629,14 +684,9 @@ function ViewRecordDialog({ recordId, open, onOpenChange, clinicId }: {
           <TabsContent value="feet" className="space-y-4 mt-4">
             {assessments.length === 0 ? (
               <p className="text-muted-foreground text-sm">Nenhuma avaliação podológica registrada.</p>
-            ) : (
-              assessments.map((a: any) => (
-                <div key={a.id}>
-                  <FootSection assessment={a} label={a.foot === "left" ? "Pé Esquerdo" : "Pé Direito"} />
-                  <Separator className="mt-4" />
-                </div>
-              ))
-            )}
+            ) : assessments.map((a: any) => (
+              <div key={a.id}><FootSection assessment={a} label={a.foot === "left" ? "Pé Esquerdo" : "Pé Direito"} /><Separator className="mt-4" /></div>
+            ))}
           </TabsContent>
 
           <TabsContent value="products" className="mt-4">
@@ -644,20 +694,10 @@ function ViewRecordDialog({ recordId, open, onOpenChange, clinicId }: {
               <p className="text-muted-foreground text-sm">Nenhum produto registrado.</p>
             ) : (
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Produto</TableHead>
-                    <TableHead>Quantidade</TableHead>
-                    <TableHead>Observação</TableHead>
-                  </TableRow>
-                </TableHeader>
+                <TableHeader><TableRow><TableHead>Produto</TableHead><TableHead>Quantidade</TableHead><TableHead>Observação</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {products.map((p: any) => (
-                    <TableRow key={p.id}>
-                      <TableCell className="font-medium">{p.product_name}</TableCell>
-                      <TableCell>{p.quantity || "—"}</TableCell>
-                      <TableCell>{p.notes || "—"}</TableCell>
-                    </TableRow>
+                    <TableRow key={p.id}><TableCell className="font-medium">{p.product_name}</TableCell><TableCell>{p.quantity || "—"}</TableCell><TableCell>{p.notes || "—"}</TableCell></TableRow>
                   ))}
                 </TableBody>
               </Table>
