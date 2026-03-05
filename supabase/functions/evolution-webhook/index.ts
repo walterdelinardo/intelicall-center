@@ -16,7 +16,23 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const payload = await req.json();
+    const body = await req.text();
+    if (!body) {
+      return new Response(
+        JSON.stringify({ success: true, message: 'No body provided' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
+    }
+
+    let payload;
+    try {
+      payload = JSON.parse(body);
+    } catch {
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
     console.log('Evolution webhook received:', JSON.stringify(payload, null, 2));
 
     // N8N will forward Evolution API webhook data
