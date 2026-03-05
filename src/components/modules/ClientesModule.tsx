@@ -7,11 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, Plus, Search, Phone, Mail, Calendar, MessageSquare, Edit, Eye } from "lucide-react";
+import { Users, Plus, Search, Phone, Mail, Calendar, MessageSquare, Edit, Eye, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -39,65 +40,90 @@ interface Client {
   created_at: string;
 }
 
+const emptyForm = {
+  name: "", phone: "", whatsapp: "", email: "", birth_date: "",
+  cpf: "", address: "", city: "", state: "", zip_code: "", notes: "", lead_source: "",
+};
+
 const ClientesModule = () => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [editClient, setEditClient] = useState<Client | null>(null);
+  const [deleteClientId, setDeleteClientId] = useState<string | null>(null);
 
-  // Form state
-  const [form, setForm] = useState({
-    name: "", phone: "", whatsapp: "", email: "", birth_date: "",
-    cpf: "", address: "", city: "", state: "", zip_code: "", notes: "", lead_source: "",
-  });
+  const [form, setForm] = useState({ ...emptyForm });
 
-  const resetForm = () => setForm({
-    name: "", phone: "", whatsapp: "", email: "", birth_date: "",
-    cpf: "", address: "", city: "", state: "", zip_code: "", notes: "", lead_source: "",
-  });
+  const resetForm = () => {
+    setForm({ ...emptyForm });
+    setEditClient(null);
+  };
+
+  const openEdit = (client: Client) => {
+    setEditClient(client);
+    setForm({
+      name: client.name, phone: client.phone || "", whatsapp: client.whatsapp || "",
+      email: client.email || "", birth_date: client.birth_date || "", cpf: client.cpf || "",
+      address: client.address || "", city: client.city || "", state: client.state || "",
+      zip_code: client.zip_code || "", notes: client.notes || "", lead_source: client.lead_source || "",
+    });
+    setIsFormOpen(true);
+  };
 
   const { data: clients = [], isLoading } = useQuery({
     queryKey: ["clients", profile?.clinic_id],
     queryFn: async () => {
       if (!profile?.clinic_id) return [];
       const { data, error } = await supabase
-        .from("clients")
-        .select("*")
-        .eq("clinic_id", profile.clinic_id)
-        .order("name");
+        .from("clients").select("*").eq("clinic_id", profile.clinic_id).order("name");
       if (error) throw error;
       return data as Client[];
     },
     enabled: !!profile?.clinic_id,
   });
 
-  const createMutation = useMutation({
+  const saveMutation = useMutation({
     mutationFn: async () => {
       if (!profile?.clinic_id) throw new Error("Sem clínica");
-      const { error } = await supabase.from("clients").insert({
-        clinic_id: profile.clinic_id,
+      const payload = {
         name: form.name,
-        phone: form.phone || null,
-        whatsapp: form.whatsapp || null,
-        email: form.email || null,
-        birth_date: form.birth_date || null,
-        cpf: form.cpf || null,
-        address: form.address || null,
-        city: form.city || null,
-        state: form.state || null,
-        zip_code: form.zip_code || null,
-        notes: form.notes || null,
+        phone: form.phone || null, whatsapp: form.whatsapp || null,
+        email: form.email || null, birth_date: form.birth_date || null,
+        cpf: form.cpf || null, address: form.address || null,
+        city: form.city || null, state: form.state || null,
+        zip_code: form.zip_code || null, notes: form.notes || null,
         lead_source: form.lead_source || null,
-      });
+      };
+
+      if (editClient) {
+        const { error } = await supabase.from("clients").update(payload).eq("id", editClient.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("clients").insert({ ...payload, clinic_id: profile.clinic_id });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["clients"] });
+      toast.success(editClient ? "Cliente atualizado!" : "Cliente cadastrado com sucesso!");
+      setIsFormOpen(false);
+      resetForm();
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("clients").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clients"] });
-      toast.success("Cliente cadastrado com sucesso!");
-      setIsCreateOpen(false);
-      resetForm();
+      toast.success("Cliente excluído!");
+      setDeleteClientId(null);
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -109,7 +135,6 @@ const ClientesModule = () => {
     c.email?.toLowerCase().includes(search.toLowerCase())
   );
 
-  // Stats
   const today = new Date();
   const currentMonth = today.getMonth();
   const birthdays = clients.filter((c) => {
@@ -158,91 +183,86 @@ const ClientesModule = () => {
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div className="relative w-full sm:w-80">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por nome, telefone, email..."
-            className="pl-10"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          <Input placeholder="Buscar por nome, telefone, email..." className="pl-10" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-gradient-primary gap-2 shadow-card">
-              <Plus className="w-4 h-4" /> Novo Cliente
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Cadastrar Novo Cliente</DialogTitle>
-            </DialogHeader>
-            <form
-              onSubmit={(e) => { e.preventDefault(); createMutation.mutate(); }}
-              className="grid grid-cols-1 sm:grid-cols-2 gap-4"
-            >
-              <div className="space-y-2 sm:col-span-2">
-                <Label>Nome *</Label>
-                <Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Telefone</Label>
-                <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="(11) 9999-9999" />
-              </div>
-              <div className="space-y-2">
-                <Label>WhatsApp</Label>
-                <Input value={form.whatsapp} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} placeholder="(11) 99999-9999" />
-              </div>
-              <div className="space-y-2">
-                <Label>Email</Label>
-                <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Data de Nascimento</Label>
-                <Input type="date" value={form.birth_date} onChange={(e) => setForm({ ...form, birth_date: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label>CPF</Label>
-                <Input value={form.cpf} onChange={(e) => setForm({ ...form, cpf: e.target.value })} placeholder="000.000.000-00" />
-              </div>
-              <div className="space-y-2">
-                <Label>Origem do Lead</Label>
-                <Select value={form.lead_source} onValueChange={(v) => setForm({ ...form, lead_source: v })}>
-                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="indicacao">Indicação</SelectItem>
-                    <SelectItem value="instagram">Instagram</SelectItem>
-                    <SelectItem value="google">Google</SelectItem>
-                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                    <SelectItem value="site">Site</SelectItem>
-                    <SelectItem value="outro">Outro</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label>Endereço</Label>
-                <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Cidade</Label>
-                <Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Estado</Label>
-                <Input value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} maxLength={2} />
-              </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label>Observações</Label>
-                <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={3} />
-              </div>
-              <div className="sm:col-span-2 flex justify-end gap-3">
-                <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>Cancelar</Button>
-                <Button type="submit" className="bg-gradient-primary" disabled={createMutation.isPending}>
-                  {createMutation.isPending ? "Salvando..." : "Salvar Cliente"}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <Button className="bg-gradient-primary gap-2 shadow-card" onClick={() => { resetForm(); setIsFormOpen(true); }}>
+          <Plus className="w-4 h-4" /> Novo Cliente
+        </Button>
       </div>
+
+      {/* Form Dialog (Create + Edit) */}
+      <Dialog open={isFormOpen} onOpenChange={(o) => { if (!o) resetForm(); setIsFormOpen(o); }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editClient ? "Editar Cliente" : "Cadastrar Novo Cliente"}</DialogTitle>
+          </DialogHeader>
+          <form
+            onSubmit={(e) => { e.preventDefault(); saveMutation.mutate(); }}
+            className="grid grid-cols-1 sm:grid-cols-2 gap-4"
+          >
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Nome *</Label>
+              <Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Telefone</Label>
+              <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="(11) 9999-9999" />
+            </div>
+            <div className="space-y-2">
+              <Label>WhatsApp</Label>
+              <Input value={form.whatsapp} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} placeholder="(11) 99999-9999" />
+            </div>
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Data de Nascimento</Label>
+              <Input type="date" value={form.birth_date} onChange={(e) => setForm({ ...form, birth_date: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>CPF</Label>
+              <Input value={form.cpf} onChange={(e) => setForm({ ...form, cpf: e.target.value })} placeholder="000.000.000-00" />
+            </div>
+            <div className="space-y-2">
+              <Label>Origem do Lead</Label>
+              <Select value={form.lead_source} onValueChange={(v) => setForm({ ...form, lead_source: v })}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="indicacao">Indicação</SelectItem>
+                  <SelectItem value="instagram">Instagram</SelectItem>
+                  <SelectItem value="google">Google</SelectItem>
+                  <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                  <SelectItem value="site">Site</SelectItem>
+                  <SelectItem value="outro">Outro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Endereço</Label>
+              <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Cidade</Label>
+              <Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Estado</Label>
+              <Input value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} maxLength={2} />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Observações</Label>
+              <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={3} />
+            </div>
+            <div className="sm:col-span-2 flex justify-end gap-3">
+              <Button type="button" variant="outline" onClick={() => { setIsFormOpen(false); resetForm(); }}>Cancelar</Button>
+              <Button type="submit" className="bg-gradient-primary" disabled={saveMutation.isPending}>
+                {saveMutation.isPending ? "Salvando..." : editClient ? "Atualizar Cliente" : "Salvar Cliente"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Table */}
       <Card className="shadow-card">
@@ -286,11 +306,14 @@ const ClientesModule = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button
-                          size="icon" variant="ghost"
-                          onClick={() => { setSelectedClient(client); setIsDetailsOpen(true); }}
-                        >
+                        <Button size="icon" variant="ghost" onClick={() => { setSelectedClient(client); setIsDetailsOpen(true); }}>
                           <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost" onClick={() => openEdit(client)}>
+                          <Edit className="w-4 h-4 text-primary" />
+                        </Button>
+                        <Button size="icon" variant="ghost" onClick={() => setDeleteClientId(client.id)}>
+                          <Trash2 className="w-4 h-4 text-destructive" />
                         </Button>
                         {client.whatsapp && (
                           <Button size="icon" variant="ghost" asChild>
@@ -311,12 +334,29 @@ const ClientesModule = () => {
 
       {/* Details dialog */}
       {selectedClient && (
-        <ClientDetailsDialog
-          client={selectedClient}
-          open={isDetailsOpen}
-          onOpenChange={setIsDetailsOpen}
-        />
+        <ClientDetailsDialog client={selectedClient} open={isDetailsOpen} onOpenChange={setIsDetailsOpen} />
       )}
+
+      {/* Delete confirmation */}
+      <AlertDialog open={!!deleteClientId} onOpenChange={(o) => !o && setDeleteClientId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Cliente</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este cliente? Esta ação não pode ser desfeita. Todos os prontuários e agendamentos associados também serão removidos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteClientId && deleteMutation.mutate(deleteClientId)}
+            >
+              {deleteMutation.isPending ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
