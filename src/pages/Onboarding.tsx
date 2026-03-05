@@ -27,32 +27,15 @@ const Onboarding = () => {
 
     setIsLoading(true);
     try {
-      // Create the clinic
-      const { data: clinic, error: clinicError } = await supabase
-        .from("clinics")
-        .insert({ name: clinicName, phone: clinicPhone, address: clinicAddress })
-        .select()
-        .single();
+      const { data, error } = await supabase.rpc("setup_clinic", {
+        _clinic_name: clinicName,
+        _clinic_phone: clinicPhone || null,
+        _clinic_address: clinicAddress || null,
+      });
 
-      if (clinicError) throw clinicError;
-
-      // Update profile with clinic_id
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .update({ clinic_id: clinic.id })
-        .eq("id", user.id);
-
-      if (profileError) throw profileError;
-
-      // Create admin role for the user
-      const { error: roleError } = await supabase
-        .from("user_roles")
-        .insert({ user_id: user.id, clinic_id: clinic.id, role: "admin" });
-
-      if (roleError) throw roleError;
+      if (error) throw error;
 
       toast.success("Clínica criada com sucesso!");
-      // Force reload to refresh auth context
       window.location.href = "/dashboard";
     } catch (error: any) {
       toast.error(error.message || "Erro ao criar clínica");

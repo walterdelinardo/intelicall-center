@@ -271,6 +271,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      setup_clinic: {
+        Args: {
+          _clinic_address?: string
+          _clinic_name: string
+          _clinic_phone?: string
+        }
+        Returns: string
+      }
       user_belongs_to_clinic: {
         Args: { _clinic_id: string; _user_id: string }
         Returns: boolean
