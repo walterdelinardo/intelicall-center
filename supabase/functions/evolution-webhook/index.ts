@@ -136,15 +136,16 @@ serve(async (req) => {
         throw msgError;
       }
 
-      // If not from me, increment unread
+      // If not from me, increment unread count directly
       if (!isFromMe) {
-        await supabase.rpc('increment_unread', { _conversation_id: conv.id }).catch(() => {
+        const { error: rpcError } = await supabase.rpc('increment_unread', { _conversation_id: conv.id });
+        if (rpcError) {
           // RPC may not exist yet, just update directly
-          supabase
+          await supabase
             .from('whatsapp_conversations')
-            .update({ unread_count: conv.unread_count ? conv.unread_count + 1 : 1 })
+            .update({ unread_count: (conv.unread_count ?? 0) + 1 })
             .eq('id', conv.id);
-        });
+        }
       }
 
       console.log('Message processed successfully');
