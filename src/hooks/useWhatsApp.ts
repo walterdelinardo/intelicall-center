@@ -46,7 +46,7 @@ export interface WhatsAppMessage {
   created_at: string;
 }
 
-export const useWhatsAppInboxes = () => {
+export const useWhatsAppInboxes = (activeOnly = false) => {
   const [inboxes, setInboxes] = useState<WhatsAppInbox[]>([]);
   const [loading, setLoading] = useState(true);
 
