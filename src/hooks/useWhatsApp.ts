@@ -76,7 +76,25 @@ export const useWhatsAppInboxes = () => {
     return () => { supabase.removeChannel(channel); };
   }, [fetchInboxes]);
 
-  return { inboxes, loading, refetch: fetchInboxes };
+  const createInbox = async (data: { instance_name: string; label: string; phone_number?: string; clinic_id: string }) => {
+    const { error } = await supabase.from('whatsapp_inboxes').insert(data as any);
+    if (error) throw error;
+    await fetchInboxes();
+  };
+
+  const updateInbox = async (id: string, data: { label?: string; instance_name?: string; phone_number?: string; is_active?: boolean }) => {
+    const { error } = await supabase.from('whatsapp_inboxes').update(data as any).eq('id', id);
+    if (error) throw error;
+    await fetchInboxes();
+  };
+
+  const toggleInbox = async (id: string, is_active: boolean) => {
+    const { error } = await supabase.from('whatsapp_inboxes').update({ is_active } as any).eq('id', id);
+    if (error) throw error;
+    await fetchInboxes();
+  };
+
+  return { inboxes, loading, refetch: fetchInboxes, createInbox, updateInbox, toggleInbox };
 };
 
 interface ConversationFilters {
