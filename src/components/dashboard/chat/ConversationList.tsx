@@ -2,6 +2,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Bot, User, Clock, XCircle } from "lucide-react";
 import { format } from "date-fns";
 import { WhatsAppConversation } from "@/hooks/useWhatsApp";
@@ -27,9 +28,17 @@ interface ConversationListProps {
   loading: boolean;
   selectedConvId: string | null;
   onSelect: (id: string) => void;
+  statusFilter: string | null;
+  onStatusFilterChange: (value: string | null) => void;
+  assignedFilter: 'mine' | 'all';
+  onAssignedFilterChange: (value: 'mine' | 'all') => void;
 }
 
-const ConversationList = ({ conversations, loading, selectedConvId, onSelect }: ConversationListProps) => {
+const ConversationList = ({
+  conversations, loading, selectedConvId, onSelect,
+  statusFilter, onStatusFilterChange,
+  assignedFilter, onAssignedFilterChange,
+}: ConversationListProps) => {
   const [search, setSearch] = useState("");
 
   const filtered = conversations.filter(c => {
@@ -43,7 +52,7 @@ const ConversationList = ({ conversations, loading, selectedConvId, onSelect }: 
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-3 border-b">
+      <div className="p-3 border-b space-y-2">
         <div className="relative">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
@@ -52,6 +61,29 @@ const ConversationList = ({ conversations, loading, selectedConvId, onSelect }: 
             onChange={e => setSearch(e.target.value)}
             className="pl-9 h-9"
           />
+        </div>
+        <div className="flex gap-2">
+          <Select value={statusFilter || "todos"} onValueChange={v => onStatusFilterChange(v === "todos" ? null : v)}>
+            <SelectTrigger className="h-7 text-xs flex-1">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              <SelectItem value="bot">Bot</SelectItem>
+              <SelectItem value="humano">Humano</SelectItem>
+              <SelectItem value="aguardando_cliente">Aguardando</SelectItem>
+              <SelectItem value="encerrado">Encerrado</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={assignedFilter} onValueChange={v => onAssignedFilterChange(v as 'mine' | 'all')}>
+            <SelectTrigger className="h-7 text-xs flex-1">
+              <SelectValue placeholder="Atendente" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="mine">Meus</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
       <ScrollArea className="flex-1">

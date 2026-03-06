@@ -69,23 +69,24 @@ export const useWhatsAppInboxes = () => {
 
   useEffect(() => {
     fetchInboxes();
-
     const channel = supabase
       .channel('whatsapp-inboxes')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'whatsapp_inboxes'
-      }, () => fetchInboxes())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_inboxes' }, () => fetchInboxes())
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, [fetchInboxes]);
 
   return { inboxes, loading, refetch: fetchInboxes };
 };
 
-export const useWhatsAppConversations = (inboxId?: string | null) => {
+interface ConversationFilters {
+  inboxId?: string | null;
+  statusFilter?: string | null;
+  assignedToFilter?: 'mine' | 'all';
+}
+
+export const useWhatsAppConversations = (filters: ConversationFilters = {}) => {
+  const { inboxId, statusFilter, assignedToFilter } = filters;
   const [conversations, setConversations] = useState<WhatsAppConversation[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -96,8 +97,11 @@ export const useWhatsAppConversations = (inboxId?: string | null) => {
         .select('*')
         .order('last_message_at', { ascending: false });
 
-      if (inboxId) {
-        query = query.eq('inbox_id', inboxId);
+      if (inboxId) query = query.eq('inbox_id', inboxId);
+      if (statusFilter) query = query.eq('conversation_status', statusFilter);
+      if (assignedToFilter === 'mine') {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) query = query.eq('assigned_to', user.id);
       }
 
       const { data, error } = await query;
@@ -108,22 +112,16 @@ export const useWhatsAppConversations = (inboxId?: string | null) => {
     } finally {
       setLoading(false);
     }
-  }, [inboxId]);
+  }, [inboxId, statusFilter, assignedToFilter]);
 
   useEffect(() => {
     fetchConversations();
-
     const channel = supabase
-      .channel(`whatsapp-conversations-${inboxId || 'all'}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'whatsapp_conversations'
-      }, () => fetchConversations())
+      .channel(`whatsapp-conversations-${inboxId || 'all'}-${statusFilter || 'all'}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_conversations' }, () => fetchConversations())
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
-  }, [fetchConversations, inboxId]);
+  }, [fetchConversations, inboxId, statusFilter]);
 
   return { conversations, loading, refetch: fetchConversations };
 };
@@ -141,7 +139,6 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
         .select('*')
         .eq('conversation_id', conversationId)
         .order('timestamp', { ascending: true });
-
       if (error) throw error;
       setMessages((data as WhatsAppMessage[]) || []);
     } catch (error) {
@@ -153,7 +150,6 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
 
   useEffect(() => {
     fetchMessages();
-
     if (!conversationId) return;
 
     const channel = supabase
@@ -166,6 +162,14 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
       }, (payload) => {
         setMessages(prev => [...prev, payload.new as WhatsAppMessage]);
       })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'whatsapp_messages',
+        filter: `conversation_id=eq.${conversationId}`
+      }, (payload) => {
+        setMessages(prev => prev.map(m => m.id === (payload.new as WhatsAppMessage).id ? payload.new as WhatsAppMessage : m));
+      })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
@@ -177,13 +181,18 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
 export const useSendWhatsAppMessage = () => {
   const [sending, setSending] = useState(false);
 
-  const sendMessage = async (remoteJid: string, message: string, inboxId?: string | null) => {
+  const sendMessage = async (
+    remoteJid: string,
+    message: string,
+    inboxId?: string | null,
+    messageType: string = 'text',
+    mediaUrl?: string | null
+  ) => {
     setSending(true);
     try {
       const { data, error } = await supabase.functions.invoke('send-evolution-message', {
-        body: { remoteJid, message, inboxId },
+        body: { remoteJid, message, inboxId, messageType, mediaUrl },
       });
-
       if (error) throw error;
       return data;
     } catch (error) {
@@ -201,38 +210,26 @@ export const useConversationActions = () => {
   const assumeConversation = async (conversationId: string) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
-
     const { error } = await supabase
       .from('whatsapp_conversations')
-      .update({
-        conversation_status: 'humano',
-        assigned_to: user.id,
-      } as any)
+      .update({ conversation_status: 'humano', assigned_to: user.id } as any)
       .eq('id', conversationId);
-
     if (error) throw error;
   };
 
   const returnToBot = async (conversationId: string) => {
     const { error } = await supabase
       .from('whatsapp_conversations')
-      .update({
-        conversation_status: 'bot',
-        assigned_to: null,
-      } as any)
+      .update({ conversation_status: 'bot', assigned_to: null } as any)
       .eq('id', conversationId);
-
     if (error) throw error;
   };
 
   const closeConversation = async (conversationId: string) => {
     const { error } = await supabase
       .from('whatsapp_conversations')
-      .update({
-        conversation_status: 'encerrado',
-      } as any)
+      .update({ conversation_status: 'encerrado' } as any)
       .eq('id', conversationId);
-
     if (error) throw error;
   };
 
@@ -241,7 +238,6 @@ export const useConversationActions = () => {
       .from('whatsapp_conversations')
       .update({ unread_count: 0 } as any)
       .eq('id', conversationId);
-
     if (error) throw error;
   };
 

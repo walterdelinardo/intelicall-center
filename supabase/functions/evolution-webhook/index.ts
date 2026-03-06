@@ -116,9 +116,10 @@ serve(async (req) => {
       const contactName = data.pushName || data.senderName || contactPhone;
       const isGroup = remoteJid.includes('@g.us');
 
-      // Build upsert object
+      // Build upsert object — inbox_id is always included
       const convData: Record<string, any> = {
         clinic_id,
+        inbox_id: inboxId,
         remote_jid: remoteJid,
         contact_name: contactName,
         contact_phone: contactPhone,
@@ -127,14 +128,15 @@ serve(async (req) => {
         last_message_at: new Date().toISOString(),
         status: 'active',
       };
-      if (inboxId) {
-        convData.inbox_id = inboxId;
-      }
 
-      // Upsert conversation
+      // Upsert conversation using inbox-aware constraint
+      const onConflictKey = inboxId
+        ? 'clinic_id,inbox_id,remote_jid'
+        : 'clinic_id,remote_jid';
+
       const { data: conv, error: convError } = await supabase
         .from('whatsapp_conversations')
-        .upsert(convData, { onConflict: 'clinic_id,remote_jid' })
+        .upsert(convData, { onConflict: onConflictKey })
         .select('id, unread_count')
         .single();
 
