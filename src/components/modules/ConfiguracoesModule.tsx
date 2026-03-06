@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Settings, Building2, Clock, Phone, MapPin, Mail, Save, Loader2, Smartphone, Plus, Power, Plug } from "lucide-react";
+import { Settings, Building2, Clock, Phone, MapPin, Mail, Save, Loader2, Smartphone, Plus, Power, Plug, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useWhatsAppInboxes } from "@/hooks/useWhatsApp";
 
@@ -45,7 +45,7 @@ const ConfiguracoesModule = () => {
   const { profile, hasRole } = useAuth();
   const queryClient = useQueryClient();
   const isAdmin = hasRole("admin");
-  const { inboxes, loading: inboxesLoading, createInbox, toggleInbox } = useWhatsAppInboxes();
+  const { inboxes, loading: inboxesLoading, createInbox, toggleInbox, deleteInbox } = useWhatsAppInboxes();
 
   const [showAddInbox, setShowAddInbox] = useState(false);
   const [newLabel, setNewLabel] = useState("");
@@ -424,21 +424,40 @@ const ConfiguracoesModule = () => {
                               </Badge>
                             </TableCell>
                             <TableCell>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={async () => {
-                                  try {
-                                    await toggleInbox(inbox.id, !inbox.is_active);
-                                    toast.success(inbox.is_active ? "Instância desativada" : "Instância ativada");
-                                  } catch (error: any) {
-                                    toast.error("Erro: " + error.message);
-                                  }
-                                }}
-                                title={inbox.is_active ? "Desativar" : "Ativar"}
-                              >
-                                <Power className="w-4 h-4" />
-                              </Button>
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={async () => {
+                                    try {
+                                      await toggleInbox(inbox.id, !inbox.is_active);
+                                      toast.success(inbox.is_active ? "Instância desativada" : "Instância ativada");
+                                    } catch (error: any) {
+                                      toast.error("Erro: " + error.message);
+                                    }
+                                  }}
+                                  title={inbox.is_active ? "Desativar" : "Ativar"}
+                                >
+                                  <Power className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-destructive hover:text-destructive"
+                                  onClick={async () => {
+                                    if (!confirm(`Excluir a instância "${inbox.label}"?`)) return;
+                                    try {
+                                      await deleteInbox(inbox.id);
+                                      toast.success("Instância excluída");
+                                    } catch (error: any) {
+                                      toast.error("Erro: " + error.message);
+                                    }
+                                  }}
+                                  title="Excluir"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}

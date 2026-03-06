@@ -96,7 +96,13 @@ export const useWhatsAppInboxes = (activeOnly = false) => {
     await fetchInboxes();
   };
 
-  return { inboxes, loading, refetch: fetchInboxes, createInbox, updateInbox, toggleInbox };
+  const deleteInbox = async (id: string) => {
+    const { error } = await supabase.from('whatsapp_inboxes').delete().eq('id', id);
+    if (error) throw error;
+    await fetchInboxes();
+  };
+
+  return { inboxes, loading, refetch: fetchInboxes, createInbox, updateInbox, toggleInbox, deleteInbox };
 };
 
 interface ConversationFilters {
