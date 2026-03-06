@@ -925,12 +925,15 @@ export type Database = {
       }
       whatsapp_conversations: {
         Row: {
+          assigned_to: string | null
           clinic_id: string
           contact_name: string | null
           contact_phone: string | null
           contact_photo_url: string | null
+          conversation_status: string
           created_at: string | null
           id: string
+          inbox_id: string | null
           is_group: boolean | null
           last_message: string | null
           last_message_at: string | null
@@ -940,12 +943,15 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          assigned_to?: string | null
           clinic_id: string
           contact_name?: string | null
           contact_phone?: string | null
           contact_photo_url?: string | null
+          conversation_status?: string
           created_at?: string | null
           id?: string
+          inbox_id?: string | null
           is_group?: boolean | null
           last_message?: string | null
           last_message_at?: string | null
@@ -955,12 +961,15 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          assigned_to?: string | null
           clinic_id?: string
           contact_name?: string | null
           contact_phone?: string | null
           contact_photo_url?: string | null
+          conversation_status?: string
           created_at?: string | null
           id?: string
+          inbox_id?: string | null
           is_group?: boolean | null
           last_message?: string | null
           last_message_at?: string | null
@@ -972,6 +981,54 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "whatsapp_conversations_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_conversations_inbox_id_fkey"
+            columns: ["inbox_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_inboxes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_inboxes: {
+        Row: {
+          clinic_id: string
+          created_at: string
+          id: string
+          instance_name: string
+          is_active: boolean
+          label: string
+          phone_number: string | null
+          updated_at: string
+        }
+        Insert: {
+          clinic_id: string
+          created_at?: string
+          id?: string
+          instance_name: string
+          is_active?: boolean
+          label?: string
+          phone_number?: string | null
+          updated_at?: string
+        }
+        Update: {
+          clinic_id?: string
+          created_at?: string
+          id?: string
+          instance_name?: string
+          is_active?: boolean
+          label?: string
+          phone_number?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_inboxes_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "clinics"
