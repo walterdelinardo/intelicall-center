@@ -182,6 +182,9 @@ const ConfiguracoesModule = () => {
           <TabsTrigger value="hours" className="gap-2">
             <Clock className="w-4 h-4" /> Horários
           </TabsTrigger>
+          <TabsTrigger value="integrations" className="gap-2">
+            <Plug className="w-4 h-4" /> Integrações
+          </TabsTrigger>
         </TabsList>
 
         {/* General Info Tab */}
