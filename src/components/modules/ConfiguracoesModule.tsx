@@ -45,6 +45,13 @@ const ConfiguracoesModule = () => {
   const { profile, hasRole } = useAuth();
   const queryClient = useQueryClient();
   const isAdmin = hasRole("admin");
+  const { inboxes, loading: inboxesLoading, createInbox, toggleInbox } = useWhatsAppInboxes();
+
+  const [showAddInbox, setShowAddInbox] = useState(false);
+  const [newLabel, setNewLabel] = useState("");
+  const [newInstanceName, setNewInstanceName] = useState("");
+  const [newPhone, setNewPhone] = useState("");
+  const [savingInbox, setSavingInbox] = useState(false);
 
   const { data: clinic, isLoading } = useQuery({
     queryKey: ["clinic", profile?.clinic_id],
