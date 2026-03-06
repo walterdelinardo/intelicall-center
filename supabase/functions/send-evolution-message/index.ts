@@ -6,6 +6,47 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
+async function findOrCreateConversation(
+  supabase: any,
+  clinicId: string,
+  inboxId: string | null,
+  remoteJid: string,
+  updateData: Record<string, any>
+) {
+  let query = supabase
+    .from('whatsapp_conversations')
+    .select('id, unread_count')
+    .eq('clinic_id', clinicId)
+    .eq('remote_jid', remoteJid);
+
+  if (inboxId) {
+    query = query.eq('inbox_id', inboxId);
+  } else {
+    query = query.is('inbox_id', null);
+  }
+
+  const { data: existing } = await query.maybeSingle();
+
+  if (existing) {
+    const { data: updated, error } = await supabase
+      .from('whatsapp_conversations')
+      .update(updateData)
+      .eq('id', existing.id)
+      .select('id, unread_count')
+      .single();
+    if (error) throw error;
+    return updated;
+  } else {
+    const { data: created, error } = await supabase
+      .from('whatsapp_conversations')
+      .insert({ clinic_id: clinicId, inbox_id: inboxId, remote_jid: remoteJid, ...updateData })
+      .select('id, unread_count')
+      .single();
+    if (error) throw error;
+    return created;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -33,15 +74,14 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } }
     });
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    const userId = claimsData.claims.sub as string;
+    const userId = user.id;
 
     const { remoteJid, message, messageType = 'text', mediaUrl, inboxId } = await req.json();
 
@@ -117,7 +157,16 @@ serve(async (req) => {
       body: JSON.stringify(body),
     });
 
-    const result = await response.json();
+    // Safe JSON parsing — handle HTML error responses
+    const contentType = response.headers.get('content-type') || '';
+    let result: any;
+    if (contentType.includes('application/json')) {
+      result = await response.json();
+    } else {
+      const text = await response.text();
+      console.error('Evolution API returned non-JSON:', text.substring(0, 500));
+      throw new Error(`Evolution API returned non-JSON response [${response.status}]: ${text.substring(0, 200)}`);
+    }
 
     if (!response.ok) {
       console.error('Evolution API error:', result);
@@ -126,7 +175,7 @@ serve(async (req) => {
 
     console.log('Message sent successfully:', result);
 
-    // Store sent message in DB
+    // Store sent message in DB using select+insert/update
     const { data: profile } = await supabaseService
       .from('profiles')
       .select('clinic_id')
@@ -134,26 +183,12 @@ serve(async (req) => {
       .single();
 
     if (profile?.clinic_id) {
-      // Build conversation upsert — always include inbox_id
-      const convData: Record<string, any> = {
-        clinic_id: profile.clinic_id,
-        inbox_id: inboxId || null,
-        remote_jid: remoteJid,
+      const conv = await findOrCreateConversation(supabaseService, profile.clinic_id, inboxId || null, remoteJid, {
         last_message: message,
         last_message_at: new Date().toISOString(),
         unread_count: 0,
         status: 'active',
-      };
-
-      const onConflictKey = inboxId
-        ? 'clinic_id,inbox_id,remote_jid'
-        : 'clinic_id,remote_jid';
-
-      const { data: conv } = await supabaseService
-        .from('whatsapp_conversations')
-        .upsert(convData, { onConflict: onConflictKey })
-        .select('id')
-        .single();
+      });
 
       if (conv) {
         await supabaseService
