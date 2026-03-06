@@ -59,6 +59,7 @@ export const useWhatsAppInboxes = (activeOnly = false) => {
 
       if (activeOnly) query = query.eq('is_active', true);
 
+      const { data, error } = await query;
       if (error) throw error;
       setInboxes((data as WhatsAppInbox[]) || []);
     } catch (error) {
