@@ -11,3 +11,9 @@ verify_jwt = false
 
 [functions.chatwoot-webhook]
 verify_jwt = false
+
+[functions.send-evolution-message]
+verify_jwt = false
+
+[functions.evolution-webhook]
+verify_jwt = false
