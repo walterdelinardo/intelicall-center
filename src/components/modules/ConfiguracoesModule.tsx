@@ -8,8 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, Building2, Clock, Phone, MapPin, Mail, Save, Loader2 } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Settings, Building2, Clock, Phone, MapPin, Mail, Save, Loader2, Smartphone, Plus, Power, Plug } from "lucide-react";
 import { toast } from "sonner";
+import { useWhatsAppInboxes } from "@/hooks/useWhatsApp";
 
 const DAYS = [
   { key: "mon", label: "Segunda-feira" },
