@@ -52,11 +52,12 @@ export const useWhatsAppInboxes = (activeOnly = false) => {
 
   const fetchInboxes = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('whatsapp_inboxes')
         .select('*')
-        .eq('is_active', true)
         .order('label');
+
+      if (activeOnly) query = query.eq('is_active', true);
 
       if (error) throw error;
       setInboxes((data as WhatsAppInbox[]) || []);
