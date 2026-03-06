@@ -14,9 +14,8 @@ serve(async (req) => {
   try {
     const evolutionUrl = Deno.env.get('EVOLUTION_API_URL');
     const evolutionKey = Deno.env.get('EVOLUTION_API_KEY');
-    const instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME');
 
-    if (!evolutionUrl || !evolutionKey || !instanceName) {
+    if (!evolutionUrl || !evolutionKey) {
       throw new Error('Evolution API credentials not configured');
     }
 
@@ -28,13 +27,13 @@ serve(async (req) => {
       });
     }
 
-    const token = authHeader.replace('Bearer ', '');
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } }
     });
 
+    const token = authHeader.replace('Bearer ', '');
     const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
     if (claimsError || !claimsData?.claims) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -42,10 +41,9 @@ serve(async (req) => {
       });
     }
 
-    const userId = claimsData.claims.sub;
-    const user = { id: userId };
+    const userId = claimsData.claims.sub as string;
 
-    const { remoteJid, message, messageType = 'text', mediaUrl } = await req.json();
+    const { remoteJid, message, messageType = 'text', mediaUrl, inboxId } = await req.json();
 
     if (!remoteJid || !message) {
       return new Response(
@@ -54,7 +52,30 @@ serve(async (req) => {
       );
     }
 
-    // Send message via Evolution API v3
+    // Determine instance name: from inbox or fallback to env
+    let instanceName = Deno.env.get('EVOLUTION_INSTANCE_NAME') || '';
+
+    const supabaseService = createClient(
+      supabaseUrl,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
+
+    if (inboxId) {
+      const { data: inbox } = await supabaseService
+        .from('whatsapp_inboxes')
+        .select('instance_name')
+        .eq('id', inboxId)
+        .single();
+      if (inbox) {
+        instanceName = inbox.instance_name;
+      }
+    }
+
+    if (!instanceName) {
+      throw new Error('No Evolution instance configured');
+    }
+
+    // Send message via Evolution API
     let endpoint = `${evolutionUrl}/message/sendText/${instanceName}`;
     let body: any = {
       number: remoteJid.replace('@s.whatsapp.net', ''),
@@ -68,6 +89,20 @@ serve(async (req) => {
         mediatype: 'image',
         media: mediaUrl,
         caption: message,
+      };
+    } else if (messageType === 'document' && mediaUrl) {
+      endpoint = `${evolutionUrl}/message/sendMedia/${instanceName}`;
+      body = {
+        number: remoteJid.replace('@s.whatsapp.net', ''),
+        mediatype: 'document',
+        media: mediaUrl,
+        caption: message,
+      };
+    } else if (messageType === 'audio' && mediaUrl) {
+      endpoint = `${evolutionUrl}/message/sendWhatsAppAudio/${instanceName}`;
+      body = {
+        number: remoteJid.replace('@s.whatsapp.net', ''),
+        audio: mediaUrl,
       };
     }
 
@@ -91,13 +126,7 @@ serve(async (req) => {
 
     console.log('Message sent successfully:', result);
 
-    // Store sent message in DB using service role
-    const supabaseService = createClient(
-      supabaseUrl,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
-
-    const userId = user.id;
+    // Store sent message in DB
     const { data: profile } = await supabaseService
       .from('profiles')
       .select('clinic_id')
@@ -105,17 +134,22 @@ serve(async (req) => {
       .single();
 
     if (profile?.clinic_id) {
-      // Find or create conversation
+      // Build conversation upsert
+      const convData: Record<string, any> = {
+        clinic_id: profile.clinic_id,
+        remote_jid: remoteJid,
+        last_message: message,
+        last_message_at: new Date().toISOString(),
+        unread_count: 0,
+        status: 'active',
+      };
+      if (inboxId) {
+        convData.inbox_id = inboxId;
+      }
+
       const { data: conv } = await supabaseService
         .from('whatsapp_conversations')
-        .upsert({
-          clinic_id: profile.clinic_id,
-          remote_jid: remoteJid,
-          last_message: message,
-          last_message_at: new Date().toISOString(),
-          unread_count: 0,
-          status: 'active',
-        }, { onConflict: 'clinic_id,remote_jid' })
+        .upsert(convData, { onConflict: 'clinic_id,remote_jid' })
         .select('id')
         .single();
 

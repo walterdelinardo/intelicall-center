@@ -1,0 +1,113 @@
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Search, Bot, User, Clock, XCircle } from "lucide-react";
+import { format } from "date-fns";
+import { WhatsAppConversation } from "@/hooks/useWhatsApp";
+import { useState } from "react";
+
+const StatusIndicator = ({ status }: { status: string }) => {
+  const config: Record<string, { icon: React.ReactNode; color: string; label: string }> = {
+    bot: { icon: <Bot className="w-3 h-3" />, color: "bg-blue-500", label: "Bot" },
+    humano: { icon: <User className="w-3 h-3" />, color: "bg-emerald-500", label: "Humano" },
+    aguardando_cliente: { icon: <Clock className="w-3 h-3" />, color: "bg-amber-500", label: "Aguardando" },
+    encerrado: { icon: <XCircle className="w-3 h-3" />, color: "bg-muted-foreground", label: "Encerrado" },
+  };
+  const c = config[status] || config.bot;
+  return (
+    <span className={`inline-flex items-center gap-1 text-[10px] text-white px-1.5 py-0.5 rounded-full ${c.color}`}>
+      {c.icon} {c.label}
+    </span>
+  );
+};
+
+interface ConversationListProps {
+  conversations: WhatsAppConversation[];
+  loading: boolean;
+  selectedConvId: string | null;
+  onSelect: (id: string) => void;
+}
+
+const ConversationList = ({ conversations, loading, selectedConvId, onSelect }: ConversationListProps) => {
+  const [search, setSearch] = useState("");
+
+  const filtered = conversations.filter(c => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return (
+      (c.contact_name || '').toLowerCase().includes(q) ||
+      (c.contact_phone || '').toLowerCase().includes(q)
+    );
+  });
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="p-3 border-b">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar conversa..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="pl-9 h-9"
+          />
+        </div>
+      </div>
+      <ScrollArea className="flex-1">
+        {loading ? (
+          <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">Carregando...</div>
+        ) : filtered.length === 0 ? (
+          <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">
+            {search ? 'Nenhum resultado' : 'Nenhuma conversa'}
+          </div>
+        ) : (
+          <div className="divide-y">
+            {filtered.map(conv => (
+              <button
+                key={conv.id}
+                onClick={() => onSelect(conv.id)}
+                className={`w-full p-3 text-left transition-colors hover:bg-accent/50 ${
+                  selectedConvId === conv.id ? "bg-accent" : ""
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <Avatar className="w-10 h-10 shrink-0">
+                    <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                      {(conv.contact_name || conv.contact_phone || '?')[0].toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="font-medium text-sm truncate">
+                        {conv.contact_name || conv.contact_phone || 'Desconhecido'}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground shrink-0 ml-2">
+                        {conv.last_message_at ? format(new Date(conv.last_message_at), 'HH:mm') : ''}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-1">
+                      <p className="text-xs text-muted-foreground truncate flex-1">
+                        {conv.last_message || 'Sem mensagens'}
+                      </p>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <StatusIndicator status={conv.conversation_status} />
+                        {conv.unread_count > 0 && (
+                          <Badge className="bg-primary text-primary-foreground text-[10px] px-1.5 py-0 min-w-[18px] h-[18px] flex items-center justify-center rounded-full">
+                            {conv.unread_count}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </ScrollArea>
+    </div>
+  );
+};
+
+export default ConversationList;

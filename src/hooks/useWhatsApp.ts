@@ -1,9 +1,21 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
+export interface WhatsAppInbox {
+  id: string;
+  clinic_id: string;
+  instance_name: string;
+  phone_number: string | null;
+  label: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface WhatsAppConversation {
   id: string;
   clinic_id: string;
+  inbox_id: string | null;
   remote_jid: string;
   contact_name: string | null;
   contact_phone: string | null;
@@ -13,6 +25,8 @@ export interface WhatsAppConversation {
   last_message_at: string | null;
   unread_count: number;
   status: string;
+  conversation_status: string;
+  assigned_to: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -32,17 +46,61 @@ export interface WhatsAppMessage {
   created_at: string;
 }
 
-export const useWhatsAppConversations = () => {
+export const useWhatsAppInboxes = () => {
+  const [inboxes, setInboxes] = useState<WhatsAppInbox[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchInboxes = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('whatsapp_inboxes')
+        .select('*')
+        .eq('is_active', true)
+        .order('label');
+
+      if (error) throw error;
+      setInboxes((data as WhatsAppInbox[]) || []);
+    } catch (error) {
+      console.error('Error fetching inboxes:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchInboxes();
+
+    const channel = supabase
+      .channel('whatsapp-inboxes')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'whatsapp_inboxes'
+      }, () => fetchInboxes())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [fetchInboxes]);
+
+  return { inboxes, loading, refetch: fetchInboxes };
+};
+
+export const useWhatsAppConversations = (inboxId?: string | null) => {
   const [conversations, setConversations] = useState<WhatsAppConversation[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchConversations = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('whatsapp_conversations')
         .select('*')
         .order('last_message_at', { ascending: false });
 
+      if (inboxId) {
+        query = query.eq('inbox_id', inboxId);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       setConversations((data as WhatsAppConversation[]) || []);
     } catch (error) {
@@ -50,24 +108,22 @@ export const useWhatsAppConversations = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [inboxId]);
 
   useEffect(() => {
     fetchConversations();
 
     const channel = supabase
-      .channel('whatsapp-conversations')
+      .channel(`whatsapp-conversations-${inboxId || 'all'}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'whatsapp_conversations'
-      }, () => {
-        fetchConversations();
-      })
+      }, () => fetchConversations())
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [fetchConversations]);
+  }, [fetchConversations, inboxId]);
 
   return { conversations, loading, refetch: fetchConversations };
 };
@@ -121,11 +177,11 @@ export const useWhatsAppMessages = (conversationId: string | null) => {
 export const useSendWhatsAppMessage = () => {
   const [sending, setSending] = useState(false);
 
-  const sendMessage = async (remoteJid: string, message: string) => {
+  const sendMessage = async (remoteJid: string, message: string, inboxId?: string | null) => {
     setSending(true);
     try {
       const { data, error } = await supabase.functions.invoke('send-evolution-message', {
-        body: { remoteJid, message },
+        body: { remoteJid, message, inboxId },
       });
 
       if (error) throw error;
@@ -139,4 +195,55 @@ export const useSendWhatsAppMessage = () => {
   };
 
   return { sendMessage, sending };
+};
+
+export const useConversationActions = () => {
+  const assumeConversation = async (conversationId: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const { error } = await supabase
+      .from('whatsapp_conversations')
+      .update({
+        conversation_status: 'humano',
+        assigned_to: user.id,
+      } as any)
+      .eq('id', conversationId);
+
+    if (error) throw error;
+  };
+
+  const returnToBot = async (conversationId: string) => {
+    const { error } = await supabase
+      .from('whatsapp_conversations')
+      .update({
+        conversation_status: 'bot',
+        assigned_to: null,
+      } as any)
+      .eq('id', conversationId);
+
+    if (error) throw error;
+  };
+
+  const closeConversation = async (conversationId: string) => {
+    const { error } = await supabase
+      .from('whatsapp_conversations')
+      .update({
+        conversation_status: 'encerrado',
+      } as any)
+      .eq('id', conversationId);
+
+    if (error) throw error;
+  };
+
+  const markAsRead = async (conversationId: string) => {
+    const { error } = await supabase
+      .from('whatsapp_conversations')
+      .update({ unread_count: 0 } as any)
+      .eq('id', conversationId);
+
+    if (error) throw error;
+  };
+
+  return { assumeConversation, returnToBot, closeConversation, markAsRead };
 };
