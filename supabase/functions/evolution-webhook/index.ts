@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 serve(async (req) => {
@@ -35,10 +35,7 @@ serve(async (req) => {
     }
     console.log('Evolution webhook received:', JSON.stringify(payload, null, 2));
 
-    // N8N will forward Evolution API webhook data
-    // Expected payload format from N8N:
-    // { clinic_id, event, data: { ... } }
-    const { clinic_id, event, data } = payload;
+    const { clinic_id, instance_name, event, data } = payload;
 
     if (!clinic_id) {
       return new Response(
@@ -47,12 +44,40 @@ serve(async (req) => {
       );
     }
 
+    // Resolve inbox_id from instance_name + clinic_id
+    let inboxId: string | null = null;
+    if (instance_name) {
+      const { data: inbox } = await supabase
+        .from('whatsapp_inboxes')
+        .select('id')
+        .eq('clinic_id', clinic_id)
+        .eq('instance_name', instance_name)
+        .eq('is_active', true)
+        .single();
+
+      if (inbox) {
+        inboxId = inbox.id;
+      } else {
+        // Auto-create inbox for this instance
+        const { data: newInbox } = await supabase
+          .from('whatsapp_inboxes')
+          .insert({
+            clinic_id,
+            instance_name,
+            label: instance_name,
+          })
+          .select('id')
+          .single();
+        inboxId = newInbox?.id || null;
+      }
+    }
+
     // Handle incoming message
     if (event === 'messages.upsert' || event === 'message') {
       const remoteJid = data.key?.remoteJid || data.remoteJid || '';
       const isFromMe = data.key?.fromMe || data.fromMe || false;
       const messageId = data.key?.id || data.messageId || crypto.randomUUID();
-      
+
       // Extract message content
       let content = '';
       let messageType = 'text';
@@ -91,21 +116,26 @@ serve(async (req) => {
       const contactName = data.pushName || data.senderName || contactPhone;
       const isGroup = remoteJid.includes('@g.us');
 
+      // Build upsert object
+      const convData: Record<string, any> = {
+        clinic_id,
+        remote_jid: remoteJid,
+        contact_name: contactName,
+        contact_phone: contactPhone,
+        is_group: isGroup,
+        last_message: content,
+        last_message_at: new Date().toISOString(),
+        status: 'active',
+      };
+      if (inboxId) {
+        convData.inbox_id = inboxId;
+      }
+
       // Upsert conversation
       const { data: conv, error: convError } = await supabase
         .from('whatsapp_conversations')
-        .upsert({
-          clinic_id,
-          remote_jid: remoteJid,
-          contact_name: contactName,
-          contact_phone: contactPhone,
-          is_group: isGroup,
-          last_message: content,
-          last_message_at: new Date().toISOString(),
-          unread_count: isFromMe ? 0 : 1,
-          status: 'active',
-        }, { onConflict: 'clinic_id,remote_jid' })
-        .select('id')
+        .upsert(convData, { onConflict: 'clinic_id,remote_jid' })
+        .select('id, unread_count')
         .single();
 
       if (convError) {
@@ -136,19 +166,15 @@ serve(async (req) => {
         throw msgError;
       }
 
-      // If not from me, increment unread count directly
+      // If not from me, increment unread count
       if (!isFromMe) {
-        const { error: rpcError } = await supabase.rpc('increment_unread', { _conversation_id: conv.id });
-        if (rpcError) {
-          // RPC may not exist yet, just update directly
-          await supabase
-            .from('whatsapp_conversations')
-            .update({ unread_count: (conv.unread_count ?? 0) + 1 })
-            .eq('id', conv.id);
-        }
+        await supabase
+          .from('whatsapp_conversations')
+          .update({ unread_count: (conv.unread_count ?? 0) + 1 })
+          .eq('id', conv.id);
       }
 
-      console.log('Message processed successfully');
+      console.log('Message processed successfully for inbox:', inboxId);
     }
 
     // Handle status updates
