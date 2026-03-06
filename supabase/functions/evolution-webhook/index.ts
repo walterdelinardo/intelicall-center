@@ -6,6 +6,79 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
+async function findOrCreateConversation(
+  supabase: any,
+  clinicId: string,
+  inboxId: string | null,
+  remoteJid: string,
+  updateData: Record<string, any>
+) {
+  // Build query to find existing conversation
+  let query = supabase
+    .from('whatsapp_conversations')
+    .select('id, unread_count')
+    .eq('clinic_id', clinicId)
+    .eq('remote_jid', remoteJid);
+
+  if (inboxId) {
+    query = query.eq('inbox_id', inboxId);
+  } else {
+    query = query.is('inbox_id', null);
+  }
+
+  const { data: existing } = await query.maybeSingle();
+
+  if (existing) {
+    // UPDATE existing conversation
+    const { data: updated, error } = await supabase
+      .from('whatsapp_conversations')
+      .update(updateData)
+      .eq('id', existing.id)
+      .select('id, unread_count')
+      .single();
+
+    if (error) throw error;
+    return updated;
+  } else {
+    // INSERT new conversation
+    const insertData = {
+      clinic_id: clinicId,
+      inbox_id: inboxId,
+      remote_jid: remoteJid,
+      ...updateData,
+    };
+    const { data: created, error } = await supabase
+      .from('whatsapp_conversations')
+      .insert(insertData)
+      .select('id, unread_count')
+      .single();
+
+    if (error) throw error;
+    return created;
+  }
+}
+
+async function upsertMessage(supabase: any, messageData: Record<string, any>) {
+  const { data: existing } = await supabase
+    .from('whatsapp_messages')
+    .select('id')
+    .eq('message_id', messageData.message_id)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await supabase
+      .from('whatsapp_messages')
+      .update(messageData)
+      .eq('id', existing.id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from('whatsapp_messages')
+      .insert(messageData);
+    if (error) throw error;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -116,57 +189,31 @@ serve(async (req) => {
       const contactName = data.pushName || data.senderName || contactPhone;
       const isGroup = remoteJid.includes('@g.us');
 
-      // Build upsert object — inbox_id is always included
-      const convData: Record<string, any> = {
-        clinic_id,
-        inbox_id: inboxId,
-        remote_jid: remoteJid,
+      // Find or create conversation (no upsert)
+      const conv = await findOrCreateConversation(supabase, clinic_id, inboxId, remoteJid, {
         contact_name: contactName,
         contact_phone: contactPhone,
         is_group: isGroup,
         last_message: content,
         last_message_at: new Date().toISOString(),
         status: 'active',
-      };
+      });
 
-      // Upsert conversation using inbox-aware constraint
-      const onConflictKey = inboxId
-        ? 'clinic_id,inbox_id,remote_jid'
-        : 'clinic_id,remote_jid';
-
-      const { data: conv, error: convError } = await supabase
-        .from('whatsapp_conversations')
-        .upsert(convData, { onConflict: onConflictKey })
-        .select('id, unread_count')
-        .single();
-
-      if (convError) {
-        console.error('Error upserting conversation:', convError);
-        throw convError;
-      }
-
-      // Insert message
-      const { error: msgError } = await supabase
-        .from('whatsapp_messages')
-        .upsert({
-          conversation_id: conv.id,
-          message_id: messageId,
-          content,
-          message_type: messageType,
-          is_from_me: isFromMe,
-          sender_name: contactName,
-          media_url: mediaUrl,
-          media_type: mediaType,
-          status: isFromMe ? 'sent' : 'received',
-          timestamp: data.messageTimestamp
-            ? new Date(Number(data.messageTimestamp) * 1000).toISOString()
-            : new Date().toISOString(),
-        }, { onConflict: 'message_id' });
-
-      if (msgError) {
-        console.error('Error upserting message:', msgError);
-        throw msgError;
-      }
+      // Insert or update message (no upsert)
+      await upsertMessage(supabase, {
+        conversation_id: conv.id,
+        message_id: messageId,
+        content,
+        message_type: messageType,
+        is_from_me: isFromMe,
+        sender_name: contactName,
+        media_url: mediaUrl,
+        media_type: mediaType,
+        status: isFromMe ? 'sent' : 'received',
+        timestamp: data.messageTimestamp
+          ? new Date(Number(data.messageTimestamp) * 1000).toISOString()
+          : new Date().toISOString(),
+      });
 
       // If not from me, increment unread count
       if (!isFromMe) {
