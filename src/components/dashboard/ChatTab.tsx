@@ -9,7 +9,13 @@ import ChatArea from "./chat/ChatArea";
 const ChatTab = () => {
   const { inboxes, loading: inboxesLoading } = useWhatsAppInboxes();
   const [selectedInboxId, setSelectedInboxId] = useState<string | null>(null);
-  const { conversations, loading: convsLoading } = useWhatsAppConversations(selectedInboxId);
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [assignedFilter, setAssignedFilter] = useState<'mine' | 'all'>('all');
+  const { conversations, loading: convsLoading } = useWhatsAppConversations({
+    inboxId: selectedInboxId,
+    statusFilter,
+    assignedToFilter: assignedFilter,
+  });
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
   const { messages, loading: msgsLoading } = useWhatsAppMessages(selectedConvId);
 
@@ -17,7 +23,6 @@ const ChatTab = () => {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-120px)]">
-      {/* Left panel: inbox selector + conversation list */}
       <Card className="lg:col-span-1 flex flex-col shadow-card overflow-hidden">
         <div className="p-3 border-b space-y-2">
           <h3 className="font-semibold flex items-center gap-2 text-sm">
@@ -52,10 +57,13 @@ const ChatTab = () => {
           loading={inboxesLoading || convsLoading}
           selectedConvId={selectedConvId}
           onSelect={setSelectedConvId}
+          statusFilter={statusFilter}
+          onStatusFilterChange={setStatusFilter}
+          assignedFilter={assignedFilter}
+          onAssignedFilterChange={setAssignedFilter}
         />
       </Card>
 
-      {/* Right panel: chat area */}
       <Card className="lg:col-span-2 flex flex-col shadow-card overflow-hidden">
         <ChatArea
           conversation={selectedConv}

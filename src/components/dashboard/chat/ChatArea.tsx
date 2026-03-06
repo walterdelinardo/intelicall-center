@@ -3,9 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Send, MessageSquare, Check, CheckCheck, Clock, Image, FileText, Mic, Bot, User, XCircle } from "lucide-react";
+import { Send, MessageSquare, Check, CheckCheck, Clock, Image, FileText, Mic, Bot, User, XCircle, Paperclip } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
 import { WhatsAppConversation, WhatsAppMessage, useSendWhatsAppMessage, useConversationActions } from "@/hooks/useWhatsApp";
 
 const MessageStatusIcon = ({ status }: { status: string }) => {
@@ -26,6 +27,24 @@ const MessageTypeIcon = ({ type }: { type: string }) => {
   }
 };
 
+const MediaPreview = ({ msg }: { msg: WhatsAppMessage }) => {
+  if (!msg.media_url) return null;
+  if (msg.media_type === 'image' || msg.message_type === 'image') {
+    return <img src={msg.media_url} alt="Imagem" className="max-w-full rounded-lg mb-1 max-h-60 object-cover" />;
+  }
+  if (msg.media_type === 'document' || msg.message_type === 'document') {
+    return (
+      <a href={msg.media_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs underline mb-1 opacity-80">
+        <FileText className="w-4 h-4" /> Abrir documento
+      </a>
+    );
+  }
+  if (msg.media_type === 'audio' || msg.message_type === 'audio') {
+    return <audio controls src={msg.media_url} className="max-w-full mb-1" />;
+  }
+  return null;
+};
+
 interface ChatAreaProps {
   conversation: WhatsAppConversation | null;
   messages: WhatsAppMessage[];
@@ -36,13 +55,14 @@ const ChatArea = ({ conversation, messages, messagesLoading }: ChatAreaProps) =>
   const { sendMessage, sending } = useSendWhatsAppMessage();
   const { assumeConversation, returnToBot, closeConversation, markAsRead } = useConversationActions();
   const [message, setMessage] = useState("");
+  const [uploading, setUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Mark as read when opening conversation
   useEffect(() => {
     if (conversation && conversation.unread_count > 0) {
       markAsRead(conversation.id).catch(console.error);
@@ -59,34 +79,56 @@ const ChatArea = ({ conversation, messages, messagesLoading }: ChatAreaProps) =>
     }
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !conversation) return;
+
+    setUploading(true);
+    try {
+      const ext = file.name.split('.').pop();
+      const path = `${conversation.clinic_id}/${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('whatsapp-media')
+        .upload(path, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('whatsapp-media')
+        .getPublicUrl(path);
+
+      const mediaUrl = urlData.publicUrl;
+      const isImage = file.type.startsWith('image/');
+      const isAudio = file.type.startsWith('audio/');
+      const messageType = isImage ? 'image' : isAudio ? 'audio' : 'document';
+      const caption = message.trim() || file.name;
+
+      await sendMessage(conversation.remote_jid, caption, conversation.inbox_id, messageType, mediaUrl);
+      setMessage("");
+    } catch {
+      toast.error("Erro ao enviar arquivo");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   const handleAssume = async () => {
     if (!conversation) return;
-    try {
-      await assumeConversation(conversation.id);
-      toast.success("Conversa assumida");
-    } catch {
-      toast.error("Erro ao assumir conversa");
-    }
+    try { await assumeConversation(conversation.id); toast.success("Conversa assumida"); }
+    catch { toast.error("Erro ao assumir conversa"); }
   };
 
   const handleReturnToBot = async () => {
     if (!conversation) return;
-    try {
-      await returnToBot(conversation.id);
-      toast.success("Devolvida ao bot");
-    } catch {
-      toast.error("Erro ao devolver ao bot");
-    }
+    try { await returnToBot(conversation.id); toast.success("Devolvida ao bot"); }
+    catch { toast.error("Erro ao devolver ao bot"); }
   };
 
   const handleClose = async () => {
     if (!conversation) return;
-    try {
-      await closeConversation(conversation.id);
-      toast.success("Conversa encerrada");
-    } catch {
-      toast.error("Erro ao encerrar");
-    }
+    try { await closeConversation(conversation.id); toast.success("Conversa encerrada"); }
+    catch { toast.error("Erro ao encerrar"); }
   };
 
   if (!conversation) {
@@ -149,12 +191,13 @@ const ChatArea = ({ conversation, messages, messagesLoading }: ChatAreaProps) =>
                     ? 'bg-primary text-primary-foreground rounded-br-sm'
                     : 'bg-muted rounded-bl-sm'
                 }`}>
-                  {msg.message_type !== 'text' && (
+                  {msg.message_type !== 'text' && !msg.media_url && (
                     <div className="flex items-center gap-1 mb-1 opacity-70">
                       <MessageTypeIcon type={msg.message_type} />
                       <span className="text-[10px] uppercase">{msg.message_type}</span>
                     </div>
                   )}
+                  <MediaPreview msg={msg} />
                   <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
                   <div className="flex items-center justify-end gap-1 mt-0.5">
                     <span className="text-[10px] opacity-60">{format(new Date(msg.timestamp), 'HH:mm')}</span>
@@ -171,15 +214,31 @@ const ChatArea = ({ conversation, messages, messagesLoading }: ChatAreaProps) =>
       {/* Input */}
       <div className="p-3 border-t">
         <div className="flex gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            accept="image/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx"
+            onChange={handleFileUpload}
+          />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="shrink-0"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={sending || uploading}
+          >
+            <Paperclip className="w-4 h-4" />
+          </Button>
           <Input
             value={message}
             onChange={e => setMessage(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
             placeholder="Digite sua mensagem..."
             className="flex-1"
-            disabled={sending}
+            disabled={sending || uploading}
           />
-          <Button onClick={handleSend} disabled={!message.trim() || sending} size="icon" className="shrink-0">
+          <Button onClick={handleSend} disabled={!message.trim() || sending || uploading} size="icon" className="shrink-0">
             <Send className="w-4 h-4" />
           </Button>
         </div>

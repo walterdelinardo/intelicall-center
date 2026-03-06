@@ -134,22 +134,24 @@ serve(async (req) => {
       .single();
 
     if (profile?.clinic_id) {
-      // Build conversation upsert
+      // Build conversation upsert — always include inbox_id
       const convData: Record<string, any> = {
         clinic_id: profile.clinic_id,
+        inbox_id: inboxId || null,
         remote_jid: remoteJid,
         last_message: message,
         last_message_at: new Date().toISOString(),
         unread_count: 0,
         status: 'active',
       };
-      if (inboxId) {
-        convData.inbox_id = inboxId;
-      }
+
+      const onConflictKey = inboxId
+        ? 'clinic_id,inbox_id,remote_jid'
+        : 'clinic_id,remote_jid';
 
       const { data: conv } = await supabaseService
         .from('whatsapp_conversations')
-        .upsert(convData, { onConflict: 'clinic_id,remote_jid' })
+        .upsert(convData, { onConflict: onConflictKey })
         .select('id')
         .single();
 
@@ -163,6 +165,8 @@ serve(async (req) => {
             message_type: messageType,
             is_from_me: true,
             sender_name: 'Você',
+            media_url: mediaUrl || null,
+            media_type: messageType !== 'text' ? messageType : null,
             status: 'sent',
             timestamp: new Date().toISOString(),
           });
