@@ -8,8 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, Building2, Clock, Phone, MapPin, Mail, Save, Loader2 } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Settings, Building2, Clock, Phone, MapPin, Mail, Save, Loader2, Smartphone, Plus, Power, Plug } from "lucide-react";
 import { toast } from "sonner";
+import { useWhatsAppInboxes } from "@/hooks/useWhatsApp";
 
 const DAYS = [
   { key: "mon", label: "Segunda-feira" },
@@ -42,6 +45,13 @@ const ConfiguracoesModule = () => {
   const { profile, hasRole } = useAuth();
   const queryClient = useQueryClient();
   const isAdmin = hasRole("admin");
+  const { inboxes, loading: inboxesLoading, createInbox, toggleInbox } = useWhatsAppInboxes();
+
+  const [showAddInbox, setShowAddInbox] = useState(false);
+  const [newLabel, setNewLabel] = useState("");
+  const [newInstanceName, setNewInstanceName] = useState("");
+  const [newPhone, setNewPhone] = useState("");
+  const [savingInbox, setSavingInbox] = useState(false);
 
   const { data: clinic, isLoading } = useQuery({
     queryKey: ["clinic", profile?.clinic_id],
@@ -171,6 +181,9 @@ const ConfiguracoesModule = () => {
           </TabsTrigger>
           <TabsTrigger value="hours" className="gap-2">
             <Clock className="w-4 h-4" /> Horários
+          </TabsTrigger>
+          <TabsTrigger value="integrations" className="gap-2">
+            <Plug className="w-4 h-4" /> Integrações
           </TabsTrigger>
         </TabsList>
 
@@ -368,6 +381,154 @@ const ConfiguracoesModule = () => {
                   </Button>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Integrations Tab */}
+        <TabsContent value="integrations">
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Smartphone className="w-5 h-5 text-primary" />
+                Instâncias WhatsApp (Evolution API)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {inboxesLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Carregando...
+                </div>
+              ) : (
+                <>
+                  {inboxes.length > 0 && (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Label</TableHead>
+                          <TableHead>Instância</TableHead>
+                          <TableHead>Telefone</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="w-[80px]">Ações</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {inboxes.map((inbox) => (
+                          <TableRow key={inbox.id}>
+                            <TableCell className="font-medium">{inbox.label}</TableCell>
+                            <TableCell className="font-mono text-xs">{inbox.instance_name}</TableCell>
+                            <TableCell>{inbox.phone_number || "—"}</TableCell>
+                            <TableCell>
+                              <Badge variant={inbox.is_active ? "default" : "secondary"}>
+                                {inbox.is_active ? "Ativo" : "Inativo"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={async () => {
+                                  try {
+                                    await toggleInbox(inbox.id, !inbox.is_active);
+                                    toast.success(inbox.is_active ? "Instância desativada" : "Instância ativada");
+                                  } catch (error: any) {
+                                    toast.error("Erro: " + error.message);
+                                  }
+                                }}
+                                title={inbox.is_active ? "Desativar" : "Ativar"}
+                              >
+                                <Power className="w-4 h-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+
+                  {inboxes.length === 0 && !showAddInbox && (
+                    <p className="text-sm text-muted-foreground">Nenhuma instância cadastrada.</p>
+                  )}
+
+                  {showAddInbox ? (
+                    <div className="border rounded-lg p-4 space-y-3">
+                      <h4 className="font-medium text-sm">Nova Instância</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="space-y-1">
+                          <Label htmlFor="new-label">Label *</Label>
+                          <Input
+                            id="new-label"
+                            placeholder="Ex: Recepção"
+                            value={newLabel}
+                            onChange={(e) => setNewLabel(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="new-instance">Instance Name *</Label>
+                          <Input
+                            id="new-instance"
+                            placeholder="Ex: demo-nw-1"
+                            value={newInstanceName}
+                            onChange={(e) => setNewInstanceName(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="new-phone">Telefone</Label>
+                          <Input
+                            id="new-phone"
+                            placeholder="Ex: 5511999999999"
+                            value={newPhone}
+                            onChange={(e) => setNewPhone(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          disabled={savingInbox}
+                          onClick={async () => {
+                            if (!newInstanceName.trim() || !newLabel.trim()) {
+                              toast.error("Preencha o nome da instância e o label");
+                              return;
+                            }
+                            if (!profile?.clinic_id) {
+                              toast.error("Clínica não encontrada");
+                              return;
+                            }
+                            setSavingInbox(true);
+                            try {
+                              await createInbox({
+                                instance_name: newInstanceName.trim(),
+                                label: newLabel.trim(),
+                                phone_number: newPhone.trim() || undefined,
+                                clinic_id: profile.clinic_id,
+                              });
+                              toast.success("Instância adicionada com sucesso!");
+                              setNewLabel("");
+                              setNewInstanceName("");
+                              setNewPhone("");
+                              setShowAddInbox(false);
+                            } catch (error: any) {
+                              toast.error("Erro ao adicionar: " + error.message);
+                            } finally {
+                              setSavingInbox(false);
+                            }
+                          }}
+                        >
+                          {savingInbox ? "Salvando..." : "Salvar"}
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => setShowAddInbox(false)}>
+                          Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button variant="outline" size="sm" onClick={() => setShowAddInbox(true)}>
+                      <Plus className="w-4 h-4 mr-1" /> Adicionar Instância
+                    </Button>
+                  )}
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
