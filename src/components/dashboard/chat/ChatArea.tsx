@@ -3,47 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Send, MessageSquare, Check, CheckCheck, Clock, Image, FileText, Mic, Bot, User, XCircle, Paperclip } from "lucide-react";
+import { Send, MessageSquare, Bot, User, XCircle, Paperclip } from "lucide-react";
 import { toast } from "sonner";
-import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { WhatsAppConversation, WhatsAppMessage, useSendWhatsAppMessage, useConversationActions } from "@/hooks/useWhatsApp";
-
-const MessageStatusIcon = ({ status }: { status: string }) => {
-  switch (status) {
-    case 'read': return <CheckCheck className="w-3 h-3 text-blue-500" />;
-    case 'delivered': return <CheckCheck className="w-3 h-3 text-muted-foreground" />;
-    case 'sent': return <Check className="w-3 h-3 text-muted-foreground" />;
-    default: return <Clock className="w-3 h-3 text-muted-foreground" />;
-  }
-};
-
-const MessageTypeIcon = ({ type }: { type: string }) => {
-  switch (type) {
-    case 'image': return <Image className="w-4 h-4" />;
-    case 'audio': return <Mic className="w-4 h-4" />;
-    case 'document': return <FileText className="w-4 h-4" />;
-    default: return null;
-  }
-};
-
-const MediaPreview = ({ msg }: { msg: WhatsAppMessage }) => {
-  if (!msg.media_url) return null;
-  if (msg.media_type === 'image' || msg.message_type === 'image') {
-    return <img src={msg.media_url} alt="Imagem" className="max-w-full rounded-lg mb-1 max-h-60 object-cover" />;
-  }
-  if (msg.media_type === 'document' || msg.message_type === 'document') {
-    return (
-      <a href={msg.media_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs underline mb-1 opacity-80">
-        <FileText className="w-4 h-4" /> Abrir documento
-      </a>
-    );
-  }
-  if (msg.media_type === 'audio' || msg.message_type === 'audio') {
-    return <audio controls src={msg.media_url} className="max-w-full mb-1" />;
-  }
-  return null;
-};
+import MessageBubble from "./MessageBubble";
 
 interface ChatAreaProps {
   conversation: WhatsAppConversation | null;
@@ -185,26 +149,7 @@ const ChatArea = ({ conversation, messages, messagesLoading }: ChatAreaProps) =>
         ) : (
           <div className="space-y-2">
             {messages.map(msg => (
-              <div key={msg.id} className={`flex ${msg.is_from_me ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[75%] rounded-2xl px-3 py-2 ${
-                  msg.is_from_me
-                    ? 'bg-primary text-primary-foreground rounded-br-sm'
-                    : 'bg-muted rounded-bl-sm'
-                }`}>
-                  {msg.message_type !== 'text' && !msg.media_url && (
-                    <div className="flex items-center gap-1 mb-1 opacity-70">
-                      <MessageTypeIcon type={msg.message_type} />
-                      <span className="text-[10px] uppercase">{msg.message_type}</span>
-                    </div>
-                  )}
-                  <MediaPreview msg={msg} />
-                  <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
-                  <div className="flex items-center justify-end gap-1 mt-0.5">
-                    <span className="text-[10px] opacity-60">{format(new Date(msg.timestamp), 'HH:mm')}</span>
-                    {msg.is_from_me && <MessageStatusIcon status={msg.status} />}
-                  </div>
-                </div>
-              </div>
+              <MessageBubble key={msg.id} msg={msg} />
             ))}
             <div ref={messagesEndRef} />
           </div>
@@ -218,7 +163,7 @@ const ChatArea = ({ conversation, messages, messagesLoading }: ChatAreaProps) =>
             ref={fileInputRef}
             type="file"
             className="hidden"
-            accept="image/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx"
+            accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx"
             onChange={handleFileUpload}
           />
           <Button

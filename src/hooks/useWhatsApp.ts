@@ -41,6 +41,14 @@ export interface WhatsAppMessage {
   sender_name: string | null;
   media_url: string | null;
   media_type: string | null;
+  mime_type: string | null;
+  caption: string | null;
+  file_name: string | null;
+  media_seconds: number | null;
+  media_width: number | null;
+  media_height: number | null;
+  thumbnail_base64: string | null;
+  base64: string | null;
   status: string;
   timestamp: string;
   created_at: string;
