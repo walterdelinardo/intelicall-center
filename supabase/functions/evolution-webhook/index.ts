@@ -11,13 +11,15 @@ const corsHeaders = {
 
 type PayloadFormat = "raw" | "flat" | "chatwoot" | "unknown";
 
+const CHATWOOT_EVENTS = ["message_created", "message_updated", "conversation_created", "conversation_updated", "conversation_status_changed"];
+
+function isChatwootEvent(eventName: any): boolean {
+  return typeof eventName === "string" && CHATWOOT_EVENTS.includes(eventName);
+}
+
 function detectPayloadFormat(payload: any): PayloadFormat {
-  // Chatwoot events
-  if (
-    payload?.event &&
-    typeof payload.event === "string" &&
-    ["message_created", "message_updated", "conversation_created", "conversation_updated", "conversation_status_changed"].includes(payload.event)
-  ) {
+  // Chatwoot events — check top-level AND inside raw wrapper (N8N wraps everything)
+  if (isChatwootEvent(payload?.event) || isChatwootEvent(payload?.raw?.event)) {
     return "chatwoot";
   }
   // New format: { raw: { data: { key: ... } } }
