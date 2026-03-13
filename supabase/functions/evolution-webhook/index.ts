@@ -298,10 +298,14 @@ serve(async (req) => {
       remoteJid: normalized.remoteJid,
       content: normalized.content?.substring(0, 80),
       messageType: normalized.messageType,
+      mediaType: normalized.mediaType,
       clinicId: normalized.clinicId,
       isFromMe: normalized.isFromMe,
       hasBase64: !!normalized.base64,
       hasMediaUrl: !!normalized.mediaUrl,
+      mediaUrl: normalized.mediaUrl?.substring(0, 80) || null,
+      mimeType: normalized.mimeType,
+      caption: normalized.caption?.substring(0, 40) || null,
     }));
 
     // ── Resolve inbox ───────────────────────────────────────────────
