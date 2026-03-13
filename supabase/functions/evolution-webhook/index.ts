@@ -49,17 +49,30 @@ async function findOrCreateConversation(
   }
 }
 
+// Media columns that should never be overwritten with null
+const MEDIA_FIELDS = [
+  'base64', 'media_url', 'mime_type', 'media_type', 'caption',
+  'file_name', 'media_seconds', 'media_width', 'media_height', 'thumbnail_base64',
+] as const;
+
 async function upsertMessage(supabase: any, messageData: Record<string, any>) {
   const { data: existing } = await supabase
     .from('whatsapp_messages')
-    .select('id')
+    .select('id, base64, media_url, mime_type, media_type, caption, file_name, media_seconds, media_width, media_height, thumbnail_base64')
     .eq('message_id', messageData.message_id)
     .maybeSingle();
 
   if (existing) {
+    // Preserve existing media fields — only overwrite if new value is non-null
+    const merged = { ...messageData };
+    for (const field of MEDIA_FIELDS) {
+      if (merged[field] == null && existing[field] != null) {
+        merged[field] = existing[field];
+      }
+    }
     const { error } = await supabase
       .from('whatsapp_messages')
-      .update(messageData)
+      .update(merged)
       .eq('id', existing.id);
     if (error) throw error;
   } else {
