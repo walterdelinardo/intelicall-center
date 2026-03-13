@@ -39,19 +39,31 @@ function formatDuration(seconds: number): string {
 // ── Media renderers ─────────────────────────────────────────────────
 
 const ImageContent = ({ msg }: { msg: WhatsAppMessage }) => {
+  const [open, setOpen] = useState(false);
   const src = getMediaSrc(msg);
   if (!src) return null;
   return (
-    <div>
-      <img
-        src={src}
-        alt={msg.caption || 'Imagem'}
-        className="max-w-full rounded-lg mb-1 max-h-60 object-cover cursor-pointer"
-        onClick={() => window.open(src, '_blank')}
-        loading="lazy"
-      />
-      {msg.caption && <p className="text-sm whitespace-pre-wrap break-words">{msg.caption}</p>}
-    </div>
+    <>
+      <div>
+        <img
+          src={src}
+          alt={msg.caption || 'Imagem'}
+          className="max-w-full rounded-lg mb-1 max-h-60 object-cover cursor-pointer"
+          onClick={() => setOpen(true)}
+          loading="lazy"
+        />
+        {msg.caption && <p className="text-sm whitespace-pre-wrap break-words">{msg.caption}</p>}
+      </div>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-[90vw] max-h-[90vh] p-2 flex items-center justify-center bg-background/95 backdrop-blur-sm border-border">
+          <img
+            src={src}
+            alt={msg.caption || 'Imagem'}
+            className="max-w-full max-h-[85vh] object-contain rounded-lg"
+          />
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 
