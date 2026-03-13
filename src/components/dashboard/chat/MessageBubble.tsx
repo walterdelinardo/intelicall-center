@@ -1,7 +1,9 @@
-import { Check, CheckCheck, Clock, FileText, Download } from "lucide-react";
+import { Check, CheckCheck, Clock, FileText, Download, X } from "lucide-react";
 import { format } from "date-fns";
+import { useState } from "react";
 import { WhatsAppMessage } from "@/hooks/useWhatsApp";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 const MessageStatusIcon = ({ status }: { status: string }) => {
   switch (status) {
