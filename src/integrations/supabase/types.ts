@@ -1038,45 +1038,69 @@ export type Database = {
       }
       whatsapp_messages: {
         Row: {
+          base64: string | null
+          caption: string | null
           content: string | null
           conversation_id: string
           created_at: string | null
+          file_name: string | null
           id: string
           is_from_me: boolean | null
+          media_height: number | null
+          media_seconds: number | null
           media_type: string | null
           media_url: string | null
+          media_width: number | null
           message_id: string
           message_type: string | null
+          mime_type: string | null
           sender_name: string | null
           status: string | null
+          thumbnail_base64: string | null
           timestamp: string
         }
         Insert: {
+          base64?: string | null
+          caption?: string | null
           content?: string | null
           conversation_id: string
           created_at?: string | null
+          file_name?: string | null
           id?: string
           is_from_me?: boolean | null
+          media_height?: number | null
+          media_seconds?: number | null
           media_type?: string | null
           media_url?: string | null
+          media_width?: number | null
           message_id: string
           message_type?: string | null
+          mime_type?: string | null
           sender_name?: string | null
           status?: string | null
+          thumbnail_base64?: string | null
           timestamp?: string
         }
         Update: {
+          base64?: string | null
+          caption?: string | null
           content?: string | null
           conversation_id?: string
           created_at?: string | null
+          file_name?: string | null
           id?: string
           is_from_me?: boolean | null
+          media_height?: number | null
+          media_seconds?: number | null
           media_type?: string | null
           media_url?: string | null
+          media_width?: number | null
           message_id?: string
           message_type?: string | null
+          mime_type?: string | null
           sender_name?: string | null
           status?: string | null
+          thumbnail_base64?: string | null
           timestamp?: string
         }
         Relationships: [

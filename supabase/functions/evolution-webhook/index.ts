@@ -83,12 +83,19 @@ interface NormalizedPayload {
   messageType: string;
   mediaUrl: string | null;
   mediaType: string | null;
+  mimeType: string | null;
+  caption: string | null;
+  fileName: string | null;
+  mediaSeconds: number | null;
+  mediaWidth: number | null;
+  mediaHeight: number | null;
+  thumbnailBase64: string | null;
+  base64: string | null;
   contactName: string;
   messageTimestamp: number | null;
 }
 
 function normalizePayload(payload: any): NormalizedPayload | null {
-  // The data object may be nested or at root level
   const data = payload.data || payload;
 
   // 1. Instance name
@@ -101,7 +108,7 @@ function normalizePayload(payload: any): NormalizedPayload | null {
   // 3. Clinic ID (optional — resolved later if missing)
   const clinicId = payload.clinic_id || payload.clinicId || data.clinic_id || null;
 
-  // 4. Remote JID — deep fallbacks
+  // 4. Remote JID
   const remoteJid = data.key?.remoteJid || data.remoteJid
     || payload.remoteJid || payload.remote_jid
     || data.data?.key?.remoteJid || '';
@@ -113,43 +120,78 @@ function normalizePayload(payload: any): NormalizedPayload | null {
   const messageId = data.key?.id || data.messageId || data.id
     || payload.messageId || crypto.randomUUID();
 
-  // 7. Content — extract from multiple message shapes
+  // 7. Content & media — extract from N8N normalized format or raw Evolution format
   let content = '';
-  let messageType = 'text';
-  let mediaUrl: string | null = null;
-  let mediaType: string | null = null;
+  let messageType = data.message_type || payload.message_type || 'text';
+  let mediaUrl: string | null = data.media_url || payload.media_url || null;
+  let mediaType: string | null = data.media_type || payload.media_type || null;
+  let mimeType: string | null = data.mime_type || payload.mime_type || null;
+  let caption: string | null = data.caption || payload.caption || null;
+  let fileName: string | null = data.file_name || payload.file_name || null;
+  let mediaSeconds: number | null = data.media_seconds != null ? Number(data.media_seconds) : (payload.media_seconds != null ? Number(payload.media_seconds) : null);
+  let mediaWidth: number | null = data.media_width != null ? Number(data.media_width) : (payload.media_width != null ? Number(payload.media_width) : null);
+  let mediaHeight: number | null = data.media_height != null ? Number(data.media_height) : (payload.media_height != null ? Number(payload.media_height) : null);
+  let thumbnailBase64: string | null = data.thumbnail_base64 || payload.thumbnail_base64 || null;
+  let base64: string | null = data.base64 || payload.base64 || null;
 
-  const msg = data.message || {};
+  // If N8N already normalized content, use it
+  content = data.content || payload.content || '';
 
-  if (msg.conversation) {
-    content = msg.conversation;
-  } else if (msg.extendedTextMessage?.text) {
-    content = msg.extendedTextMessage.text;
-  } else if (msg.imageMessage) {
-    messageType = 'image';
-    content = msg.imageMessage.caption || '[Imagem]';
-    mediaUrl = data.mediaUrl || payload.mediaUrl || null;
-    mediaType = 'image';
-  } else if (msg.audioMessage) {
-    messageType = 'audio';
-    content = '[Áudio]';
-    mediaUrl = data.mediaUrl || payload.mediaUrl || null;
-    mediaType = 'audio';
-  } else if (msg.videoMessage) {
-    messageType = 'video';
-    content = msg.videoMessage.caption || '[Vídeo]';
-    mediaUrl = data.mediaUrl || payload.mediaUrl || null;
-    mediaType = 'video';
-  } else if (msg.documentMessage) {
-    messageType = 'document';
-    content = msg.documentMessage.fileName || '[Documento]';
-    mediaUrl = data.mediaUrl || payload.mediaUrl || null;
-    mediaType = 'document';
+  // Fallback: parse raw Evolution message object
+  if (!content) {
+    const msg = data.message || {};
+    if (msg.conversation) {
+      content = msg.conversation;
+      messageType = 'text';
+    } else if (msg.extendedTextMessage?.text) {
+      content = msg.extendedTextMessage.text;
+      messageType = 'text';
+    } else if (msg.imageMessage) {
+      messageType = 'image';
+      content = msg.imageMessage.caption || caption || '[Imagem]';
+      caption = msg.imageMessage.caption || caption;
+      mimeType = mimeType || msg.imageMessage.mimetype || null;
+      mediaUrl = mediaUrl || data.mediaUrl || payload.mediaUrl || null;
+      mediaType = 'image';
+    } else if (msg.audioMessage) {
+      messageType = 'audio';
+      content = '[Áudio]';
+      mimeType = mimeType || msg.audioMessage.mimetype || null;
+      mediaSeconds = mediaSeconds ?? (msg.audioMessage.seconds ? Number(msg.audioMessage.seconds) : null);
+      mediaUrl = mediaUrl || data.mediaUrl || payload.mediaUrl || null;
+      mediaType = 'audio';
+    } else if (msg.videoMessage) {
+      messageType = 'video';
+      content = msg.videoMessage.caption || caption || '[Vídeo]';
+      caption = msg.videoMessage.caption || caption;
+      mimeType = mimeType || msg.videoMessage.mimetype || null;
+      mediaSeconds = mediaSeconds ?? (msg.videoMessage.seconds ? Number(msg.videoMessage.seconds) : null);
+      mediaUrl = mediaUrl || data.mediaUrl || payload.mediaUrl || null;
+      mediaType = 'video';
+    } else if (msg.documentMessage) {
+      messageType = 'document';
+      fileName = fileName || msg.documentMessage.fileName || null;
+      content = fileName || '[Documento]';
+      mimeType = mimeType || msg.documentMessage.mimetype || null;
+      mediaUrl = mediaUrl || data.mediaUrl || payload.mediaUrl || null;
+      mediaType = 'document';
+    } else if (msg.stickerMessage) {
+      messageType = 'sticker';
+      content = '[Sticker]';
+      mimeType = mimeType || msg.stickerMessage.mimetype || null;
+      mediaUrl = mediaUrl || data.mediaUrl || payload.mediaUrl || null;
+      mediaType = 'sticker';
+    }
   }
 
-  // Flattened fallbacks (N8N may send content/body at root)
+  // Flattened fallbacks
   if (!content) {
-    content = data.body || data.content || payload.body || payload.content || '';
+    content = data.body || payload.body || '';
+  }
+
+  // Set mediaType from messageType if not set
+  if (!mediaType && messageType !== 'text') {
+    mediaType = messageType;
   }
 
   // 8. Contact / push name
@@ -171,6 +213,14 @@ function normalizePayload(payload: any): NormalizedPayload | null {
     messageType,
     mediaUrl,
     mediaType,
+    mimeType,
+    caption,
+    fileName,
+    mediaSeconds,
+    mediaWidth,
+    mediaHeight,
+    thumbnailBase64,
+    base64,
     contactName,
     messageTimestamp,
   };
@@ -206,7 +256,6 @@ serve(async (req) => {
       );
     }
 
-    // Debug: log top-level keys
     console.log('Webhook received — top-level keys:', Object.keys(payload));
     if (payload.data && typeof payload.data === 'object') {
       console.log('payload.data keys:', Object.keys(payload.data));
@@ -226,8 +275,11 @@ serve(async (req) => {
       instanceName: normalized.instanceName,
       remoteJid: normalized.remoteJid,
       content: normalized.content?.substring(0, 80),
+      messageType: normalized.messageType,
       clinicId: normalized.clinicId,
       isFromMe: normalized.isFromMe,
+      hasBase64: !!normalized.base64,
+      hasMediaUrl: !!normalized.mediaUrl,
     }));
 
     // ── Resolve inbox ───────────────────────────────────────────────
@@ -235,7 +287,6 @@ serve(async (req) => {
     let clinicId = normalized.clinicId;
 
     if (normalized.instanceName) {
-      // Try to find existing inbox
       const { data: inbox } = await supabase
         .from('whatsapp_inboxes')
         .select('id, clinic_id')
@@ -245,12 +296,10 @@ serve(async (req) => {
 
       if (inbox) {
         inboxId = inbox.id;
-        // If clinic_id wasn't in payload, use the one from inbox
         if (!clinicId) {
           clinicId = inbox.clinic_id;
         }
       } else if (clinicId) {
-        // Auto-create inbox
         const { data: newInbox } = await supabase
           .from('whatsapp_inboxes')
           .insert({
@@ -275,11 +324,13 @@ serve(async (req) => {
     // ── Handle message events ────────────────────────────────────────
     const event = normalized.event;
 
-    if (event === 'messages.upsert' || event === 'message' || event === 'messages.upsert') {
-      const { remoteJid, content, messageId, isFromMe, messageType, mediaUrl, mediaType, contactName, messageTimestamp } = normalized;
+    if (event === 'messages.upsert' || event === 'message' || !event) {
+      const { remoteJid, content, messageId, isFromMe, messageType, mediaUrl, mediaType,
+              mimeType, caption, fileName, mediaSeconds, mediaWidth, mediaHeight,
+              thumbnailBase64, base64, contactName, messageTimestamp } = normalized;
 
       if (!remoteJid) {
-        console.error('remoteJid is empty after normalization. Full payload:', JSON.stringify(payload).substring(0, 1000));
+        console.error('remoteJid is empty after normalization.');
         return new Response(
           JSON.stringify({ error: 'remoteJid could not be extracted from payload' }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
@@ -290,17 +341,24 @@ serve(async (req) => {
       const displayName = contactName || contactPhone;
       const isGroup = remoteJid.includes('@g.us');
 
-      // Find or create conversation
+      // Determine last_message preview text
+      const lastMessagePreview = messageType === 'text' ? content
+        : messageType === 'image' ? (caption || '📷 Imagem')
+        : messageType === 'audio' ? '🎵 Áudio'
+        : messageType === 'video' ? (caption || '🎥 Vídeo')
+        : messageType === 'document' ? (fileName || '📄 Documento')
+        : messageType === 'sticker' ? '🏷️ Sticker'
+        : content || '[Sem conteúdo]';
+
       const conv = await findOrCreateConversation(supabase, clinicId, inboxId, remoteJid, {
         contact_name: displayName,
         contact_phone: contactPhone,
         is_group: isGroup,
-        last_message: content || '[Sem conteúdo]',
+        last_message: lastMessagePreview,
         last_message_at: new Date().toISOString(),
         status: 'active',
       });
 
-      // Upsert message
       const timestamp = messageTimestamp
         ? new Date(messageTimestamp * 1000).toISOString()
         : new Date().toISOString();
@@ -308,17 +366,24 @@ serve(async (req) => {
       await upsertMessage(supabase, {
         conversation_id: conv.id,
         message_id: messageId,
-        content: content || '[Sem conteúdo]',
+        content: content || null,
         message_type: messageType,
         is_from_me: isFromMe,
         sender_name: displayName,
         media_url: mediaUrl,
         media_type: mediaType,
+        mime_type: mimeType,
+        caption: caption,
+        file_name: fileName,
+        media_seconds: mediaSeconds,
+        media_width: mediaWidth,
+        media_height: mediaHeight,
+        thumbnail_base64: thumbnailBase64,
+        base64: base64,
         status: isFromMe ? 'sent' : 'received',
         timestamp,
       });
 
-      // Increment unread if not from me
       if (!isFromMe) {
         await supabase
           .from('whatsapp_conversations')
@@ -326,7 +391,7 @@ serve(async (req) => {
           .eq('id', conv.id);
       }
 
-      console.log('Message processed — conv:', conv.id, 'inbox:', inboxId, 'jid:', remoteJid);
+      console.log('Message processed — conv:', conv.id, 'type:', messageType, 'inbox:', inboxId);
     }
 
     // ── Handle status update events ──────────────────────────────────
