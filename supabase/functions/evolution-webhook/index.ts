@@ -108,134 +108,104 @@ interface NormalizedPayload {
   messageTimestamp: number | null;
 }
 
+// Map Evolution messageType field ("audioMessage") to short type ("audio")
+const MESSAGE_TYPE_MAP: Record<string, string> = {
+  audioMessage: 'audio',
+  imageMessage: 'image',
+  videoMessage: 'video',
+  documentMessage: 'document',
+  stickerMessage: 'sticker',
+  conversation: 'text',
+  extendedTextMessage: 'text',
+};
+
+// Placeholder text per media type
+const PLACEHOLDER_MAP: Record<string, string> = {
+  audio: '[Áudio]',
+  image: '[Imagem]',
+  video: '[Vídeo]',
+  document: '[Documento]',
+  sticker: '[Sticker]',
+};
+
 function normalizePayload(payload: any): NormalizedPayload | null {
-  const data = payload.data || payload;
+  // Resolve structure: payload is { raw: { event, instance, data } }
+  const raw = payload.raw || payload;
+  const data = raw.data || raw;
 
-  // Helper: check payload top-level first (N8N flattened), then data (Evolution raw)
-  const p = (snake: string, camel?: string): any => {
-    if (payload[snake] !== undefined) return payload[snake];
-    if (camel && payload[camel] !== undefined) return payload[camel];
-    if (data[snake] !== undefined) return data[snake];
-    if (camel && data[camel] !== undefined) return data[camel];
-    return undefined;
-  };
+  // 1. Event & instance
+  const event = raw.event || data.event || '';
+  const instanceName = raw.instance || data.instance || data.instance_name || '';
 
-  // 1. Instance name
-  const instanceName = p('instance_name', 'instanceName') || '';
+  // 2. Clinic ID (may come from legacy formats)
+  const clinicId = data.clinic_id || data.clinicId || null;
 
-  // 2. Event
-  const event = p('event') || '';
+  // 3. Key fields
+  const key = data.key || {};
+  const remoteJid = key.remoteJid || data.remote_jid || '';
+  const isFromMe = !!(key.fromMe ?? data.from_me ?? false);
+  const messageId = key.id || data.message_id || crypto.randomUUID();
 
-  // 3. Clinic ID
-  const clinicId = p('clinic_id', 'clinicId') || null;
+  // 4. Contact name
+  const contactName = data.pushName || data.push_name || data.senderName || '';
 
-  // 4. Remote JID — N8N sends as top-level remote_jid
-  const remoteJid = p('remote_jid', 'remoteJid')
-    || data.key?.remoteJid
-    || data.data?.key?.remoteJid || '';
-
-  // 5. fromMe — N8N sends as top-level from_me (boolean)
-  const rawFromMe = p('from_me', 'fromMe');
-  const isFromMe = rawFromMe ?? data.key?.fromMe ?? false;
-
-  // 6. Message ID — N8N sends as top-level message_id
-  const messageId = p('message_id', 'messageId')
-    || data.key?.id || data.id
-    || crypto.randomUUID();
-
-  // 7. Content & media — extract from top-level (N8N) first, then raw Evolution
-  let content = p('content') || '';
-  let messageType = p('message_type', 'messageType') || 'text';
-  let mediaUrl: string | null = p('media_url', 'mediaUrl') || null;
-  let mediaType: string | null = p('media_type', 'mediaType') || null;
-  let mimeType: string | null = p('mime_type', 'mimeType') || null;
-  let caption: string | null = p('caption') || null;
-  let fileName: string | null = p('file_name', 'fileName') || null;
-  let mediaSeconds: number | null = p('media_seconds', 'mediaSeconds') != null ? Number(p('media_seconds', 'mediaSeconds')) : null;
-  let mediaWidth: number | null = p('media_width', 'mediaWidth') != null ? Number(p('media_width', 'mediaWidth')) : null;
-  let mediaHeight: number | null = p('media_height', 'mediaHeight') != null ? Number(p('media_height', 'mediaHeight')) : null;
-  let thumbnailBase64: string | null = p('thumbnail_base64', 'thumbnailBase64') || null;
-  let base64: string | null = p('base64') || null;
-
-  // Fallback: parse raw Evolution message object (when N8N didn't flatten)
-  if (!content || content === '[Imagem]' || content === '[Áudio]' || content === '[Vídeo]') {
-    const msg = data.message || {};
-    if (msg.conversation) {
-      content = msg.conversation;
-      messageType = 'text';
-    } else if (msg.extendedTextMessage?.text) {
-      content = msg.extendedTextMessage.text;
-      messageType = 'text';
-    } else if (msg.imageMessage) {
-      messageType = 'image';
-      content = msg.imageMessage.caption || caption || '[Imagem]';
-      caption = msg.imageMessage.caption || caption;
-      mimeType = mimeType || msg.imageMessage.mimetype || null;
-      mediaUrl = mediaUrl || data.mediaUrl || null;
-      mediaType = 'image';
-    } else if (msg.audioMessage) {
-      messageType = 'audio';
-      content = '[Áudio]';
-      mimeType = mimeType || msg.audioMessage.mimetype || null;
-      mediaSeconds = mediaSeconds ?? (msg.audioMessage.seconds ? Number(msg.audioMessage.seconds) : null);
-      mediaUrl = mediaUrl || data.mediaUrl || null;
-      mediaType = 'audio';
-    } else if (msg.videoMessage) {
-      messageType = 'video';
-      content = msg.videoMessage.caption || caption || '[Vídeo]';
-      caption = msg.videoMessage.caption || caption;
-      mimeType = mimeType || msg.videoMessage.mimetype || null;
-      mediaSeconds = mediaSeconds ?? (msg.videoMessage.seconds ? Number(msg.videoMessage.seconds) : null);
-      mediaUrl = mediaUrl || data.mediaUrl || null;
-      mediaType = 'video';
-    } else if (msg.documentMessage) {
-      messageType = 'document';
-      fileName = fileName || msg.documentMessage.fileName || null;
-      content = fileName || '[Documento]';
-      mimeType = mimeType || msg.documentMessage.mimetype || null;
-      mediaUrl = mediaUrl || data.mediaUrl || null;
-      mediaType = 'document';
-    } else if (msg.stickerMessage) {
-      messageType = 'sticker';
-      content = '[Sticker]';
-      mimeType = mimeType || msg.stickerMessage.mimetype || null;
-      mediaUrl = mediaUrl || data.mediaUrl || null;
-      mediaType = 'sticker';
-    }
-  }
-
-  // Fallback: extract from Chatwoot-style attachments array
-  const attachments = data.attachments || payload.attachments;
-  if (Array.isArray(attachments) && attachments.length > 0 && !mediaUrl && !base64) {
-    const att = attachments[0];
-    mediaUrl = att.data_url || att.url || att.external_url || null;
-    mimeType = mimeType || att.content_type || null;
-    const fileType = att.file_type || '';
-    if (!mediaType && fileType) {
-      mediaType = fileType;
-      if (messageType === 'text') messageType = fileType;
-    }
-    fileName = fileName || att.file_name || null;
-  }
-
-  // Flattened fallbacks for content
-  if (!content) {
-    content = data.body || payload.body || '';
-  }
-
-  // Set mediaType from messageType if not set
-  if (!mediaType && messageType !== 'text') {
-    mediaType = messageType;
-  }
-
-  // 8. Contact / push name — N8N sends as top-level push_name
-  const contactName = p('push_name', 'pushName')
-    || data.senderName || data.sender?.pushName || data.sender?.name
-    || '';
-
-  // 9. Timestamp — N8N sends as top-level timestamp
-  const ts = p('timestamp', 'messageTimestamp');
+  // 5. Timestamp
+  const ts = data.messageTimestamp || data.timestamp;
   const messageTimestamp = ts ? Number(ts) : null;
+
+  // 6. Message type — map from Evolution "audioMessage" → "audio"
+  const rawMessageType = data.messageType || '';
+  let messageType = MESSAGE_TYPE_MAP[rawMessageType] || rawMessageType || 'text';
+
+  // 7. Extract media metadata from nested message object
+  const msg = data.message || {};
+  const mediaObj = msg[rawMessageType] || {};
+
+  let mediaUrl: string | null = mediaObj.url || data.mediaUrl || null;
+  let mimeType: string | null = mediaObj.mimetype || null;
+  let caption: string | null = mediaObj.caption || null;
+  let fileName: string | null = mediaObj.fileName || null;
+  let mediaSeconds: number | null = mediaObj.seconds != null ? Number(mediaObj.seconds) : null;
+  let mediaWidth: number | null = mediaObj.width != null ? Number(mediaObj.width) : null;
+  let mediaHeight: number | null = mediaObj.height != null ? Number(mediaObj.height) : null;
+  let thumbnailBase64: string | null = mediaObj.jpegThumbnail || null;
+
+  // 8. Base64 — Evolution puts it at data.base64 (top of data object)
+  let base64: string | null = data.base64 || mediaObj.base64 || null;
+
+  // 9. Media type (short)
+  let mediaType: string | null = messageType !== 'text' ? messageType : null;
+
+  // 10. Content — for text messages, extract from message object; for media, use caption or placeholder
+  let content = '';
+  if (messageType === 'text') {
+    content = msg.conversation || msg.extendedTextMessage?.text || data.body || '';
+  } else {
+    content = caption || PLACEHOLDER_MAP[messageType] || '[Sem conteúdo]';
+  }
+
+  // 11. Fallback: if messageType is still 'text' but we didn't get content, try detecting from message keys
+  if (!content && messageType === 'text') {
+    for (const [evoType, shortType] of Object.entries(MESSAGE_TYPE_MAP)) {
+      if (msg[evoType] && shortType !== 'text') {
+        messageType = shortType;
+        mediaType = shortType;
+        const fallbackObj = msg[evoType];
+        mediaUrl = mediaUrl || fallbackObj.url || null;
+        mimeType = mimeType || fallbackObj.mimetype || null;
+        caption = caption || fallbackObj.caption || null;
+        fileName = fileName || fallbackObj.fileName || null;
+        mediaSeconds = mediaSeconds ?? (fallbackObj.seconds != null ? Number(fallbackObj.seconds) : null);
+        base64 = base64 || fallbackObj.base64 || null;
+        content = caption || PLACEHOLDER_MAP[shortType] || '[Sem conteúdo]';
+        break;
+      }
+    }
+  }
+
+  if (!content) {
+    content = data.content || data.body || '';
+  }
 
   return {
     clinicId,
@@ -435,19 +405,21 @@ serve(async (req) => {
 
     // ── Handle status update events ──────────────────────────────────
     if (event === 'messages.update' || event === 'message.update') {
-      const data = payload.data || payload;
-      const messageId = data.key?.id || data.messageId;
-      const status = data.update?.status || data.status;
+      const rawUp = payload.raw || payload;
+      const dataUp = rawUp.data || rawUp;
+      const upKey = dataUp.key || {};
+      const upMessageId = upKey.id || dataUp.messageId;
+      const upStatus = dataUp.update?.status || dataUp.status;
 
-      if (messageId && status !== undefined) {
+      if (upMessageId && upStatus !== undefined) {
         const statusMap: Record<number, string> = {
           0: 'error', 1: 'pending', 2: 'sent', 3: 'delivered', 4: 'read',
         };
 
         await supabase
           .from('whatsapp_messages')
-          .update({ status: statusMap[status] || String(status) })
-          .eq('message_id', messageId);
+          .update({ status: statusMap[upStatus] || String(upStatus) })
+          .eq('message_id', upMessageId);
       }
     }
 
