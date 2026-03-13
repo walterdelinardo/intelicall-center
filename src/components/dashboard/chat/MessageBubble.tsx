@@ -17,7 +17,9 @@ const MessageStatusIcon = ({ status }: { status: string }) => {
 /** Resolve the best source URL for media — base64 data URI or media_url */
 function getMediaSrc(msg: WhatsAppMessage): string | null {
   if (msg.base64) {
-    const mime = msg.mime_type || 'application/octet-stream';
+    // Use audio/ogg as safe fallback for audio to avoid unplayable application/octet-stream
+    const fallbackMime = msg.message_type === 'audio' ? 'audio/ogg' : 'application/octet-stream';
+    const mime = msg.mime_type || fallbackMime;
     return `data:${mime};base64,${msg.base64}`;
   }
   return msg.media_url || null;
