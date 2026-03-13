@@ -405,19 +405,21 @@ serve(async (req) => {
 
     // ── Handle status update events ──────────────────────────────────
     if (event === 'messages.update' || event === 'message.update') {
-      const data = payload.data || payload;
-      const messageId = data.key?.id || data.messageId;
-      const status = data.update?.status || data.status;
+      const rawUp = payload.raw || payload;
+      const dataUp = rawUp.data || rawUp;
+      const upKey = dataUp.key || {};
+      const upMessageId = upKey.id || dataUp.messageId;
+      const upStatus = dataUp.update?.status || dataUp.status;
 
-      if (messageId && status !== undefined) {
+      if (upMessageId && upStatus !== undefined) {
         const statusMap: Record<number, string> = {
           0: 'error', 1: 'pending', 2: 'sent', 3: 'delivered', 4: 'read',
         };
 
         await supabase
           .from('whatsapp_messages')
-          .update({ status: statusMap[status] || String(status) })
-          .eq('message_id', messageId);
+          .update({ status: statusMap[upStatus] || String(upStatus) })
+          .eq('message_id', upMessageId);
       }
     }
 
