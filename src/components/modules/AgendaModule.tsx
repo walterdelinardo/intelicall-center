@@ -16,8 +16,10 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Calendar, Plus, ChevronLeft, ChevronRight, Clock, Globe, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { format, addDays, startOfWeek, endOfWeek, eachDayOfInterval, isToday, isSameDay, parseISO } from "date-fns";
+import { format, addDays, addMonths, subMonths, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isToday, isSameDay, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { TimeGrid, WeekTimeGrid } from "./agenda/TimeGrid";
+import { MonthView } from "./agenda/MonthView";
 
 const statusColors: Record<string, string> = {
   agendado: "bg-primary/10 text-primary border-primary/30",
@@ -74,7 +76,7 @@ const AgendaModule = () => {
   const { events: googleEvents, loading: googleLoading, fetchEvents: fetchGoogleEvents, createEvent: createGoogleEvent, updateEvent: updateGoogleEvent, deleteEvent: deleteGoogleEvent } = useGoogleCalendar();
   const { accounts, isConnected } = useGoogleOAuth();
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [view, setView] = useState<"day" | "week">("day");
+  const [view, setView] = useState<"day" | "week" | "month">("day");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
   const [filterAccount, setFilterAccount] = useState<string>("all");
@@ -339,7 +341,24 @@ const AgendaModule = () => {
   };
 
   const navigate = (dir: number) => {
-    setSelectedDate((d) => addDays(d, view === "day" ? dir : dir * 7));
+    setSelectedDate((d) => {
+      if (view === "month") return dir > 0 ? addMonths(d, 1) : subMonths(d, 1);
+      return addDays(d, view === "day" ? dir : dir * 7);
+    });
+  };
+
+  const handleSlotClick = (date: Date, time: string) => {
+    setForm({ ...form, date: format(date, "yyyy-MM-dd"), start_time: time });
+    setIsCreateOpen(true);
+  };
+
+  const handleDaySlotClick = (time: string) => {
+    handleSlotClick(selectedDate, time);
+  };
+
+  const handleMonthDayClick = (day: Date) => {
+    setSelectedDate(day);
+    setView("day");
   };
 
   const dayEvents = (day: Date) =>
@@ -425,7 +444,9 @@ const AgendaModule = () => {
             <h2 className="font-semibold">
               {view === "day"
                 ? format(selectedDate, "EEEE, dd 'de' MMMM", { locale: ptBR })
-                : `${format(weekStart, "dd/MM")} — ${format(weekEnd, "dd/MM/yyyy")}`}
+                : view === "week"
+                ? `${format(weekStart, "dd/MM")} — ${format(weekEnd, "dd/MM/yyyy")}`
+                : format(selectedDate, "MMMM 'de' yyyy", { locale: ptBR })}
             </h2>
           </div>
           <Button size="icon" variant="outline" onClick={() => navigate(1)}>
@@ -453,6 +474,7 @@ const AgendaModule = () => {
             <TabsList>
               <TabsTrigger value="day">Dia</TabsTrigger>
               <TabsTrigger value="week">Semana</TabsTrigger>
+              <TabsTrigger value="month">Mês</TabsTrigger>
             </TabsList>
           </Tabs>
 
@@ -600,45 +622,26 @@ const AgendaModule = () => {
       {(isLoading || googleLoading) ? (
         <div className="p-8 text-center text-muted-foreground">Carregando...</div>
       ) : view === "day" ? (
-        <div className="space-y-3">
-          {dayEvents(selectedDate).length === 0 ? (
-            <Card className="shadow-card">
-              <CardContent className="p-8 text-center text-muted-foreground">
-                Nenhum agendamento para este dia.
-              </CardContent>
-            </Card>
-          ) : (
-            dayEvents(selectedDate).map(renderEventCard)
-          )}
-        </div>
+        <TimeGrid
+          events={dayEvents(selectedDate)}
+          onSlotClick={handleDaySlotClick}
+          onEventClick={(evt) => evt.type === 'google' ? handleEditEvent(evt) : undefined}
+          onStatusChange={!useGoogleAsPrimary ? (id, status) => updateStatusMutation.mutate({ id, status }) : undefined}
+        />
+      ) : view === "week" ? (
+        <WeekTimeGrid
+          days={weekDays}
+          getEventsForDay={dayEvents}
+          onSlotClick={handleSlotClick}
+          onEventClick={(evt) => evt.type === 'google' ? handleEditEvent(evt) : undefined}
+          isToday={isToday}
+        />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-7 gap-3">
-          {weekDays.map((day) => (
-            <div key={day.toISOString()} className="space-y-2">
-              <div className={`text-center text-sm font-medium p-2 rounded-lg ${isToday(day) ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-                <div className="text-xs opacity-75">{format(day, "EEE", { locale: ptBR })}</div>
-                <div>{format(day, "dd")}</div>
-              </div>
-              <div className="space-y-2 min-h-[60px]">
-                {dayEvents(day).map((evt) => (
-                  <Card
-                    key={`${evt.type}-${evt.id}`}
-                    className={`border text-xs cursor-pointer hover:shadow-md transition-shadow ${evt.type === 'google' ? 'border-blue-200 bg-blue-50/50' : statusColors[evt.status]}`}
-                    onClick={() => evt.type === 'google' && handleEditEvent(evt)}
-                  >
-                    <CardContent className="p-2">
-                      <p className="font-medium truncate">{evt.title}</p>
-                      <p className="opacity-75">{evt.time}</p>
-                      {evt.type === 'google' && evt.accountLabel && (
-                        <p className="text-[10px] text-blue-500 truncate">{evt.accountLabel}</p>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
+        <MonthView
+          currentMonth={selectedDate}
+          events={mergedEvents}
+          onDayClick={handleMonthDayClick}
+        />
       )}
 
       {/* Edit Google Event Dialog */}
