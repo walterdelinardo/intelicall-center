@@ -386,7 +386,7 @@ async function findOrCreateConversation(
   return created;
 }
 
-async function upsertMessage(supabase: any, messageData: Record<string, any>): Promise<{ isDuplicate: boolean }> {
+async function upsertMessage(supabase: any, messageData: Record<string, any>): Promise<{ isDuplicate: boolean; mergeResult: string; mergeError: string | null }> {
   const { data: existing } = await supabase.from("whatsapp_messages")
     .select("id").eq("message_id", messageData.message_id).maybeSingle();
 
@@ -401,14 +401,34 @@ async function upsertMessage(supabase: any, messageData: Record<string, any>): P
         mergedUpdate[key] = val;
       }
     }
+
+    const mergeKeys = Object.keys(mergedUpdate);
+    const hasBase64InMerge = "base64" in mergedUpdate;
+    const base64LenInMerge = mergedUpdate.base64?.length || 0;
+
+    console.log(JSON.stringify({
+      action: "merge_debug",
+      messageId: messageData.message_id,
+      mergeKeys,
+      hasBase64InMerge,
+      base64LenInMerge,
+      existingId: existing.id,
+    }));
+
     const { error } = await supabase.from("whatsapp_messages").update(mergedUpdate).eq("id", existing.id);
-    if (error) throw error;
-    return { isDuplicate: true };
+    if (error) {
+      console.error(JSON.stringify({ action: "merge_error", messageId: messageData.message_id, error: error.message }));
+      return { isDuplicate: true, mergeResult: "error", mergeError: error.message };
+    }
+    return { isDuplicate: true, mergeResult: `merged_${mergeKeys.length}_fields${hasBase64InMerge ? '_with_base64' : ''}`, mergeError: null };
   }
 
   const { error } = await supabase.from("whatsapp_messages").insert(messageData);
-  if (error) throw error;
-  return { isDuplicate: false };
+  if (error) {
+    console.error(JSON.stringify({ action: "insert_error", messageId: messageData.message_id, error: error.message }));
+    return { isDuplicate: false, mergeResult: "insert_error", mergeError: error.message };
+  }
+  return { isDuplicate: false, mergeResult: "inserted", mergeError: null };
 }
 
 // ── Main handler ────────────────────────────────────────────────────
@@ -535,7 +555,7 @@ serve(async (req) => {
 
       const timestamp = messageTimestamp ? new Date(messageTimestamp * 1000).toISOString() : new Date().toISOString();
 
-      const { isDuplicate } = await upsertMessage(supabase, {
+      const { isDuplicate, mergeResult, mergeError } = await upsertMessage(supabase, {
         conversation_id: conv.id, message_id: messageId, content: content || null,
         message_type: messageType, is_from_me: isFromMe, sender_name: displayName,
         media_url: mediaUrl, media_type: mediaType, mime_type: mimeType,
@@ -545,8 +565,30 @@ serve(async (req) => {
         status: isFromMe ? "sent" : "received", timestamp,
       });
 
+      // Log to webhook_logs
+      const normalizedForLog = { ...normalized, base64: undefined };
+      await supabase.from("webhook_logs").insert({
+        message_id: messageId,
+        payload_format: normalized.payloadFormat,
+        event: normalized.event,
+        instance_name: normalized.instanceName,
+        remote_jid: remoteJid,
+        message_type: messageType,
+        has_base64: !!base64,
+        base64_length: base64?.length || 0,
+        base64_source: normalized.sourceUsed,
+        has_media_url: !!mediaUrl,
+        media_url: mediaUrl,
+        mime_type: mimeType,
+        is_duplicate: isDuplicate,
+        merge_result: mergeResult,
+        merge_error: mergeError,
+        raw_payload: payload,
+        normalized_data: normalizedForLog,
+      });
+
       if (isDuplicate) {
-        console.log(JSON.stringify({ action: "duplicate_merged", messageId, format: normalized.payloadFormat }));
+        console.log(JSON.stringify({ action: "duplicate_merged", messageId, mergeResult, mergeError, format: normalized.payloadFormat }));
       }
 
       if (!isFromMe && !isDuplicate) {
