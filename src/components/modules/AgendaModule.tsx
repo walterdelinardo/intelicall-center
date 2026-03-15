@@ -481,9 +481,10 @@ const AgendaModule = () => {
   const filteredExternalClients = useMemo(() => {
     if (!clientSearch) return externalClients.slice(0, 20);
     const q = clientSearch.toLowerCase();
-    return externalClients.filter(c =>
-      c.nome?.toLowerCase().includes(q) || c.whatsapp?.includes(q)
-    ).slice(0, 20);
+    return externalClients.filter(c => {
+      const name = c.nome || c.nome_wpp || '';
+      return name.toLowerCase().includes(q) || c.whatsapp?.includes(q);
+    }).slice(0, 20);
   }, [externalClients, clientSearch]);
 
   const renderEventCard = (evt: MergedEvent) => {
