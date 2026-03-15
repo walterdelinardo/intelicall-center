@@ -91,7 +91,9 @@ const AgendaModule = () => {
   const [editingEvent, setEditingEvent] = useState<MergedEvent | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [eventToDelete, setEventToDelete] = useState<MergedEvent | null>(null);
+  const [editEnabled, setEditEnabled] = useState(false);
   const [editForm, setEditForm] = useState({
     title: "", description: "", date: "", startTime: "", endTime: "",
     clientName: "", clientWhatsapp: "", clientEmail: "", clientOrigin: "",
