@@ -49,19 +49,17 @@ const ConfiguracoesModule = () => {
   const queryClient = useQueryClient();
   const isAdmin = hasRole("admin");
   const { inboxes, loading: inboxesLoading, createInbox, toggleInbox, deleteInbox } = useWhatsAppInboxes();
-  const { accounts: googleAccounts, loading: googleLoading, initiateOAuth, addICalAccount, toggleAccount: toggleGoogleAccount, deleteAccount: deleteGoogleAccount, fetchCalendars, updateCalendarId } = useGoogleOAuth();
+  const { accounts: googleAccounts, loading: googleLoading, initiateOAuth, toggleAccount: toggleGoogleAccount, deleteAccount: deleteGoogleAccount, fetchCalendars, updateCalendarId, updateLabel } = useGoogleOAuth();
 
   const [showAddInbox, setShowAddInbox] = useState(false);
   const [newLabel, setNewLabel] = useState("");
   const [newInstanceName, setNewInstanceName] = useState("");
   const [newPhone, setNewPhone] = useState("");
   const [savingInbox, setSavingInbox] = useState(false);
-  const [showAddGoogle, setShowAddGoogle] = useState(false);
-  const [newGoogleLabel, setNewGoogleLabel] = useState("");
-  const [addGoogleMode, setAddGoogleMode] = useState<"oauth" | "ical">("oauth");
-  const [newICalUrl, setNewICalUrl] = useState("");
   const [calendarsMap, setCalendarsMap] = useState<Record<string, GoogleCalendarOption[]>>({});
   const [loadingCalendars, setLoadingCalendars] = useState<Record<string, boolean>>({});
+  const [editingLabel, setEditingLabel] = useState<string | null>(null);
+  const [editLabelValue, setEditLabelValue] = useState("");
   const { data: clinic, isLoading } = useQuery({
     queryKey: ["clinic", profile?.clinic_id],
     queryFn: async () => {
