@@ -734,17 +734,29 @@ const ConfiguracoesModule = () => {
                                         Personalizada
                                         <input
                                           type="color"
+                                          id={`color-input-${acc.id}`}
                                           defaultValue={acc.color || '#039BE5'}
-                                          onBlur={(e) => {
-                                            const newColor = e.target.value;
-                                            if (newColor !== (acc.color || '#039BE5')) {
-                                              updateColor(acc.id, newColor);
-                                            }
-                                          }}
                                           onChange={(e) => e.stopPropagation()}
                                           className="w-7 h-7 rounded cursor-pointer border-0 p-0 bg-transparent"
                                         />
                                       </label>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 ml-auto"
+                                        onClick={() => {
+                                          const input = document.getElementById(`color-input-${acc.id}`) as HTMLInputElement;
+                                          if (input) {
+                                            const newColor = input.value;
+                                            if (newColor !== (acc.color || '#039BE5')) {
+                                              updateColor(acc.id, newColor);
+                                            }
+                                          }
+                                        }}
+                                        title="Confirmar cor"
+                                      >
+                                        <Check className="w-3.5 h-3.5" />
+                                      </Button>
                                     </div>
                                   </PopoverContent>
                                 </Popover>
