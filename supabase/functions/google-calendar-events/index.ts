@@ -147,7 +147,7 @@ async function createEvent(accessToken: string, calendarId: string, body: any, l
   return { success: true, event: { id: created.id, title: created.summary, htmlLink: created.htmlLink } };
 }
 
-async function updateEvent(accessToken: string, calendarId: string, body: any) {
+async function updateEvent(accessToken: string, calendarId: string, body: any, locationUrl?: string) {
   const { eventId, title, description, startDateTime, endDateTime, extendedProperties } = body;
   if (!eventId || !title || !startDateTime || !endDateTime) throw new Error('Missing required fields');
 
@@ -157,6 +157,10 @@ async function updateEvent(accessToken: string, calendarId: string, body: any) {
     start: { dateTime: startDateTime, timeZone: 'America/Sao_Paulo' },
     end: { dateTime: endDateTime, timeZone: 'America/Sao_Paulo' },
   };
+
+  if (locationUrl) {
+    eventBody.location = locationUrl;
+  }
 
   if (extendedProperties) {
     eventBody.extendedProperties = { private: extendedProperties };
