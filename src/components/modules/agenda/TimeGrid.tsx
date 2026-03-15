@@ -15,6 +15,7 @@ interface MergedEvent {
   description?: string;
   accountLabel?: string;
   accountId?: string;
+  accountColor?: string;
   appointment?: any;
   startDateTime?: string;
   endDateTime?: string;
@@ -32,7 +33,7 @@ const statusColors: Record<string, string> = {
 
 const START_HOUR = 0;
 const END_HOUR = 24;
-const SLOT_HEIGHT = 32; // px per 30min slot
+const SLOT_HEIGHT = 32;
 
 function generateTimeSlots() {
   const slots: string[] = [];
@@ -51,6 +52,20 @@ function timeToMinutes(time: string): number {
 function parseDuration(duration: string): number {
   const match = duration.match(/(\d+)/);
   return match ? parseInt(match[1]) : 60;
+}
+
+const DEFAULT_COLOR = '#039BE5';
+
+function getEventStyles(evt: MergedEvent) {
+  if (evt.type === 'google') {
+    const color = evt.accountColor || DEFAULT_COLOR;
+    return {
+      backgroundColor: `${color}20`,
+      borderLeft: `3px solid ${color}`,
+      color: color,
+    };
+  }
+  return {};
 }
 
 interface TimeGridProps {
@@ -109,6 +124,8 @@ export const TimeGrid = ({ events, onSlotClick, onEventClick, onStatusChange }: 
 
           if (evtMinutes < gridStartMin || evtMinutes >= END_HOUR * 60 || top < 0) return null;
 
+          const styles = getEventStyles(evt);
+
           return (
             <div
               key={`${evt.type}-${evt.id}`}
@@ -117,11 +134,14 @@ export const TimeGrid = ({ events, onSlotClick, onEventClick, onStatusChange }: 
               onClick={() => onEventClick(evt)}
             >
               {evt.type === 'google' ? (
-                <div className="h-full rounded-md border border-blue-200 bg-blue-50 px-2 py-1 overflow-hidden hover:shadow-md transition-shadow">
-                  <p className="font-medium text-xs text-blue-900 truncate">{evt.title}</p>
-                  <p className="text-[10px] text-blue-600">{evt.time} · {evt.duration}</p>
+                <div
+                  className="h-full rounded-md px-2 py-1 overflow-hidden hover:shadow-md transition-shadow"
+                  style={styles}
+                >
+                  <p className="font-medium text-xs truncate" style={{ color: styles.color }}>{evt.title}</p>
+                  <p className="text-[10px]" style={{ color: styles.color, opacity: 0.7 }}>{evt.time} · {evt.duration}</p>
                   {evt.accountLabel && (
-                    <p className="text-[10px] text-blue-400 truncate">{evt.accountLabel}</p>
+                    <p className="text-[10px] truncate" style={{ color: styles.color, opacity: 0.5 }}>{evt.accountLabel}</p>
                   )}
                 </div>
               ) : (
@@ -226,6 +246,8 @@ export const WeekTimeGrid = ({ days, getEventsForDay, onSlotClick, onEventClick,
 
             if (evtMinutes < gridStartMin || evtMinutes >= END_HOUR * 60 || top < 0) return null;
 
+            const styles = evt.type === 'google' ? getEventStyles(evt) : {};
+
             return (
               <div
                 key={`${evt.type}-${evt.id}`}
@@ -238,12 +260,20 @@ export const WeekTimeGrid = ({ days, getEventsForDay, onSlotClick, onEventClick,
                 }}
                 onClick={() => onEventClick(evt)}
               >
-                <div className={`h-full rounded border text-[10px] px-1 py-0.5 overflow-hidden hover:shadow-md transition-shadow ${
-                  evt.type === 'google' ? 'border-blue-200 bg-blue-50 text-blue-900' : statusColors[evt.status] || 'bg-card'
-                }`}>
-                  <p className="font-medium truncate">{evt.title}</p>
-                  <p className="opacity-75">{evt.time}</p>
-                </div>
+                {evt.type === 'google' ? (
+                  <div
+                    className="h-full rounded text-[10px] px-1 py-0.5 overflow-hidden hover:shadow-md transition-shadow"
+                    style={styles}
+                  >
+                    <p className="font-medium truncate" style={{ color: styles.color }}>{evt.title}</p>
+                    <p style={{ color: styles.color, opacity: 0.7 }}>{evt.time}</p>
+                  </div>
+                ) : (
+                  <div className={`h-full rounded border text-[10px] px-1 py-0.5 overflow-hidden hover:shadow-md transition-shadow ${statusColors[evt.status] || 'bg-card'}`}>
+                    <p className="font-medium truncate">{evt.title}</p>
+                    <p className="opacity-75">{evt.time}</p>
+                  </div>
+                )}
               </div>
             );
           });
