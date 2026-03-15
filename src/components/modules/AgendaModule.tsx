@@ -330,6 +330,8 @@ const AgendaModule = () => {
         resetForm();
       } catch (err: any) {
         toast.error(err.message);
+      } finally {
+        setIsSubmitting(false);
       }
     }
   };
