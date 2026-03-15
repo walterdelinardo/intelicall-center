@@ -46,9 +46,19 @@ async function getValidAccessToken(
   if (expiresAt > new Date()) return account.access_token;
 
   console.log('Access token expired for account', account.id, ', refreshing...');
-  const clientId = Deno.env.get('GOOGLE_CLIENT_ID')!;
-  const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET')!;
-  return refreshAccessToken(supabase, account, clientId, clientSecret);
+
+  // Fetch credentials from google_oauth_config per clinic
+  const { data: oauthConfig, error: configError } = await supabase
+    .from('google_oauth_config')
+    .select('client_id, client_secret')
+    .eq('clinic_id', account.clinic_id)
+    .single();
+
+  if (configError || !oauthConfig) {
+    throw new Error('Google OAuth credentials not found for this clinic');
+  }
+
+  return refreshAccessToken(supabase, account, oauthConfig.client_id, oauthConfig.client_secret);
 }
 
 async function listEvents(accessToken: string, calendarId: string) {

@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Settings, Building2, Clock, Phone, MapPin, Mail, Save, Loader2, Smartphone, Plus, Power, Plug, Trash2, Calendar, Pencil, KeyRound } from "lucide-react";
+import { Settings, Building2, Clock, Phone, MapPin, Mail, Save, Loader2, Smartphone, Plus, Power, Plug, Trash2, Calendar, Pencil } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { type GoogleCalendarOption } from "@/hooks/useGoogleOAuth";
 import { toast } from "sonner";
@@ -751,21 +751,16 @@ const ConfiguracoesModule = () => {
                     <p className="text-sm text-muted-foreground">Nenhuma conta Google Calendar conectada.</p>
                   )}
 
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setShowGoogleConfig(true)}>
-                      <KeyRound className="w-4 h-4 mr-1" /> {hasCredentials ? "Editar Credenciais" : "Configurar Credenciais"}
-                    </Button>
-                    {hasCredentials && (
-                      <Button variant="outline" size="sm" onClick={() => initiateOAuth()}>
-                        <Plus className="w-4 h-4 mr-1" /> Conectar Conta Google
-                      </Button>
-                    )}
-                  </div>
+                  <Button variant="outline" size="sm" onClick={() => setShowGoogleConfig(true)}>
+                    <Plus className="w-4 h-4 mr-1" /> Conectar Conta Google
+                  </Button>
 
                   <GoogleOAuthConfigDialog
                     open={showGoogleConfig}
                     onOpenChange={setShowGoogleConfig}
                     onSaved={() => fetchOAuthConfig()}
+                    onConnect={() => initiateOAuth()}
+                    hasCredentials={hasCredentials}
                   />
                 </>
               )}
