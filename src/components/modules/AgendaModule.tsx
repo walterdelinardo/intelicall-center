@@ -264,6 +264,7 @@ const AgendaModule = () => {
       const extendedProperties: CalendarEventExtendedProps = {
         clientName: form.clientName,
         clientWhatsapp: form.clientWhatsapp,
+        clientEmail: form.clientEmail,
         clientOrigin: form.clientOrigin,
         procedureName: proc?.name || '',
         procedureValue: form.estimated_price || (proc ? String(proc.price) : ''),
