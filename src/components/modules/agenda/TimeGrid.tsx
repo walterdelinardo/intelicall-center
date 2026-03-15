@@ -30,9 +30,9 @@ const statusColors: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-700 border-yellow-300",
 };
 
-const START_HOUR = 7;
-const END_HOUR = 21;
-const SLOT_HEIGHT = 48; // px per 30min slot
+const START_HOUR = 0;
+const END_HOUR = 24;
+const SLOT_HEIGHT = 32; // px per 30min slot
 
 function generateTimeSlots() {
   const slots: string[] = [];
@@ -107,7 +107,7 @@ export const TimeGrid = ({ events, onSlotClick, onEventClick, onStatusChange }: 
           const top = ((evtMinutes - gridStartMin) / 30) * SLOT_HEIGHT;
           const height = Math.max((durationMin / 30) * SLOT_HEIGHT - 2, SLOT_HEIGHT - 2);
 
-          if (evtMinutes < gridStartMin || evtMinutes >= END_HOUR * 60) return null;
+          if (evtMinutes < gridStartMin || evtMinutes >= END_HOUR * 60 || top < 0) return null;
 
           return (
             <div
@@ -224,7 +224,7 @@ export const WeekTimeGrid = ({ days, getEventsForDay, onSlotClick, onEventClick,
             const top = slotIndex * SLOT_HEIGHT;
             const height = Math.max((durationMin / 30) * SLOT_HEIGHT - 2, SLOT_HEIGHT - 2);
 
-            if (evtMinutes < gridStartMin || evtMinutes >= END_HOUR * 60) return null;
+            if (evtMinutes < gridStartMin || evtMinutes >= END_HOUR * 60 || top < 0) return null;
 
             return (
               <div
