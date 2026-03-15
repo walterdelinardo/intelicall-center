@@ -312,7 +312,7 @@ const AgendaModule = () => {
       title: "", description: "", client_id: "", procedure_id: "",
       date: format(selectedDate, "yyyy-MM-dd"), start_time: "09:00",
       duration_minutes: "30", estimated_price: "", notes: "",
-      clientName: "", clientWhatsapp: "", clientOrigin: "",
+      clientName: "", clientWhatsapp: "", clientEmail: "", clientOrigin: "",
     });
     setIsNewClient(false);
   };
