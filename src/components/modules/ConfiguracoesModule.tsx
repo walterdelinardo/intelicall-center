@@ -60,7 +60,8 @@ const ConfiguracoesModule = () => {
   const [newGoogleLabel, setNewGoogleLabel] = useState("");
   const [addGoogleMode, setAddGoogleMode] = useState<"oauth" | "ical">("oauth");
   const [newICalUrl, setNewICalUrl] = useState("");
-
+  const [calendarsMap, setCalendarsMap] = useState<Record<string, GoogleCalendarOption[]>>({});
+  const [loadingCalendars, setLoadingCalendars] = useState<Record<string, boolean>>({});
   const { data: clinic, isLoading } = useQuery({
     queryKey: ["clinic", profile?.clinic_id],
     queryFn: async () => {
