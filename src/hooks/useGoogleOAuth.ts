@@ -43,7 +43,7 @@ export const useGoogleOAuth = () => {
 
       const { data, error } = await supabase
         .from('google_calendar_accounts')
-        .select('id, label, calendar_id, is_active, expires_at, created_at, ical_url')
+        .select('id, label, calendar_id, is_active, expires_at, created_at, ical_url, color')
         .order('created_at');
 
       if (error) {
