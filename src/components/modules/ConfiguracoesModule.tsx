@@ -640,7 +640,25 @@ const ConfiguracoesModule = () => {
 
                   {showAddGoogle ? (
                     <div className="border rounded-lg p-4 space-y-3">
-                      <h4 className="font-medium text-sm">Conectar Google Calendar</h4>
+                      <h4 className="font-medium text-sm">Adicionar Google Calendar</h4>
+                      
+                      <div className="flex gap-2">
+                        <Button
+                          variant={addGoogleMode === "oauth" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setAddGoogleMode("oauth")}
+                        >
+                          OAuth (acesso completo)
+                        </Button>
+                        <Button
+                          variant={addGoogleMode === "ical" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setAddGoogleMode("ical")}
+                        >
+                          Link iCal (somente leitura)
+                        </Button>
+                      </div>
+
                       <div className="space-y-1">
                         <Label htmlFor="google-label">Label *</Label>
                         <Input
@@ -650,20 +668,47 @@ const ConfiguracoesModule = () => {
                           onChange={(e) => setNewGoogleLabel(e.target.value)}
                         />
                       </div>
+
+                      {addGoogleMode === "ical" && (
+                        <div className="space-y-1">
+                          <Label htmlFor="ical-url">URL iCal *</Label>
+                          <Input
+                            id="ical-url"
+                            placeholder="https://calendar.google.com/calendar/ical/..."
+                            value={newICalUrl}
+                            onChange={(e) => setNewICalUrl(e.target.value)}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Cole o link iCal do Google Calendar (Configurações → Integrar agenda → Endereço secreto no formato iCal)
+                          </p>
+                        </div>
+                      )}
+
                       <div className="flex gap-2">
                         <Button
                           size="sm"
-                          onClick={() => {
+                          onClick={async () => {
                             if (!newGoogleLabel.trim()) {
                               toast.error("Preencha o label da conta");
                               return;
                             }
-                            initiateOAuth(newGoogleLabel.trim());
+                            if (addGoogleMode === "ical") {
+                              if (!newICalUrl.trim()) {
+                                toast.error("Preencha a URL iCal");
+                                return;
+                              }
+                              await addICalAccount(newGoogleLabel.trim(), newICalUrl.trim());
+                              setShowAddGoogle(false);
+                              setNewGoogleLabel("");
+                              setNewICalUrl("");
+                            } else {
+                              initiateOAuth(newGoogleLabel.trim());
+                            }
                           }}
                         >
-                          Conectar com Google
+                          {addGoogleMode === "ical" ? "Adicionar iCal" : "Conectar com Google"}
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => { setShowAddGoogle(false); setNewGoogleLabel(""); }}>
+                        <Button variant="outline" size="sm" onClick={() => { setShowAddGoogle(false); setNewGoogleLabel(""); setNewICalUrl(""); }}>
                           Cancelar
                         </Button>
                       </div>
