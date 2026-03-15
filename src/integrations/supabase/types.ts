@@ -510,6 +510,59 @@ export type Database = {
           },
         ]
       }
+      google_calendar_accounts: {
+        Row: {
+          access_token: string
+          calendar_id: string
+          clinic_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          is_active: boolean
+          label: string
+          refresh_token: string | null
+          scope: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          calendar_id?: string
+          clinic_id: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          is_active?: boolean
+          label?: string
+          refresh_token?: string | null
+          scope?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          calendar_id?: string
+          clinic_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          is_active?: boolean
+          label?: string
+          refresh_token?: string | null
+          scope?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_calendar_accounts_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       google_oauth_tokens: {
         Row: {
           access_token: string

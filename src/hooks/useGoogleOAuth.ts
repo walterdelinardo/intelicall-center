@@ -1,62 +1,63 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
+interface GoogleCalendarAccount {
+  id: string;
+  label: string;
+  calendar_id: string;
+  is_active: boolean;
+  expires_at: string;
+  created_at: string;
+}
+
 export const useGoogleOAuth = () => {
-  const [isConnected, setIsConnected] = useState(false);
+  const { profile } = useAuth();
+  const [accounts, setAccounts] = useState<GoogleCalendarAccount[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const checkConnection = async () => {
+  const fetchAccounts = async () => {
     try {
       setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        setIsConnected(false);
+      if (!profile?.clinic_id) {
+        setAccounts([]);
         return;
       }
 
       const { data, error } = await supabase
-        .from('google_oauth_tokens')
-        .select('id, expires_at')
-        .eq('user_id', user.id)
-        .single();
+        .from('google_calendar_accounts')
+        .select('id, label, calendar_id, is_active, expires_at, created_at')
+        .order('created_at');
 
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error checking connection:', error);
-        setIsConnected(false);
+      if (error) {
+        console.error('Error fetching accounts:', error);
+        setAccounts([]);
         return;
       }
 
-      // Check if token exists and is not expired
-      if (data) {
-        const expiresAt = new Date(data.expires_at);
-        const now = new Date();
-        setIsConnected(expiresAt > now);
-      } else {
-        setIsConnected(false);
-      }
+      setAccounts((data as any[]) || []);
     } catch (error) {
       console.error('Error:', error);
-      setIsConnected(false);
+      setAccounts([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const initiateOAuth = async () => {
+  const initiateOAuth = async (label: string = 'Principal') => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
+      if (!user || !profile?.clinic_id) {
         toast.error('Você precisa estar logado');
         return;
       }
 
       const clientId = '282570764186-4s0gf5qguon2ddfsocp41cphsq99ta50.apps.googleusercontent.com';
-      const redirectUri = `${window.location.origin}/supabase/functions/v1/google-oauth-callback`;
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const redirectUri = `${supabaseUrl}/functions/v1/google-oauth-callback`;
       const scope = 'https://www.googleapis.com/auth/calendar';
-      const state = user.id;
+      const state = JSON.stringify({ user_id: user.id, clinic_id: profile.clinic_id, label });
 
       const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
       authUrl.searchParams.append('client_id', clientId);
@@ -74,51 +75,52 @@ export const useGoogleOAuth = () => {
     }
   };
 
-  const disconnect = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        return;
-      }
+  const toggleAccount = async (accountId: string, isActive: boolean) => {
+    const { error } = await supabase
+      .from('google_calendar_accounts')
+      .update({ is_active: isActive })
+      .eq('id', accountId);
 
-      const { error } = await supabase
-        .from('google_oauth_tokens')
-        .delete()
-        .eq('user_id', user.id);
-
-      if (error) {
-        console.error('Error disconnecting:', error);
-        toast.error('Erro ao desconectar');
-        return;
-      }
-
-      setIsConnected(false);
-      toast.success('Desconectado do Google Calendar');
-    } catch (error) {
-      console.error('Error:', error);
-      toast.error('Erro ao desconectar');
+    if (error) {
+      toast.error('Erro ao atualizar conta');
+      throw error;
     }
+    await fetchAccounts();
+  };
+
+  const deleteAccount = async (accountId: string) => {
+    const { error } = await supabase
+      .from('google_calendar_accounts')
+      .delete()
+      .eq('id', accountId);
+
+    if (error) {
+      toast.error('Erro ao excluir conta');
+      throw error;
+    }
+    await fetchAccounts();
   };
 
   useEffect(() => {
-    checkConnection();
+    if (profile?.clinic_id) {
+      fetchAccounts();
+    }
 
-    // Check for OAuth callback success
     const params = new URLSearchParams(window.location.search);
     if (params.get('google_auth') === 'success') {
       toast.success('Conectado ao Google Calendar com sucesso!');
-      checkConnection();
-      // Clean up URL
+      fetchAccounts();
       window.history.replaceState({}, '', window.location.pathname);
     }
-  }, []);
+  }, [profile?.clinic_id]);
 
   return {
-    isConnected,
+    accounts,
     loading,
     initiateOAuth,
-    disconnect,
-    checkConnection,
+    toggleAccount,
+    deleteAccount,
+    fetchAccounts,
+    isConnected: accounts.some((a) => a.is_active),
   };
 };

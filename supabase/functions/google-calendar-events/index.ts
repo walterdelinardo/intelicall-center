@@ -1,293 +1,275 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.80.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-serve(async (req) => {
+async function refreshAccessToken(
+  supabase: any,
+  account: any,
+  clientId: string,
+  clientSecret: string
+): Promise<string> {
+  if (!account.refresh_token) throw new Error('No refresh token available');
+
+  const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: account.refresh_token,
+      grant_type: 'refresh_token',
+    }),
+  });
+
+  if (!refreshResponse.ok) throw new Error('Failed to refresh access token');
+
+  const refreshData = await refreshResponse.json();
+  const newExpiresAt = new Date(Date.now() + refreshData.expires_in * 1000).toISOString();
+
+  await supabase
+    .from('google_calendar_accounts')
+    .update({ access_token: refreshData.access_token, expires_at: newExpiresAt })
+    .eq('id', account.id);
+
+  console.log('Token refreshed for account', account.id);
+  return refreshData.access_token;
+}
+
+async function getValidAccessToken(
+  supabase: any,
+  account: any
+): Promise<string> {
+  const expiresAt = new Date(account.expires_at);
+  if (expiresAt > new Date()) return account.access_token;
+
+  console.log('Access token expired for account', account.id, ', refreshing...');
+  const clientId = Deno.env.get('GOOGLE_CLIENT_ID')!;
+  const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET')!;
+  return refreshAccessToken(supabase, account, clientId, clientSecret);
+}
+
+async function listEvents(accessToken: string, calendarId: string) {
+  const timeMin = new Date().toISOString();
+  const timeMax = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  const response = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime&maxResults=50`,
+    {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Google Calendar API error:', errorText);
+    throw new Error(`Google Calendar API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data.items?.map((event: any) => ({
+    id: event.id,
+    title: event.summary || 'Sem título',
+    date: event.start?.dateTime ? new Date(event.start.dateTime).toISOString().split('T')[0] : event.start?.date,
+    time: event.start?.dateTime ? new Date(event.start.dateTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'Dia inteiro',
+    duration: event.start?.dateTime && event.end?.dateTime
+      ? `${Math.round((new Date(event.end.dateTime).getTime() - new Date(event.start.dateTime).getTime()) / 60000)} min`
+      : 'Dia inteiro',
+    status: event.status === 'confirmed' ? 'confirmed' : 'pending',
+    description: event.description || '',
+    startDateTime: event.start?.dateTime || null,
+    endDateTime: event.end?.dateTime || null,
+  })) || [];
+}
+
+async function createEvent(accessToken: string, calendarId: string, body: any) {
+  const { title, description, startDateTime, endDateTime } = body;
+  if (!title || !startDateTime || !endDateTime) throw new Error('Missing required fields');
+
+  const response = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
+    {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        summary: title,
+        description: description || '',
+        start: { dateTime: startDateTime, timeZone: 'America/Sao_Paulo' },
+        end: { dateTime: endDateTime, timeZone: 'America/Sao_Paulo' },
+      }),
+    }
+  );
+
+  if (!response.ok) throw new Error(`Failed to create event: ${response.status}`);
+  const created = await response.json();
+  return { success: true, event: { id: created.id, title: created.summary, htmlLink: created.htmlLink } };
+}
+
+async function updateEvent(accessToken: string, calendarId: string, body: any) {
+  const { eventId, title, description, startDateTime, endDateTime } = body;
+  if (!eventId || !title || !startDateTime || !endDateTime) throw new Error('Missing required fields');
+
+  const response = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${eventId}`,
+    {
+      method: 'PUT',
+      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        summary: title,
+        description: description || '',
+        start: { dateTime: startDateTime, timeZone: 'America/Sao_Paulo' },
+        end: { dateTime: endDateTime, timeZone: 'America/Sao_Paulo' },
+      }),
+    }
+  );
+
+  if (!response.ok) throw new Error(`Failed to update event: ${response.status}`);
+  const updated = await response.json();
+  return { success: true, event: { id: updated.id, title: updated.summary } };
+}
+
+async function deleteEvent(accessToken: string, calendarId: string, eventId: string) {
+  if (!eventId) throw new Error('Missing eventId');
+
+  const response = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${eventId}`,
+    {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    }
+  );
+
+  if (!response.ok) throw new Error(`Failed to delete event: ${response.status}`);
+  return { success: true, eventId };
+}
+
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Get authorization header
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('Missing authorization header');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const token = authHeader.replace('Bearer ', '');
-
-    // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: { Authorization: authHeader },
-      },
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
     });
 
-    // Get user from token
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: userError } = await userClient.auth.getUser(token);
     if (userError || !user) {
-      throw new Error('Invalid or expired token');
+      return new Response(JSON.stringify({ error: 'Invalid token' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Get Google OAuth token from database
-    const { data: tokenData, error: tokenError } = await supabase
-      .from('google_oauth_tokens')
-      .select('access_token, refresh_token, expires_at')
-      .eq('user_id', user.id)
-      .single();
-
-    if (tokenError || !tokenData) {
-      throw new Error('Google Calendar not connected. Please connect your account first.');
-    }
-
-    // Check if token is expired and refresh if needed
-    let accessToken = tokenData.access_token;
-    const expiresAt = new Date(tokenData.expires_at);
-    const now = new Date();
-
-    if (expiresAt <= now && tokenData.refresh_token) {
-      console.log('Access token expired, refreshing...');
-      
-      const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
-      const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
-
-      const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-          client_id: clientId!,
-          client_secret: clientSecret!,
-          refresh_token: tokenData.refresh_token,
-          grant_type: 'refresh_token',
-        }),
-      });
-
-      if (!refreshResponse.ok) {
-        throw new Error('Failed to refresh access token');
-      }
-
-      const refreshData = await refreshResponse.json();
-      accessToken = refreshData.access_token;
-
-      // Update token in database
-      const newExpiresAt = new Date(Date.now() + refreshData.expires_in * 1000).toISOString();
-      await supabase
-        .from('google_oauth_tokens')
-        .update({
-          access_token: accessToken,
-          expires_at: newExpiresAt,
-        })
-        .eq('user_id', user.id);
-
-      console.log('Token refreshed successfully');
-    }
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const body = await req.json().catch(() => ({}));
     const action = body.action || 'list';
+    const accountId = body.account_id;
 
-    if (action === 'list') {
-      console.log('Fetching events from Google Calendar');
-      const timeMin = new Date().toISOString();
-      const timeMax = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    // If account_id provided, use that specific account
+    // Otherwise, fetch all active accounts for the user's clinic
+    let accounts: any[] = [];
 
-      const response = await fetch(
-        `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime&maxResults=50`,
-        {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+    if (accountId) {
+      const { data, error } = await supabase
+        .from('google_calendar_accounts')
+        .select('*')
+        .eq('id', accountId)
+        .eq('is_active', true)
+        .single();
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Google Calendar API error:', errorText);
-        throw new Error(`Google Calendar API error: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
-
-      // Format events for the app
-      const events = data.items?.map((event: any) => ({
-        id: event.id,
-        title: event.summary || 'Sem título',
-        date: event.start?.dateTime ? new Date(event.start.dateTime).toISOString().split('T')[0] : event.start?.date,
-        time: event.start?.dateTime ? new Date(event.start.dateTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'Dia inteiro',
-        duration: event.start?.dateTime && event.end?.dateTime 
-          ? `${Math.round((new Date(event.end.dateTime).getTime() - new Date(event.start.dateTime).getTime()) / 60000)} min`
-          : 'Dia inteiro',
-        status: event.status === 'confirmed' ? 'confirmed' : 'pending',
-        description: event.description || '',
-      })) || [];
-
-      console.log(`Found ${events.length} events`);
-
-      return new Response(JSON.stringify({ events }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-
-    } else if (action === 'create') {
-      const { title, description, startDateTime, endDateTime } = body;
-
-      if (!title || !startDateTime || !endDateTime) {
-        throw new Error('Missing required fields: title, startDateTime, endDateTime');
-      }
-
-      const eventData = {
-        summary: title,
-        description: description || '',
-        start: {
-          dateTime: startDateTime,
-          timeZone: 'America/Sao_Paulo',
-        },
-        end: {
-          dateTime: endDateTime,
-          timeZone: 'America/Sao_Paulo',
-        },
-      };
-
-      console.log('Creating event in Google Calendar:', eventData);
-
-      const response = await fetch(
-        'https://www.googleapis.com/calendar/v3/calendars/primary/events',
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(eventData),
-        }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error creating event:', errorText);
-        throw new Error(`Failed to create event: ${response.status} ${response.statusText}`);
-      }
-
-      const createdEvent = await response.json();
-      console.log('Event created successfully:', createdEvent.id);
-
-      return new Response(JSON.stringify({ 
-        success: true,
-        event: {
-          id: createdEvent.id,
-          title: createdEvent.summary,
-          htmlLink: createdEvent.htmlLink,
-        }
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-
-    } else if (action === 'update') {
-      const { eventId, title, description, startDateTime, endDateTime } = body;
-
-      if (!eventId || !title || !startDateTime || !endDateTime) {
-        throw new Error('Missing required fields: eventId, title, startDateTime, endDateTime');
-      }
-
-      const eventData = {
-        summary: title,
-        description: description || '',
-        start: {
-          dateTime: startDateTime,
-          timeZone: 'America/Sao_Paulo',
-        },
-        end: {
-          dateTime: endDateTime,
-          timeZone: 'America/Sao_Paulo',
-        },
-      };
-
-      console.log('Updating event in Google Calendar:', eventId, eventData);
-
-      const response = await fetch(
-        `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,
-        {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(eventData),
-        }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error updating event:', errorText);
-        throw new Error(`Failed to update event: ${response.status} ${response.statusText}`);
-      }
-
-      const updatedEvent = await response.json();
-      console.log('Event updated successfully:', updatedEvent.id);
-
-      return new Response(JSON.stringify({ 
-        success: true,
-        event: {
-          id: updatedEvent.id,
-          title: updatedEvent.summary,
-        }
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-
-    } else if (action === 'delete') {
-      const { eventId } = body;
-
-      if (!eventId) {
-        throw new Error('Missing required field: eventId');
-      }
-
-      console.log('Deleting event from Google Calendar:', eventId);
-
-      const response = await fetch(
-        `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,
-        {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error deleting event:', errorText);
-        throw new Error(`Failed to delete event: ${response.status} ${response.statusText}`);
-      }
-
-      console.log('Event deleted successfully:', eventId);
-
-      return new Response(JSON.stringify({ 
-        success: true,
-        eventId
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-
+      if (error || !data) throw new Error('Google Calendar account not found');
+      accounts = [data];
     } else {
-      throw new Error('Invalid action. Use action: list, create, update, or delete');
+      // Get user's clinic_id
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('clinic_id')
+        .eq('id', user.id)
+        .single();
+
+      if (!profile?.clinic_id) throw new Error('User has no clinic');
+
+      const { data, error } = await supabase
+        .from('google_calendar_accounts')
+        .select('*')
+        .eq('clinic_id', profile.clinic_id)
+        .eq('is_active', true);
+
+      if (error) throw error;
+      accounts = data || [];
     }
 
+    if (accounts.length === 0) {
+      throw new Error('Google Calendar not connected. Please connect your account first.');
+    }
+
+    if (action === 'list') {
+      // Fetch events from all accounts
+      const allEvents: any[] = [];
+      for (const account of accounts) {
+        try {
+          const accessToken = await getValidAccessToken(supabase, account);
+          const events = await listEvents(accessToken, account.calendar_id);
+          allEvents.push(...events.map((e: any) => ({
+            ...e,
+            account_id: account.id,
+            account_label: account.label,
+          })));
+        } catch (err) {
+          console.error(`Error fetching from account ${account.id}:`, err);
+        }
+      }
+
+      // Sort by date+time
+      allEvents.sort((a, b) => {
+        const da = a.startDateTime || `${a.date}T${a.time}`;
+        const db = b.startDateTime || `${b.date}T${b.time}`;
+        return da.localeCompare(db);
+      });
+
+      console.log(`Found ${allEvents.length} events from ${accounts.length} accounts`);
+      return new Response(JSON.stringify({ events: allEvents }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // For create/update/delete, use the first account or specific account_id
+    const account = accounts[0];
+    const accessToken = await getValidAccessToken(supabase, account);
+
+    let result;
+    if (action === 'create') {
+      result = await createEvent(accessToken, account.calendar_id, body);
+    } else if (action === 'update') {
+      result = await updateEvent(accessToken, account.calendar_id, body);
+    } else if (action === 'delete') {
+      result = await deleteEvent(accessToken, account.calendar_id, body.eventId);
+    } else {
+      throw new Error('Invalid action');
+    }
+
+    return new Response(JSON.stringify(result), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+
   } catch (error) {
-    console.error('Error in google-calendar-events function:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    return new Response(JSON.stringify({ 
-      error: errorMessage
-    }), {
+    console.error('Error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return new Response(JSON.stringify({ error: errorMessage }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

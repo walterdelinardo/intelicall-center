@@ -10,9 +10,10 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Settings, Building2, Clock, Phone, MapPin, Mail, Save, Loader2, Smartphone, Plus, Power, Plug, Trash2 } from "lucide-react";
+import { Settings, Building2, Clock, Phone, MapPin, Mail, Save, Loader2, Smartphone, Plus, Power, Plug, Trash2, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { useWhatsAppInboxes } from "@/hooks/useWhatsApp";
+import { useGoogleOAuth } from "@/hooks/useGoogleOAuth";
 
 const DAYS = [
   { key: "mon", label: "Segunda-feira" },
@@ -46,12 +47,15 @@ const ConfiguracoesModule = () => {
   const queryClient = useQueryClient();
   const isAdmin = hasRole("admin");
   const { inboxes, loading: inboxesLoading, createInbox, toggleInbox, deleteInbox } = useWhatsAppInboxes();
+  const { accounts: googleAccounts, loading: googleLoading, initiateOAuth, toggleAccount: toggleGoogleAccount, deleteAccount: deleteGoogleAccount } = useGoogleOAuth();
 
   const [showAddInbox, setShowAddInbox] = useState(false);
   const [newLabel, setNewLabel] = useState("");
   const [newInstanceName, setNewInstanceName] = useState("");
   const [newPhone, setNewPhone] = useState("");
   const [savingInbox, setSavingInbox] = useState(false);
+  const [showAddGoogle, setShowAddGoogle] = useState(false);
+  const [newGoogleLabel, setNewGoogleLabel] = useState("");
 
   const { data: clinic, isLoading } = useQuery({
     queryKey: ["clinic", profile?.clinic_id],
@@ -544,6 +548,127 @@ const ConfiguracoesModule = () => {
                   ) : (
                     <Button variant="outline" size="sm" onClick={() => setShowAddInbox(true)}>
                       <Plus className="w-4 h-4 mr-1" /> Adicionar Instância
+                    </Button>
+                  )}
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Google Calendar Section */}
+          <Card className="shadow-card mt-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-primary" />
+                Google Calendar
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {googleLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Carregando...
+                </div>
+              ) : (
+                <>
+                  {googleAccounts.length > 0 && (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Label</TableHead>
+                          <TableHead>Calendar ID</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="w-[80px]">Ações</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {googleAccounts.map((acc) => (
+                          <TableRow key={acc.id}>
+                            <TableCell className="font-medium">{acc.label}</TableCell>
+                            <TableCell className="font-mono text-xs">{acc.calendar_id}</TableCell>
+                            <TableCell>
+                              <Badge variant={acc.is_active ? "default" : "secondary"}>
+                                {acc.is_active ? "Ativo" : "Inativo"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={async () => {
+                                    try {
+                                      await toggleGoogleAccount(acc.id, !acc.is_active);
+                                      toast.success(acc.is_active ? "Conta desativada" : "Conta ativada");
+                                    } catch (error: any) {
+                                      toast.error("Erro: " + error.message);
+                                    }
+                                  }}
+                                  title={acc.is_active ? "Desativar" : "Ativar"}
+                                >
+                                  <Power className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-destructive hover:text-destructive"
+                                  onClick={async () => {
+                                    if (!confirm(`Excluir a conta "${acc.label}"?`)) return;
+                                    try {
+                                      await deleteGoogleAccount(acc.id);
+                                      toast.success("Conta excluída");
+                                    } catch (error: any) {
+                                      toast.error("Erro: " + error.message);
+                                    }
+                                  }}
+                                  title="Excluir"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+
+                  {googleAccounts.length === 0 && !showAddGoogle && (
+                    <p className="text-sm text-muted-foreground">Nenhuma conta Google Calendar conectada.</p>
+                  )}
+
+                  {showAddGoogle ? (
+                    <div className="border rounded-lg p-4 space-y-3">
+                      <h4 className="font-medium text-sm">Conectar Google Calendar</h4>
+                      <div className="space-y-1">
+                        <Label htmlFor="google-label">Label *</Label>
+                        <Input
+                          id="google-label"
+                          placeholder="Ex: Dr. João"
+                          value={newGoogleLabel}
+                          onChange={(e) => setNewGoogleLabel(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            if (!newGoogleLabel.trim()) {
+                              toast.error("Preencha o label da conta");
+                              return;
+                            }
+                            initiateOAuth(newGoogleLabel.trim());
+                          }}
+                        >
+                          Conectar com Google
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => { setShowAddGoogle(false); setNewGoogleLabel(""); }}>
+                          Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button variant="outline" size="sm" onClick={() => setShowAddGoogle(true)}>
+                      <Plus className="w-4 h-4 mr-1" /> Conectar Conta
                     </Button>
                   )}
                 </>
