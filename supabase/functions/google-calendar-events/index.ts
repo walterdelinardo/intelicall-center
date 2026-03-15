@@ -168,53 +168,50 @@ Deno.serve(async (req) => {
     });
 
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: userError } = await userClient.auth.getUser(token);
-    if (userError || !user) {
+    const { data, error: claimsError } = await userClient.auth.getClaims(token);
+    if (claimsError || !data?.claims) {
       return new Response(JSON.stringify({ error: 'Invalid token' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
+    const userId = data.claims.sub;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const body = await req.json().catch(() => ({}));
     const action = body.action || 'list';
     const accountId = body.account_id;
 
-    // If account_id provided, use that specific account
-    // Otherwise, fetch all active accounts for the user's clinic
     let accounts: any[] = [];
 
     if (accountId) {
-      const { data, error } = await supabase
+      const { data: accData, error } = await supabase
         .from('google_calendar_accounts')
         .select('*')
         .eq('id', accountId)
         .eq('is_active', true)
         .single();
 
-      if (error || !data) throw new Error('Google Calendar account not found');
-      accounts = [data];
+      if (error || !accData) throw new Error('Google Calendar account not found');
+      accounts = [accData];
     } else {
-      // Get user's clinic_id
       const { data: profile } = await supabase
         .from('profiles')
         .select('clinic_id')
-        .eq('id', user.id)
+        .eq('id', userId)
         .single();
 
       if (!profile?.clinic_id) throw new Error('User has no clinic');
 
-      const { data, error } = await supabase
+      const { data: accData, error } = await supabase
         .from('google_calendar_accounts')
         .select('*')
         .eq('clinic_id', profile.clinic_id)
         .eq('is_active', true);
 
       if (error) throw error;
-      accounts = data || [];
+      accounts = accData || [];
     }
 
     if (accounts.length === 0) {
-      // Return empty if no accounts (not an error - iCal accounts may exist separately)
       if (action === 'list') {
         return new Response(JSON.stringify({ events: [] }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -226,7 +223,6 @@ Deno.serve(async (req) => {
     if (action === 'list') {
       const allEvents: any[] = [];
       for (const account of accounts) {
-        // Skip iCal-only accounts (handled by fetch-ical-events)
         if (account.ical_url && !account.access_token) continue;
         if (!account.access_token) continue;
 
@@ -255,7 +251,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // For create/update/delete, use the first account or specific account_id
     const account = accounts[0];
     const accessToken = await getValidAccessToken(supabase, account);
 

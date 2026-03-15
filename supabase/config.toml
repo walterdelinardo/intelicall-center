@@ -1,7 +1,10 @@
 project_id = "nlpnfkidnixphnlwhrux"
 
 [functions.google-calendar-events]
-verify_jwt = true
+verify_jwt = false
+
+[functions.fetch-ical-events]
+verify_jwt = false
 
 [functions.google-oauth-callback]
 verify_jwt = false

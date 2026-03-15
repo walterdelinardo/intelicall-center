@@ -8,13 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar, Plus, ChevronLeft, ChevronRight, Clock, Globe } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Calendar, Plus, ChevronLeft, ChevronRight, Clock, Globe, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { format, addDays, startOfWeek, endOfWeek, eachDayOfInterval, isToday, isSameDay, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -25,6 +25,8 @@ const statusColors: Record<string, string> = {
   compareceu: "bg-green-100 text-green-700 border-green-300",
   faltou: "bg-red-100 text-red-700 border-red-300",
   cancelado: "bg-muted text-muted-foreground border-border",
+  confirmed: "bg-blue-100 text-blue-700 border-blue-300",
+  pending: "bg-yellow-100 text-yellow-700 border-yellow-300",
 };
 
 const statusLabels: Record<string, string> = {
@@ -58,31 +60,53 @@ interface MergedEvent {
   time: string;
   duration: string;
   status: string;
+  description?: string;
   accountLabel?: string;
+  accountId?: string;
   appointment?: Appointment;
+  startDateTime?: string;
+  endDateTime?: string;
 }
 
 const AgendaModule = () => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
-  const { events: googleEvents, loading: googleLoading, fetchEvents: fetchGoogleEvents } = useGoogleCalendar();
+  const { events: googleEvents, loading: googleLoading, fetchEvents: fetchGoogleEvents, createEvent: createGoogleEvent, updateEvent: updateGoogleEvent, deleteEvent: deleteGoogleEvent } = useGoogleCalendar();
   const { accounts, isConnected } = useGoogleOAuth();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [view, setView] = useState<"day" | "week">("day");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [syncToGoogle, setSyncToGoogle] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
   const [filterAccount, setFilterAccount] = useState<string>("all");
+
+  // Edit/Delete state for Google events
+  const [editingEvent, setEditingEvent] = useState<MergedEvent | null>(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [eventToDelete, setEventToDelete] = useState<MergedEvent | null>(null);
+  const [editForm, setEditForm] = useState({ title: "", description: "", date: "", startTime: "", endTime: "" });
+  const [editLoading, setEditLoading] = useState(false);
+
+  // Create form - adapts based on whether Google is primary
   const [form, setForm] = useState({
-    client_id: "", procedure_id: "", date: format(new Date(), "yyyy-MM-dd"),
-    start_time: "09:00", duration_minutes: "30", estimated_price: "", notes: "",
+    title: "", description: "", client_id: "", procedure_id: "",
+    date: format(new Date(), "yyyy-MM-dd"), start_time: "09:00",
+    duration_minutes: "30", estimated_price: "", notes: "",
   });
 
-  const activeAccounts = accounts.filter(a => a.is_active);
+  const activeAccounts = accounts.filter(a => a.is_active && !a.ical_url);
+  const useGoogleAsPrimary = isConnected && activeAccounts.length > 0;
 
   useEffect(() => {
     if (isConnected) fetchGoogleEvents();
   }, [isConnected]);
+
+  // Set default account
+  useEffect(() => {
+    if (activeAccounts.length === 1 && !selectedAccountId) {
+      setSelectedAccountId(activeAccounts[0].id);
+    }
+  }, [activeAccounts, selectedAccountId]);
 
   const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(selectedDate, { weekStartsOn: 1 });
@@ -91,6 +115,7 @@ const AgendaModule = () => {
   const dateFrom = view === "day" ? format(selectedDate, "yyyy-MM-dd") : format(weekStart, "yyyy-MM-dd");
   const dateTo = view === "day" ? format(selectedDate, "yyyy-MM-dd") : format(weekEnd, "yyyy-MM-dd");
 
+  // Only fetch local appointments if Google is NOT primary
   const { data: appointments = [], isLoading } = useQuery({
     queryKey: ["appointments", profile?.clinic_id, dateFrom, dateTo],
     queryFn: async () => {
@@ -106,7 +131,7 @@ const AgendaModule = () => {
       if (error) throw error;
       return data as Appointment[];
     },
-    enabled: !!profile?.clinic_id,
+    enabled: !!profile?.clinic_id && !useGoogleAsPrimary,
   });
 
   const { data: clients = [] } = useQuery({
@@ -139,9 +164,29 @@ const AgendaModule = () => {
     enabled: !!profile?.clinic_id,
   });
 
-  // Merge local appointments with Google Calendar events
   const mergedEvents = useMemo((): MergedEvent[] => {
-    const local: MergedEvent[] = appointments.map((apt) => ({
+    if (useGoogleAsPrimary) {
+      // Google is primary — show only Google events
+      return googleEvents
+        .filter((e) => filterAccount === 'all' || e.account_id === filterAccount)
+        .map((e) => ({
+          type: 'google' as const,
+          id: e.id,
+          title: e.title,
+          date: e.date,
+          time: e.time,
+          duration: e.duration,
+          status: e.status,
+          description: e.description,
+          accountLabel: e.account_label,
+          accountId: e.account_id,
+          startDateTime: e.startDateTime,
+          endDateTime: e.endDateTime,
+        }));
+    }
+
+    // No Google — show local appointments
+    return appointments.map((apt) => ({
       type: 'local' as const,
       id: apt.id,
       title: (apt.clients as any)?.name || 'Cliente',
@@ -151,79 +196,127 @@ const AgendaModule = () => {
       status: apt.status,
       appointment: apt,
     }));
+  }, [appointments, googleEvents, filterAccount, useGoogleAsPrimary]);
 
-    const google: MergedEvent[] = googleEvents
-      .filter((e) => {
-        if (filterAccount !== 'all' && e.account_id !== filterAccount) return false;
-        return true;
-      })
-      .map((e) => ({
-        type: 'google' as const,
-        id: e.id,
-        title: e.title,
-        date: e.date,
-        time: e.time,
-        duration: e.duration,
-        status: e.status,
-        accountLabel: e.account_label,
-      }));
+  // Create event — Google-first when connected
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-    return [...local, ...google].sort((a, b) => {
-      if (a.date !== b.date) return a.date.localeCompare(b.date);
-      return a.time.localeCompare(b.time);
-    });
-  }, [appointments, googleEvents, filterAccount]);
+    if (useGoogleAsPrimary) {
+      // Create directly in Google Calendar
+      const accountId = selectedAccountId || activeAccounts[0]?.id;
+      if (!accountId) { toast.error("Selecione uma agenda"); return; }
 
-  const createMutation = useMutation({
-    mutationFn: async () => {
-      if (!profile?.clinic_id) throw new Error("Sem clínica");
-      const { error } = await supabase.from("appointments").insert({
-        clinic_id: profile.clinic_id,
-        client_id: form.client_id,
-        procedure_id: form.procedure_id || null,
-        date: form.date,
-        start_time: form.start_time,
-        duration_minutes: parseInt(form.duration_minutes) || 30,
-        estimated_price: form.estimated_price ? parseFloat(form.estimated_price) : null,
-        notes: form.notes || null,
+      const durationMs = (parseInt(form.duration_minutes) || 30) * 60000;
+      const startDT = `${form.date}T${form.start_time}:00`;
+      const endDT = new Date(new Date(startDT).getTime() + durationMs).toISOString();
+
+      const title = form.title || (() => {
+        const clientName = clients.find(c => c.id === form.client_id)?.name;
+        const procName = procedures.find(p => p.id === form.procedure_id)?.name;
+        return `${clientName || 'Agendamento'}${procName ? ` — ${procName}` : ''}`;
+      })();
+
+      const success = await createGoogleEvent({
+        title,
+        description: form.description || form.notes || '',
+        startDateTime: startDT,
+        endDateTime: endDT,
+        account_id: accountId,
       });
-      if (error) throw error;
 
-      // Also create in Google Calendar if requested
-      if (syncToGoogle && selectedAccountId) {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          const durationMs = (parseInt(form.duration_minutes) || 30) * 60000;
-          const startDT = `${form.date}T${form.start_time}:00`;
-          const endDT = new Date(new Date(startDT).getTime() + durationMs).toISOString();
-          const clientName = clients.find(c => c.id === form.client_id)?.name || 'Agendamento';
-          const procName = procedures.find(p => p.id === form.procedure_id)?.name;
-
-          await supabase.functions.invoke('google-calendar-events', {
-            body: {
-              action: 'create',
-              account_id: selectedAccountId,
-              title: `${clientName}${procName ? ` — ${procName}` : ''}`,
-              description: form.notes || '',
-              startDateTime: startDT,
-              endDateTime: endDT,
-            },
-            headers: { Authorization: `Bearer ${session.access_token}` },
-          });
-        }
+      if (success) {
+        setIsCreateOpen(false);
+        resetForm();
       }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["appointments"] });
-      if (syncToGoogle) fetchGoogleEvents();
-      toast.success("Agendamento criado!");
-      setIsCreateOpen(false);
-      setSyncToGoogle(false);
-      setForm({ client_id: "", procedure_id: "", date: format(selectedDate, "yyyy-MM-dd"), start_time: "09:00", duration_minutes: "30", estimated_price: "", notes: "" });
-    },
-    onError: (e: any) => toast.error(e.message),
-  });
+    } else {
+      // Create locally
+      if (!profile?.clinic_id || !form.client_id) return;
+      try {
+        const { error } = await supabase.from("appointments").insert({
+          clinic_id: profile.clinic_id,
+          client_id: form.client_id,
+          procedure_id: form.procedure_id || null,
+          date: form.date,
+          start_time: form.start_time,
+          duration_minutes: parseInt(form.duration_minutes) || 30,
+          estimated_price: form.estimated_price ? parseFloat(form.estimated_price) : null,
+          notes: form.notes || null,
+        });
+        if (error) throw error;
+        queryClient.invalidateQueries({ queryKey: ["appointments"] });
+        toast.success("Agendamento criado!");
+        setIsCreateOpen(false);
+        resetForm();
+      } catch (err: any) {
+        toast.error(err.message);
+      }
+    }
+  };
 
+  const resetForm = () => {
+    setForm({
+      title: "", description: "", client_id: "", procedure_id: "",
+      date: format(selectedDate, "yyyy-MM-dd"), start_time: "09:00",
+      duration_minutes: "30", estimated_price: "", notes: "",
+    });
+  };
+
+  // Edit Google event
+  const handleEditEvent = (evt: MergedEvent) => {
+    if (evt.type !== 'google') return;
+    setEditingEvent(evt);
+    setEditForm({
+      title: evt.title,
+      description: evt.description || '',
+      date: evt.date,
+      startTime: evt.time,
+      endTime: (() => {
+        const durationMatch = evt.duration.match(/(\d+)/);
+        const durationMin = durationMatch ? parseInt(durationMatch[1]) : 60;
+        const [h, m] = evt.time.split(':').map(Number);
+        const totalMin = h * 60 + m + durationMin;
+        return `${String(Math.floor(totalMin / 60) % 24).padStart(2, '0')}:${String(totalMin % 60).padStart(2, '0')}`;
+      })(),
+    });
+    setIsEditOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingEvent) return;
+    setEditLoading(true);
+
+    const startDT = new Date(`${editForm.date}T${editForm.startTime}:00`);
+    const endDT = new Date(`${editForm.date}T${editForm.endTime}:00`);
+
+    const success = await updateGoogleEvent({
+      eventId: editingEvent.id,
+      title: editForm.title,
+      description: editForm.description,
+      startDateTime: startDT.toISOString(),
+      endDateTime: endDT.toISOString(),
+      account_id: editingEvent.accountId,
+    });
+
+    setEditLoading(false);
+    if (success) {
+      setIsEditOpen(false);
+      setEditingEvent(null);
+    }
+  };
+
+  const handleDeleteEvent = async () => {
+    if (!eventToDelete) return;
+    setEditLoading(true);
+    const success = await deleteGoogleEvent(eventToDelete.id, eventToDelete.accountId);
+    setEditLoading(false);
+    if (success) {
+      setShowDeleteDialog(false);
+      setEventToDelete(null);
+    }
+  };
+
+  // Local appointment status update
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
       const { error } = await supabase.from("appointments").update({ status }).eq("id", id);
@@ -255,11 +348,18 @@ const AgendaModule = () => {
   const renderEventCard = (evt: MergedEvent) => {
     if (evt.type === 'google') {
       return (
-        <Card key={`g-${evt.id}`} className="border border-blue-200 bg-blue-50/50 shadow-sm">
+        <Card
+          key={`g-${evt.id}`}
+          className="border border-blue-200 bg-blue-50/50 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+          onClick={() => handleEditEvent(evt)}
+        >
           <CardContent className="p-3 space-y-1">
             <div className="flex justify-between items-start">
               <div>
                 <p className="font-medium text-sm text-blue-900">{evt.title}</p>
+                {evt.description && (
+                  <p className="text-xs text-blue-600/70 line-clamp-1">{evt.description}</p>
+                )}
                 {evt.accountLabel && (
                   <Badge variant="outline" className="text-[10px] mt-0.5 border-blue-300 text-blue-600">
                     <Globe className="w-3 h-3 mr-1" />
@@ -335,7 +435,6 @@ const AgendaModule = () => {
         </div>
 
         <div className="flex gap-2 flex-wrap items-center">
-          {/* Filter by Google account */}
           {isConnected && activeAccounts.length > 0 && (
             <Select value={filterAccount} onValueChange={setFilterAccount}>
               <SelectTrigger className="w-[160px] h-8 text-xs">
@@ -365,94 +464,122 @@ const AgendaModule = () => {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Novo Agendamento</DialogTitle>
+                <DialogTitle>
+                  {useGoogleAsPrimary ? "Novo Evento no Google Calendar" : "Novo Agendamento"}
+                </DialogTitle>
               </DialogHeader>
-              <form onSubmit={(e) => { e.preventDefault(); createMutation.mutate(); }} className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Cliente *</Label>
-                  <Select value={form.client_id} onValueChange={(v) => setForm({ ...form, client_id: v })}>
-                    <SelectTrigger><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
-                    <SelectContent>
-                      {clients.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Procedimento</Label>
-                  <Select value={form.procedure_id} onValueChange={handleProcedureSelect}>
-                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                    <SelectContent>
-                      {procedures.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>{p.name} — R$ {Number(p.price).toFixed(2)}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Data *</Label>
-                    <Input type="date" required value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Horário *</Label>
-                    <Input type="time" required value={form.start_time} onChange={(e) => setForm({ ...form, start_time: e.target.value })} />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Duração (min)</Label>
-                    <Input type="number" min="5" value={form.duration_minutes} onChange={(e) => setForm({ ...form, duration_minutes: e.target.value })} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Valor (R$)</Label>
-                    <Input type="number" step="0.01" value={form.estimated_price} onChange={(e) => setForm({ ...form, estimated_price: e.target.value })} />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Observações</Label>
-                  <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} />
-                </div>
-
-                {/* Sync to Google Calendar option */}
-                {isConnected && activeAccounts.length > 0 && (
-                  <div className="border rounded-lg p-3 space-y-2 bg-blue-50/50">
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        id="sync-google"
-                        checked={syncToGoogle}
-                        onCheckedChange={(checked) => {
-                          setSyncToGoogle(!!checked);
-                          if (checked && activeAccounts.length === 1) {
-                            setSelectedAccountId(activeAccounts[0].id);
-                          }
-                        }}
+              <form onSubmit={handleCreate} className="space-y-4">
+                {useGoogleAsPrimary ? (
+                  <>
+                    {/* Google Calendar form */}
+                    <div className="space-y-2">
+                      <Label>Título *</Label>
+                      <Input
+                        value={form.title}
+                        onChange={(e) => setForm({ ...form, title: e.target.value })}
+                        placeholder="Ex: Consulta João Silva"
+                        required
                       />
-                      <Label htmlFor="sync-google" className="flex items-center gap-1 text-sm cursor-pointer">
-                        <Globe className="w-4 h-4 text-blue-600" />
-                        Criar também no Google Calendar
-                      </Label>
                     </div>
-                    {syncToGoogle && activeAccounts.length > 1 && (
-                      <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
-                        <SelectTrigger className="h-8 text-xs">
-                          <SelectValue placeholder="Selecione a agenda" />
-                        </SelectTrigger>
+                    <div className="space-y-2">
+                      <Label>Descrição</Label>
+                      <Textarea
+                        value={form.description}
+                        onChange={(e) => setForm({ ...form, description: e.target.value })}
+                        placeholder="Detalhes do evento"
+                        rows={2}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Data *</Label>
+                        <Input type="date" required value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Horário *</Label>
+                        <Input type="time" required value={form.start_time} onChange={(e) => setForm({ ...form, start_time: e.target.value })} />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Duração (min)</Label>
+                      <Input type="number" min="5" value={form.duration_minutes} onChange={(e) => setForm({ ...form, duration_minutes: e.target.value })} />
+                    </div>
+                    {activeAccounts.length > 1 && (
+                      <div className="space-y-2">
+                        <Label>Agenda</Label>
+                        <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione a agenda" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {activeAccounts.map((acc) => (
+                              <SelectItem key={acc.id} value={acc.id}>{acc.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {/* Local appointments form */}
+                    <div className="space-y-2">
+                      <Label>Cliente *</Label>
+                      <Select value={form.client_id} onValueChange={(v) => setForm({ ...form, client_id: v })}>
+                        <SelectTrigger><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
                         <SelectContent>
-                          {activeAccounts.map((acc) => (
-                            <SelectItem key={acc.id} value={acc.id}>{acc.label}</SelectItem>
+                          {clients.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
-                    )}
-                  </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Procedimento</Label>
+                      <Select value={form.procedure_id} onValueChange={handleProcedureSelect}>
+                        <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                        <SelectContent>
+                          {procedures.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>{p.name} — R$ {Number(p.price).toFixed(2)}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Data *</Label>
+                        <Input type="date" required value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Horário *</Label>
+                        <Input type="time" required value={form.start_time} onChange={(e) => setForm({ ...form, start_time: e.target.value })} />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Duração (min)</Label>
+                        <Input type="number" min="5" value={form.duration_minutes} onChange={(e) => setForm({ ...form, duration_minutes: e.target.value })} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Valor (R$)</Label>
+                        <Input type="number" step="0.01" value={form.estimated_price} onChange={(e) => setForm({ ...form, estimated_price: e.target.value })} />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Observações</Label>
+                      <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} />
+                    </div>
+                  </>
                 )}
 
                 <div className="flex justify-end gap-3">
                   <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>Cancelar</Button>
-                  <Button type="submit" className="bg-gradient-primary" disabled={createMutation.isPending || !form.client_id}>
-                    {createMutation.isPending ? "Salvando..." : "Agendar"}
+                  <Button
+                    type="submit"
+                    className="bg-gradient-primary"
+                    disabled={useGoogleAsPrimary ? !form.title : !form.client_id}
+                  >
+                    {useGoogleAsPrimary ? "Criar Evento" : "Agendar"}
                   </Button>
                 </div>
               </form>
@@ -461,8 +588,16 @@ const AgendaModule = () => {
         </div>
       </div>
 
+      {/* Google connected indicator */}
+      {useGoogleAsPrimary && (
+        <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 rounded-lg px-3 py-2">
+          <Globe className="w-4 h-4" />
+          <span>Google Calendar é a fonte principal. Alterações sincronizam automaticamente.</span>
+        </div>
+      )}
+
       {/* Calendar views */}
-      {isLoading ? (
+      {(isLoading || googleLoading) ? (
         <div className="p-8 text-center text-muted-foreground">Carregando...</div>
       ) : view === "day" ? (
         <div className="space-y-3">
@@ -486,7 +621,11 @@ const AgendaModule = () => {
               </div>
               <div className="space-y-2 min-h-[60px]">
                 {dayEvents(day).map((evt) => (
-                  <Card key={`${evt.type}-${evt.id}`} className={`border text-xs ${evt.type === 'google' ? 'border-blue-200 bg-blue-50/50' : statusColors[evt.status]}`}>
+                  <Card
+                    key={`${evt.type}-${evt.id}`}
+                    className={`border text-xs cursor-pointer hover:shadow-md transition-shadow ${evt.type === 'google' ? 'border-blue-200 bg-blue-50/50' : statusColors[evt.status]}`}
+                    onClick={() => evt.type === 'google' && handleEditEvent(evt)}
+                  >
                     <CardContent className="p-2">
                       <p className="font-medium truncate">{evt.title}</p>
                       <p className="opacity-75">{evt.time}</p>
@@ -501,6 +640,84 @@ const AgendaModule = () => {
           ))}
         </div>
       )}
+
+      {/* Edit Google Event Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Pencil className="w-5 h-5" />
+                Editar Evento
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setEventToDelete(editingEvent);
+                  setShowDeleteDialog(true);
+                }}
+                className="gap-2 text-destructive hover:text-destructive"
+              >
+                <Trash2 className="w-4 h-4" />
+                Excluir
+              </Button>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Título *</Label>
+              <Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Descrição</Label>
+              <Textarea value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} rows={2} />
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Data</Label>
+                <Input type="date" value={editForm.date} onChange={(e) => setEditForm({ ...editForm, date: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Início</Label>
+                <Input type="time" value={editForm.startTime} onChange={(e) => setEditForm({ ...editForm, startTime: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Fim</Label>
+                <Input type="time" value={editForm.endTime} onChange={(e) => setEditForm({ ...editForm, endTime: e.target.value })} />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditOpen(false)} disabled={editLoading}>Cancelar</Button>
+            <Button onClick={handleSaveEdit} disabled={editLoading || !editForm.title}>
+              {editLoading ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir "{eventToDelete?.title}"? O evento será removido do Google Calendar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={editLoading}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteEvent}
+              disabled={editLoading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {editLoading ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
