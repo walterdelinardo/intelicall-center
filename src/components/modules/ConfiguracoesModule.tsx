@@ -50,7 +50,7 @@ const ConfiguracoesModule = () => {
   const queryClient = useQueryClient();
   const isAdmin = hasRole("admin");
   const { inboxes, loading: inboxesLoading, createInbox, toggleInbox, deleteInbox } = useWhatsAppInboxes();
-  const { accounts: googleAccounts, loading: googleLoading, initiateOAuth, toggleAccount: toggleGoogleAccount, deleteAccount: deleteGoogleAccount, fetchCalendars, updateCalendarId, updateLabel, hasCredentials, fetchOAuthConfig } = useGoogleOAuth();
+  const { accounts: googleAccounts, loading: googleLoading, initiateOAuth, toggleAccount: toggleGoogleAccount, deleteAccount: deleteGoogleAccount, fetchCalendars, updateCalendarId, updateLabel, updateColor, hasCredentials, fetchOAuthConfig } = useGoogleOAuth();
 
   const [showAddInbox, setShowAddInbox] = useState(false);
   const [newLabel, setNewLabel] = useState("");
