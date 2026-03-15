@@ -1,8 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-interface CalendarEvent {
+export interface CalendarEventExtendedProps {
+  clientName?: string;
+  clientWhatsapp?: string;
+  clientOrigin?: string;
+  procedureName?: string;
+  procedureValue?: string;
+}
+
+export interface CalendarEvent {
   id: string;
   title: string;
   date: string;
@@ -15,6 +23,7 @@ interface CalendarEvent {
   account_color?: string;
   startDateTime?: string;
   endDateTime?: string;
+  extendedProperties?: CalendarEventExtendedProps | null;
 }
 
 export const useGoogleCalendar = () => {
@@ -28,14 +37,11 @@ export const useGoogleCalendar = () => {
       if (!session) return;
 
       const authHeaders = { Authorization: `Bearer ${session.access_token}` };
-
-      // Fetch from OAuth accounts
       const body: any = {};
       if (accountId) body.account_id = accountId;
 
       const [oauthResult, icalResult] = await Promise.allSettled([
         supabase.functions.invoke('google-calendar-events', { body, headers: authHeaders }),
-        // Fetch iCal accounts list first, then fetch events for each
         fetchICalEvents(session.access_token),
       ]);
 
@@ -49,7 +55,6 @@ export const useGoogleCalendar = () => {
         allEvents.push(...icalResult.value);
       }
 
-      // Sort combined events
       allEvents.sort((a, b) => {
         if (a.date !== b.date) return a.date.localeCompare(b.date);
         return a.time.localeCompare(b.time);
@@ -64,7 +69,6 @@ export const useGoogleCalendar = () => {
   };
 
   const fetchICalEvents = async (accessToken: string): Promise<CalendarEvent[]> => {
-    // Get iCal accounts from the database
     const { data: accounts } = await supabase
       .from('google_calendar_accounts')
       .select('id, label, ical_url, is_active');
@@ -107,6 +111,7 @@ export const useGoogleCalendar = () => {
     startDateTime: string;
     endDateTime: string;
     account_id?: string;
+    extendedProperties?: CalendarEventExtendedProps;
   }) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -137,6 +142,7 @@ export const useGoogleCalendar = () => {
     startDateTime: string;
     endDateTime: string;
     account_id?: string;
+    extendedProperties?: CalendarEventExtendedProps;
   }) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();

@@ -2,8 +2,9 @@ import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useGoogleCalendar } from "@/hooks/useGoogleCalendar";
+import { useGoogleCalendar, CalendarEventExtendedProps } from "@/hooks/useGoogleCalendar";
 import { useGoogleOAuth } from "@/hooks/useGoogleOAuth";
+import { useClients } from "@/hooks/useClients";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,9 +15,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Calendar, Plus, ChevronLeft, ChevronRight, Clock, Globe, Pencil, Trash2 } from "lucide-react";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar, Plus, ChevronLeft, ChevronRight, Clock, Globe, Pencil, Trash2, Search, UserPlus, User, Phone, DollarSign, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { format, addDays, addMonths, subMonths, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isToday, isSameDay, parseISO } from "date-fns";
+import { format, addDays, addMonths, subMonths, startOfWeek, endOfWeek, eachDayOfInterval, isToday, isSameDay, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { TimeGrid, WeekTimeGrid } from "./agenda/TimeGrid";
 import { MonthView } from "./agenda/MonthView";
@@ -69,6 +72,7 @@ interface MergedEvent {
   appointment?: Appointment;
   startDateTime?: string;
   endDateTime?: string;
+  extendedProperties?: CalendarEventExtendedProps | null;
 }
 
 const AgendaModule = () => {
@@ -76,6 +80,7 @@ const AgendaModule = () => {
   const queryClient = useQueryClient();
   const { events: googleEvents, loading: googleLoading, fetchEvents: fetchGoogleEvents, createEvent: createGoogleEvent, updateEvent: updateGoogleEvent, deleteEvent: deleteGoogleEvent } = useGoogleCalendar();
   const { accounts, isConnected } = useGoogleOAuth();
+  const { data: externalClients = [] } = useClients();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [view, setView] = useState<"day" | "week" | "month">("day");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -87,15 +92,23 @@ const AgendaModule = () => {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [eventToDelete, setEventToDelete] = useState<MergedEvent | null>(null);
-  const [editForm, setEditForm] = useState({ title: "", description: "", date: "", startTime: "", endTime: "" });
+  const [editForm, setEditForm] = useState({
+    title: "", description: "", date: "", startTime: "", endTime: "",
+    clientName: "", clientWhatsapp: "", clientOrigin: "",
+    procedureName: "", procedureValue: "", procedure_id: "",
+  });
   const [editLoading, setEditLoading] = useState(false);
 
-  // Create form - adapts based on whether Google is primary
+  // Create form state
   const [form, setForm] = useState({
     title: "", description: "", client_id: "", procedure_id: "",
     date: format(new Date(), "yyyy-MM-dd"), start_time: "09:00",
     duration_minutes: "30", estimated_price: "", notes: "",
+    clientName: "", clientWhatsapp: "", clientOrigin: "",
   });
+  const [isNewClient, setIsNewClient] = useState(false);
+  const [clientSearchOpen, setClientSearchOpen] = useState(false);
+  const [clientSearch, setClientSearch] = useState("");
 
   const activeAccounts = accounts.filter(a => a.is_active && !a.ical_url);
   const useGoogleAsPrimary = isConnected && activeAccounts.length > 0;
@@ -104,7 +117,6 @@ const AgendaModule = () => {
     if (isConnected) fetchGoogleEvents();
   }, [isConnected]);
 
-  // Set default account
   useEffect(() => {
     if (activeAccounts.length === 1 && !selectedAccountId) {
       setSelectedAccountId(activeAccounts[0].id);
@@ -118,7 +130,6 @@ const AgendaModule = () => {
   const dateFrom = view === "day" ? format(selectedDate, "yyyy-MM-dd") : format(weekStart, "yyyy-MM-dd");
   const dateTo = view === "day" ? format(selectedDate, "yyyy-MM-dd") : format(weekEnd, "yyyy-MM-dd");
 
-  // Only fetch local appointments if Google is NOT primary
   const { data: appointments = [], isLoading } = useQuery({
     queryKey: ["appointments", profile?.clinic_id, dateFrom, dateTo],
     queryFn: async () => {
@@ -169,7 +180,6 @@ const AgendaModule = () => {
 
   const mergedEvents = useMemo((): MergedEvent[] => {
     if (useGoogleAsPrimary) {
-      // Google is primary — show only Google events
       return googleEvents
         .filter((e) => filterAccount === 'all' || e.account_id === filterAccount)
         .map((e) => ({
@@ -186,10 +196,10 @@ const AgendaModule = () => {
           accountColor: e.account_color,
           startDateTime: e.startDateTime,
           endDateTime: e.endDateTime,
+          extendedProperties: e.extendedProperties,
         }));
     }
 
-    // No Google — show local appointments
     return appointments.map((apt) => ({
       type: 'local' as const,
       id: apt.id,
@@ -202,24 +212,60 @@ const AgendaModule = () => {
     }));
   }, [appointments, googleEvents, filterAccount, useGoogleAsPrimary]);
 
-  // Create event — Google-first when connected
+  // Auto-compose title for create form
+  const composedTitle = useMemo(() => {
+    if (!useGoogleAsPrimary) return form.title;
+    const proc = procedures.find(p => p.id === form.procedure_id);
+    const procName = proc?.name || '';
+    const name = form.clientName || '';
+    if (procName && name) return `${procName} - ${name}`;
+    if (procName) return procName;
+    if (name) return name;
+    return '';
+  }, [form.procedure_id, form.clientName, procedures, useGoogleAsPrimary]);
+
+  // Auto-compose title for edit form
+  const composedEditTitle = useMemo(() => {
+    const procName = editForm.procedureName || '';
+    const name = editForm.clientName || '';
+    if (procName && name) return `${procName} - ${name}`;
+    if (procName) return procName;
+    if (name) return name;
+    return editForm.title;
+  }, [editForm.procedureName, editForm.clientName, editForm.title]);
+
+  const handleSelectExternalClient = (client: typeof externalClients[0]) => {
+    setForm({
+      ...form,
+      clientName: client.nome,
+      clientWhatsapp: client.whatsapp || '',
+      clientOrigin: 'cadastro',
+    });
+    setIsNewClient(false);
+    setClientSearchOpen(false);
+  };
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (useGoogleAsPrimary) {
-      // Create directly in Google Calendar
       const accountId = selectedAccountId || activeAccounts[0]?.id;
       if (!accountId) { toast.error("Selecione uma agenda"); return; }
 
-      const durationMs = (parseInt(form.duration_minutes) || 30) * 60000;
+      const proc = procedures.find(p => p.id === form.procedure_id);
+      const durationMs = (proc?.duration_minutes || parseInt(form.duration_minutes) || 30) * 60000;
       const startDT = `${form.date}T${form.start_time}:00`;
       const endDT = new Date(new Date(startDT).getTime() + durationMs).toISOString();
 
-      const title = form.title || (() => {
-        const clientName = clients.find(c => c.id === form.client_id)?.name;
-        const procName = procedures.find(p => p.id === form.procedure_id)?.name;
-        return `${clientName || 'Agendamento'}${procName ? ` — ${procName}` : ''}`;
-      })();
+      const title = composedTitle || 'Agendamento';
+
+      const extendedProperties: CalendarEventExtendedProps = {
+        clientName: form.clientName,
+        clientWhatsapp: form.clientWhatsapp,
+        clientOrigin: form.clientOrigin,
+        procedureName: proc?.name || '',
+        procedureValue: form.estimated_price || (proc ? String(proc.price) : ''),
+      };
 
       const success = await createGoogleEvent({
         title,
@@ -227,6 +273,7 @@ const AgendaModule = () => {
         startDateTime: startDT,
         endDateTime: endDT,
         account_id: accountId,
+        extendedProperties,
       });
 
       if (success) {
@@ -234,7 +281,6 @@ const AgendaModule = () => {
         resetForm();
       }
     } else {
-      // Create locally
       if (!profile?.clinic_id || !form.client_id) return;
       try {
         const { error } = await supabase.from("appointments").insert({
@@ -263,6 +309,18 @@ const AgendaModule = () => {
       title: "", description: "", client_id: "", procedure_id: "",
       date: format(selectedDate, "yyyy-MM-dd"), start_time: "09:00",
       duration_minutes: "30", estimated_price: "", notes: "",
+      clientName: "", clientWhatsapp: "", clientOrigin: "",
+    });
+    setIsNewClient(false);
+  };
+
+  const handleProcedureSelect = (procId: string) => {
+    const proc = procedures.find((p) => p.id === procId);
+    setForm({
+      ...form,
+      procedure_id: procId,
+      duration_minutes: proc ? String(proc.duration_minutes) : form.duration_minutes,
+      estimated_price: proc ? String(proc.price) : form.estimated_price,
     });
   };
 
@@ -270,6 +328,7 @@ const AgendaModule = () => {
   const handleEditEvent = (evt: MergedEvent) => {
     if (evt.type !== 'google') return;
     setEditingEvent(evt);
+    const ep = evt.extendedProperties || {};
     setEditForm({
       title: evt.title,
       description: evt.description || '',
@@ -282,8 +341,26 @@ const AgendaModule = () => {
         const totalMin = h * 60 + m + durationMin;
         return `${String(Math.floor(totalMin / 60) % 24).padStart(2, '0')}:${String(totalMin % 60).padStart(2, '0')}`;
       })(),
+      clientName: ep.clientName || '',
+      clientWhatsapp: ep.clientWhatsapp || '',
+      clientOrigin: ep.clientOrigin || '',
+      procedureName: ep.procedureName || '',
+      procedureValue: ep.procedureValue || '',
+      procedure_id: procedures.find(p => p.name === ep.procedureName)?.id || '',
     });
     setIsEditOpen(true);
+  };
+
+  const handleEditProcedureSelect = (procId: string) => {
+    const proc = procedures.find(p => p.id === procId);
+    if (proc) {
+      setEditForm({
+        ...editForm,
+        procedure_id: procId,
+        procedureName: proc.name,
+        procedureValue: String(proc.price),
+      });
+    }
   };
 
   const handleSaveEdit = async () => {
@@ -293,19 +370,54 @@ const AgendaModule = () => {
     const startDT = new Date(`${editForm.date}T${editForm.startTime}:00`);
     const endDT = new Date(`${editForm.date}T${editForm.endTime}:00`);
 
+    const title = composedEditTitle || editForm.title || 'Agendamento';
+
+    const extendedProperties: CalendarEventExtendedProps = {
+      clientName: editForm.clientName,
+      clientWhatsapp: editForm.clientWhatsapp,
+      clientOrigin: editForm.clientOrigin,
+      procedureName: editForm.procedureName,
+      procedureValue: editForm.procedureValue,
+    };
+
     const success = await updateGoogleEvent({
       eventId: editingEvent.id,
-      title: editForm.title,
+      title,
       description: editForm.description,
       startDateTime: startDT.toISOString(),
       endDateTime: endDT.toISOString(),
       account_id: editingEvent.accountId,
+      extendedProperties,
     });
 
     setEditLoading(false);
     if (success) {
       setIsEditOpen(false);
       setEditingEvent(null);
+    }
+  };
+
+  const handleUpdateContact = async () => {
+    if (!editForm.clientWhatsapp || !editForm.clientName) {
+      toast.error("Nome e WhatsApp são obrigatórios para atualizar contato");
+      return;
+    }
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      
+      const { error } = await supabase.functions.invoke('update-whatsapp-contact', {
+        body: {
+          name: editForm.clientName,
+          whatsapp: editForm.clientWhatsapp,
+          origin: editForm.clientOrigin,
+        },
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (error) throw error;
+      toast.success("Contato atualizado!");
+    } catch (err) {
+      toast.error("Erro ao atualizar contato");
     }
   };
 
@@ -320,7 +432,6 @@ const AgendaModule = () => {
     }
   };
 
-  // Local appointment status update
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
       const { error } = await supabase.from("appointments").update({ status }).eq("id", id);
@@ -331,16 +442,6 @@ const AgendaModule = () => {
       toast.success("Status atualizado!");
     },
   });
-
-  const handleProcedureSelect = (procId: string) => {
-    const proc = procedures.find((p) => p.id === procId);
-    setForm({
-      ...form,
-      procedure_id: procId,
-      duration_minutes: proc ? String(proc.duration_minutes) : form.duration_minutes,
-      estimated_price: proc ? String(proc.price) : form.estimated_price,
-    });
-  };
 
   const navigate = (dir: number) => {
     setSelectedDate((d) => {
@@ -366,8 +467,18 @@ const AgendaModule = () => {
   const dayEvents = (day: Date) =>
     mergedEvents.filter((e) => isSameDay(parseISO(e.date), day));
 
+  // Filtered external clients for search
+  const filteredExternalClients = useMemo(() => {
+    if (!clientSearch) return externalClients.slice(0, 20);
+    const q = clientSearch.toLowerCase();
+    return externalClients.filter(c =>
+      c.nome?.toLowerCase().includes(q) || c.whatsapp?.includes(q)
+    ).slice(0, 20);
+  }, [externalClients, clientSearch]);
+
   const renderEventCard = (evt: MergedEvent) => {
     if (evt.type === 'google') {
+      const ep = evt.extendedProperties;
       return (
         <Card
           key={`g-${evt.id}`}
@@ -378,6 +489,9 @@ const AgendaModule = () => {
             <div className="flex justify-between items-start">
               <div>
                 <p className="font-medium text-sm text-blue-900">{evt.title}</p>
+                {ep?.procedureValue && (
+                  <p className="text-xs text-green-700 font-medium">R$ {Number(ep.procedureValue).toFixed(2)}</p>
+                )}
                 {evt.description && (
                   <p className="text-xs text-blue-600/70 line-clamp-1">{evt.description}</p>
                 )}
@@ -434,6 +548,262 @@ const AgendaModule = () => {
     );
   };
 
+  // Google Calendar create form
+  const renderGoogleCreateForm = () => (
+    <>
+      {/* Procedimento */}
+      <div className="space-y-2">
+        <Label>Procedimento</Label>
+        <Select value={form.procedure_id} onValueChange={handleProcedureSelect}>
+          <SelectTrigger><SelectValue placeholder="Selecione o procedimento" /></SelectTrigger>
+          <SelectContent>
+            {procedures.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.name} — R$ {Number(p.price).toFixed(2)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Cliente */}
+      <div className="space-y-2">
+        <Label className="flex items-center justify-between">
+          <span>Cliente</span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-6 text-xs gap-1"
+            onClick={() => { setIsNewClient(!isNewClient); if (!isNewClient) setForm({ ...form, clientName: '', clientWhatsapp: '', clientOrigin: '' }); }}
+          >
+            <UserPlus className="w-3 h-3" />
+            {isNewClient ? 'Buscar existente' : 'Novo cliente'}
+          </Button>
+        </Label>
+
+        {isNewClient ? (
+          <div className="space-y-2 p-3 border rounded-lg bg-muted/30">
+            <div className="space-y-1">
+              <Label className="text-xs flex items-center gap-1"><User className="w-3 h-3" /> Nome *</Label>
+              <Input
+                value={form.clientName}
+                onChange={(e) => setForm({ ...form, clientName: e.target.value })}
+                placeholder="Nome do cliente"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs flex items-center gap-1"><Phone className="w-3 h-3" /> WhatsApp</Label>
+              <Input
+                value={form.clientWhatsapp}
+                onChange={(e) => setForm({ ...form, clientWhatsapp: e.target.value })}
+                placeholder="5511999999999"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Origem do Contato</Label>
+              <Select value={form.clientOrigin} onValueChange={(v) => setForm({ ...form, clientOrigin: v })}>
+                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="indicacao">Indicação</SelectItem>
+                  <SelectItem value="instagram">Instagram</SelectItem>
+                  <SelectItem value="google">Google</SelectItem>
+                  <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                  <SelectItem value="outro">Outro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        ) : (
+          <Popover open={clientSearchOpen} onOpenChange={setClientSearchOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full justify-start text-left font-normal"
+              >
+                <Search className="w-4 h-4 mr-2 text-muted-foreground" />
+                {form.clientName || "Buscar cliente..."}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[320px] p-0" align="start">
+              <Command shouldFilter={false}>
+                <CommandInput
+                  placeholder="Buscar por nome ou WhatsApp..."
+                  value={clientSearch}
+                  onValueChange={setClientSearch}
+                />
+                <CommandList>
+                  <CommandEmpty>Nenhum cliente encontrado</CommandEmpty>
+                  <CommandGroup>
+                    {filteredExternalClients.map((c, i) => (
+                      <CommandItem
+                        key={`${c.whatsapp}-${i}`}
+                        onSelect={() => handleSelectExternalClient(c)}
+                        className="flex flex-col items-start"
+                      >
+                        <span className="font-medium">{c.nome}</span>
+                        <span className="text-xs text-muted-foreground">{c.whatsapp}</span>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        )}
+
+        {/* Show selected client details (editable) */}
+        {!isNewClient && form.clientName && (
+          <div className="space-y-2 p-3 border rounded-lg bg-muted/30">
+            <div className="space-y-1">
+              <Label className="text-xs flex items-center gap-1"><User className="w-3 h-3" /> Nome</Label>
+              <Input
+                value={form.clientName}
+                onChange={(e) => setForm({ ...form, clientName: e.target.value })}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs flex items-center gap-1"><Phone className="w-3 h-3" /> WhatsApp</Label>
+              <Input
+                value={form.clientWhatsapp}
+                onChange={(e) => setForm({ ...form, clientWhatsapp: e.target.value })}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Origem</Label>
+              <Select value={form.clientOrigin} onValueChange={(v) => setForm({ ...form, clientOrigin: v })}>
+                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="indicacao">Indicação</SelectItem>
+                  <SelectItem value="instagram">Instagram</SelectItem>
+                  <SelectItem value="google">Google</SelectItem>
+                  <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                  <SelectItem value="cadastro">Cadastro</SelectItem>
+                  <SelectItem value="outro">Outro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Título (auto-composto) */}
+      <div className="space-y-2">
+        <Label>Título (auto)</Label>
+        <Input value={composedTitle} readOnly className="bg-muted/50" />
+      </div>
+
+      {/* Valor */}
+      <div className="space-y-2">
+        <Label className="flex items-center gap-1"><DollarSign className="w-3 h-3" /> Valor (R$)</Label>
+        <Input
+          type="number"
+          step="0.01"
+          value={form.estimated_price}
+          onChange={(e) => setForm({ ...form, estimated_price: e.target.value })}
+          placeholder="0.00"
+        />
+      </div>
+
+      {/* Descrição */}
+      <div className="space-y-2">
+        <Label>Observações</Label>
+        <Textarea
+          value={form.description}
+          onChange={(e) => setForm({ ...form, description: e.target.value })}
+          placeholder="Informações importantes sobre o atendimento"
+          rows={2}
+        />
+      </div>
+
+      {/* Data/Hora */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Data *</Label>
+          <Input type="date" required value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+        </div>
+        <div className="space-y-2">
+          <Label>Horário *</Label>
+          <Input type="time" required value={form.start_time} onChange={(e) => setForm({ ...form, start_time: e.target.value })} />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Duração (min)</Label>
+        <Input type="number" min="5" value={form.duration_minutes} onChange={(e) => setForm({ ...form, duration_minutes: e.target.value })} />
+      </div>
+
+      {activeAccounts.length > 1 && (
+        <div className="space-y-2">
+          <Label>Agenda</Label>
+          <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+            <SelectTrigger><SelectValue placeholder="Selecione a agenda" /></SelectTrigger>
+            <SelectContent>
+              {activeAccounts.map((acc) => (
+                <SelectItem key={acc.id} value={acc.id}>{acc.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+    </>
+  );
+
+  // Local create form
+  const renderLocalCreateForm = () => (
+    <>
+      <div className="space-y-2">
+        <Label>Cliente *</Label>
+        <Select value={form.client_id} onValueChange={(v) => setForm({ ...form, client_id: v })}>
+          <SelectTrigger><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
+          <SelectContent>
+            {clients.map((c) => (
+              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
+        <Label>Procedimento</Label>
+        <Select value={form.procedure_id} onValueChange={handleProcedureSelect}>
+          <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+          <SelectContent>
+            {procedures.map((p) => (
+              <SelectItem key={p.id} value={p.id}>{p.name} — R$ {Number(p.price).toFixed(2)}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Data *</Label>
+          <Input type="date" required value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+        </div>
+        <div className="space-y-2">
+          <Label>Horário *</Label>
+          <Input type="time" required value={form.start_time} onChange={(e) => setForm({ ...form, start_time: e.target.value })} />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Duração (min)</Label>
+          <Input type="number" min="5" value={form.duration_minutes} onChange={(e) => setForm({ ...form, duration_minutes: e.target.value })} />
+        </div>
+        <div className="space-y-2">
+          <Label>Valor (R$)</Label>
+          <Input type="number" step="0.01" value={form.estimated_price} onChange={(e) => setForm({ ...form, estimated_price: e.target.value })} />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label>Observações</Label>
+        <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} />
+      </div>
+    </>
+  );
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -486,122 +856,21 @@ const AgendaModule = () => {
                 <Plus className="w-4 h-4" /> Agendar
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>
                   {useGoogleAsPrimary ? "Novo Evento no Google Calendar" : "Novo Agendamento"}
                 </DialogTitle>
               </DialogHeader>
               <form onSubmit={handleCreate} className="space-y-4">
-                {useGoogleAsPrimary ? (
-                  <>
-                    {/* Google Calendar form */}
-                    <div className="space-y-2">
-                      <Label>Título *</Label>
-                      <Input
-                        value={form.title}
-                        onChange={(e) => setForm({ ...form, title: e.target.value })}
-                        placeholder="Ex: Consulta João Silva"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Descrição</Label>
-                      <Textarea
-                        value={form.description}
-                        onChange={(e) => setForm({ ...form, description: e.target.value })}
-                        placeholder="Detalhes do evento"
-                        rows={2}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Data *</Label>
-                        <Input type="date" required value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Horário *</Label>
-                        <Input type="time" required value={form.start_time} onChange={(e) => setForm({ ...form, start_time: e.target.value })} />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Duração (min)</Label>
-                      <Input type="number" min="5" value={form.duration_minutes} onChange={(e) => setForm({ ...form, duration_minutes: e.target.value })} />
-                    </div>
-                    {activeAccounts.length > 1 && (
-                      <div className="space-y-2">
-                        <Label>Agenda</Label>
-                        <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione a agenda" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {activeAccounts.map((acc) => (
-                              <SelectItem key={acc.id} value={acc.id}>{acc.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    {/* Local appointments form */}
-                    <div className="space-y-2">
-                      <Label>Cliente *</Label>
-                      <Select value={form.client_id} onValueChange={(v) => setForm({ ...form, client_id: v })}>
-                        <SelectTrigger><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
-                        <SelectContent>
-                          {clients.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Procedimento</Label>
-                      <Select value={form.procedure_id} onValueChange={handleProcedureSelect}>
-                        <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                        <SelectContent>
-                          {procedures.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>{p.name} — R$ {Number(p.price).toFixed(2)}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Data *</Label>
-                        <Input type="date" required value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Horário *</Label>
-                        <Input type="time" required value={form.start_time} onChange={(e) => setForm({ ...form, start_time: e.target.value })} />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Duração (min)</Label>
-                        <Input type="number" min="5" value={form.duration_minutes} onChange={(e) => setForm({ ...form, duration_minutes: e.target.value })} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Valor (R$)</Label>
-                        <Input type="number" step="0.01" value={form.estimated_price} onChange={(e) => setForm({ ...form, estimated_price: e.target.value })} />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Observações</Label>
-                      <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} />
-                    </div>
-                  </>
-                )}
+                {useGoogleAsPrimary ? renderGoogleCreateForm() : renderLocalCreateForm()}
 
                 <div className="flex justify-end gap-3">
                   <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>Cancelar</Button>
                   <Button
                     type="submit"
                     className="bg-gradient-primary"
-                    disabled={useGoogleAsPrimary ? !form.title : !form.client_id}
+                    disabled={useGoogleAsPrimary ? !composedTitle : !form.client_id}
                   >
                     {useGoogleAsPrimary ? "Criar Evento" : "Agendar"}
                   </Button>
@@ -648,7 +917,7 @@ const AgendaModule = () => {
 
       {/* Edit Google Event Dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
               <span className="flex items-center gap-2">
@@ -670,14 +939,87 @@ const AgendaModule = () => {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Procedimento */}
             <div className="space-y-2">
-              <Label>Título *</Label>
-              <Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} />
+              <Label>Procedimento</Label>
+              <Select value={editForm.procedure_id} onValueChange={handleEditProcedureSelect}>
+                <SelectTrigger><SelectValue placeholder="Selecione o procedimento" /></SelectTrigger>
+                <SelectContent>
+                  {procedures.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name} — R$ {Number(p.price).toFixed(2)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+
+            {/* Client fields */}
+            <div className="space-y-2 p-3 border rounded-lg bg-muted/30">
+              <p className="text-xs font-medium text-muted-foreground mb-2">Dados do Cliente</p>
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center gap-1"><User className="w-3 h-3" /> Nome</Label>
+                <Input
+                  value={editForm.clientName}
+                  onChange={(e) => setEditForm({ ...editForm, clientName: e.target.value })}
+                  className="h-8 text-sm"
+                  placeholder="Nome do cliente"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center gap-1"><Phone className="w-3 h-3" /> WhatsApp</Label>
+                <Input
+                  value={editForm.clientWhatsapp}
+                  onChange={(e) => setEditForm({ ...editForm, clientWhatsapp: e.target.value })}
+                  className="h-8 text-sm"
+                  placeholder="5511999999999"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Origem</Label>
+                <Select value={editForm.clientOrigin} onValueChange={(v) => setEditForm({ ...editForm, clientOrigin: v })}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="indicacao">Indicação</SelectItem>
+                    <SelectItem value="instagram">Instagram</SelectItem>
+                    <SelectItem value="google">Google</SelectItem>
+                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                    <SelectItem value="cadastro">Cadastro</SelectItem>
+                    <SelectItem value="outro">Outro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Título (auto) */}
             <div className="space-y-2">
-              <Label>Descrição</Label>
-              <Textarea value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} rows={2} />
+              <Label>Título (auto)</Label>
+              <Input value={composedEditTitle} readOnly className="bg-muted/50" />
             </div>
+
+            {/* Valor */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1"><DollarSign className="w-3 h-3" /> Valor (R$)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={editForm.procedureValue}
+                onChange={(e) => setEditForm({ ...editForm, procedureValue: e.target.value })}
+                placeholder="0.00"
+              />
+            </div>
+
+            {/* Descrição */}
+            <div className="space-y-2">
+              <Label>Observações</Label>
+              <Textarea
+                value={editForm.description}
+                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                rows={2}
+              />
+            </div>
+
+            {/* Date/Time */}
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Data</Label>
@@ -693,11 +1035,24 @@ const AgendaModule = () => {
               </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditOpen(false)} disabled={editLoading}>Cancelar</Button>
-            <Button onClick={handleSaveEdit} disabled={editLoading || !editForm.title}>
-              {editLoading ? "Salvando..." : "Salvar"}
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleUpdateContact}
+              disabled={editLoading}
+              className="gap-1"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              Atualizar Contato
             </Button>
+            <div className="flex gap-2 ml-auto">
+              <Button variant="outline" onClick={() => setIsEditOpen(false)} disabled={editLoading}>Cancelar</Button>
+              <Button onClick={handleSaveEdit} disabled={editLoading || !composedEditTitle}>
+                {editLoading ? "Salvando..." : "Salvar Evento"}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
