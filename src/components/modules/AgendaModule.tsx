@@ -263,6 +263,7 @@ const AgendaModule = () => {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
 
     // Block scheduling in the past (GMT-3)
     const eventDateTimeStr = `${form.date}T${form.start_time}:00-03:00`;
@@ -271,6 +272,8 @@ const AgendaModule = () => {
       toast.error("Não é possível agendar no passado");
       return;
     }
+
+    setIsSubmitting(true);
 
     if (useGoogleAsPrimary) {
       const accountId = selectedAccountId || activeAccounts[0]?.id;
