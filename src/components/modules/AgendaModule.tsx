@@ -1012,11 +1012,17 @@ const AgendaModule = () => {
                       Evento passado — somente leitura. Você pode adicionar observações abaixo.
                     </div>
                   )}
+                  {!isPast && !editEnabled && (
+                    <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg px-3 py-2 flex items-center gap-2">
+                      <Lock className="w-3.5 h-3.5" />
+                      Evento em modo leitura. Clique em "Habilitar Edição" para alterar.
+                    </div>
+                  )}
 
                   {/* Procedimento */}
                   <div className="space-y-2">
                     <Label>Procedimento</Label>
-                    <Select value={editForm.procedure_id} onValueChange={handleEditProcedureSelect} disabled={isPast}>
+                    <Select value={editForm.procedure_id} onValueChange={handleEditProcedureSelect} disabled={isDisabled}>
                       <SelectTrigger><SelectValue placeholder="Selecione o procedimento" /></SelectTrigger>
                       <SelectContent>
                         {procedures.map((p) => (
@@ -1038,7 +1044,7 @@ const AgendaModule = () => {
                         onChange={(e) => setEditForm({ ...editForm, clientName: e.target.value })}
                         className="h-8 text-sm"
                         placeholder="Nome do cliente"
-                        disabled={isPast}
+                        disabled={isDisabled}
                       />
                     </div>
                     <div className="space-y-1">
@@ -1048,7 +1054,7 @@ const AgendaModule = () => {
                         onChange={(e) => setEditForm({ ...editForm, clientWhatsapp: e.target.value })}
                         className="h-8 text-sm"
                         placeholder="5511999999999"
-                        disabled={isPast}
+                        disabled={isDisabled}
                       />
                     </div>
                     <div className="space-y-1">
@@ -1059,12 +1065,12 @@ const AgendaModule = () => {
                         className="h-8 text-sm"
                         placeholder="email@exemplo.com"
                         type="email"
-                        disabled={isPast}
+                        disabled={isDisabled}
                       />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Origem</Label>
-                      <Select value={editForm.clientOrigin} onValueChange={(v) => setEditForm({ ...editForm, clientOrigin: v })} disabled={isPast}>
+                      <Select value={editForm.clientOrigin} onValueChange={(v) => setEditForm({ ...editForm, clientOrigin: v })} disabled={isDisabled}>
                         <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecione" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="indicacao">Indicação</SelectItem>
@@ -1093,7 +1099,7 @@ const AgendaModule = () => {
                       value={editForm.procedureValue}
                       onChange={(e) => setEditForm({ ...editForm, procedureValue: e.target.value })}
                       placeholder="0.00"
-                      disabled={isPast}
+                      disabled={isDisabled}
                     />
                   </div>
 
@@ -1104,7 +1110,6 @@ const AgendaModule = () => {
                       value={editForm.description}
                       onChange={(e) => {
                         if (isPast) {
-                          // For past events, only allow appending (can't remove existing content)
                           const original = editingEvent?.description || '';
                           if (e.target.value.startsWith(original)) {
                             setEditForm({ ...editForm, description: e.target.value });
@@ -1114,6 +1119,7 @@ const AgendaModule = () => {
                         }
                       }}
                       rows={3}
+                      disabled={isPast ? false : isDisabled}
                     />
                   </div>
 
@@ -1121,15 +1127,15 @@ const AgendaModule = () => {
                   <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label>Data</Label>
-                      <Input type="date" value={editForm.date} onChange={(e) => setEditForm({ ...editForm, date: e.target.value })} disabled={isPast} />
+                      <Input type="date" value={editForm.date} onChange={(e) => setEditForm({ ...editForm, date: e.target.value })} disabled={isDisabled} />
                     </div>
                     <div className="space-y-2">
                       <Label>Início</Label>
-                      <Input type="time" value={editForm.startTime} onChange={(e) => setEditForm({ ...editForm, startTime: e.target.value })} disabled={isPast} />
+                      <Input type="time" value={editForm.startTime} onChange={(e) => setEditForm({ ...editForm, startTime: e.target.value })} disabled={isDisabled} />
                     </div>
                     <div className="space-y-2">
                       <Label>Fim</Label>
-                      <Input type="time" value={editForm.endTime} onChange={(e) => setEditForm({ ...editForm, endTime: e.target.value })} disabled={isPast} />
+                      <Input type="time" value={editForm.endTime} onChange={(e) => setEditForm({ ...editForm, endTime: e.target.value })} disabled={isDisabled} />
                     </div>
                   </div>
                 </div>
