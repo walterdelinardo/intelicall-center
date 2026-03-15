@@ -17,7 +17,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar, Plus, ChevronLeft, ChevronRight, Clock, Globe, Pencil, Trash2, Search, UserPlus, User, Phone, DollarSign, RefreshCw } from "lucide-react";
+import { Calendar, Plus, ChevronLeft, ChevronRight, Clock, Globe, Pencil, Trash2, Search, UserPlus, User, Phone, DollarSign, RefreshCw, Mail, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { format, addDays, addMonths, subMonths, startOfWeek, endOfWeek, eachDayOfInterval, isToday, isSameDay, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -94,7 +94,7 @@ const AgendaModule = () => {
   const [eventToDelete, setEventToDelete] = useState<MergedEvent | null>(null);
   const [editForm, setEditForm] = useState({
     title: "", description: "", date: "", startTime: "", endTime: "",
-    clientName: "", clientWhatsapp: "", clientOrigin: "",
+    clientName: "", clientWhatsapp: "", clientEmail: "", clientOrigin: "",
     procedureName: "", procedureValue: "", procedure_id: "",
   });
   const [editLoading, setEditLoading] = useState(false);
@@ -104,7 +104,7 @@ const AgendaModule = () => {
     title: "", description: "", client_id: "", procedure_id: "",
     date: format(new Date(), "yyyy-MM-dd"), start_time: "09:00",
     duration_minutes: "30", estimated_price: "", notes: "",
-    clientName: "", clientWhatsapp: "", clientOrigin: "",
+    clientName: "", clientWhatsapp: "", clientEmail: "", clientOrigin: "",
   });
   const [isNewClient, setIsNewClient] = useState(false);
   const [clientSearchOpen, setClientSearchOpen] = useState(false);
@@ -235,10 +235,12 @@ const AgendaModule = () => {
   }, [editForm.procedureName, editForm.clientName, editForm.title]);
 
   const handleSelectExternalClient = (client: typeof externalClients[0]) => {
+    const displayName = client.nome || client.nome_wpp || client.whatsapp || '';
     setForm({
       ...form,
-      clientName: client.nome,
+      clientName: displayName,
       clientWhatsapp: client.whatsapp || '',
+      clientEmail: client.email || '',
       clientOrigin: 'cadastro',
     });
     setIsNewClient(false);
@@ -262,6 +264,7 @@ const AgendaModule = () => {
       const extendedProperties: CalendarEventExtendedProps = {
         clientName: form.clientName,
         clientWhatsapp: form.clientWhatsapp,
+        clientEmail: form.clientEmail,
         clientOrigin: form.clientOrigin,
         procedureName: proc?.name || '',
         procedureValue: form.estimated_price || (proc ? String(proc.price) : ''),
@@ -309,7 +312,7 @@ const AgendaModule = () => {
       title: "", description: "", client_id: "", procedure_id: "",
       date: format(selectedDate, "yyyy-MM-dd"), start_time: "09:00",
       duration_minutes: "30", estimated_price: "", notes: "",
-      clientName: "", clientWhatsapp: "", clientOrigin: "",
+      clientName: "", clientWhatsapp: "", clientEmail: "", clientOrigin: "",
     });
     setIsNewClient(false);
   };
@@ -324,7 +327,12 @@ const AgendaModule = () => {
     });
   };
 
-  // Edit Google event
+  // Determine if event is in the past
+  const isEventPast = (evt: MergedEvent) => {
+    if (!evt.startDateTime) return false;
+    return new Date(evt.startDateTime) < new Date();
+  };
+
   const handleEditEvent = (evt: MergedEvent) => {
     if (evt.type !== 'google') return;
     setEditingEvent(evt);
@@ -343,6 +351,7 @@ const AgendaModule = () => {
       })(),
       clientName: ep.clientName || '',
       clientWhatsapp: ep.clientWhatsapp || '',
+      clientEmail: ep.clientEmail || '',
       clientOrigin: ep.clientOrigin || '',
       procedureName: ep.procedureName || '',
       procedureValue: ep.procedureValue || '',
@@ -375,6 +384,7 @@ const AgendaModule = () => {
     const extendedProperties: CalendarEventExtendedProps = {
       clientName: editForm.clientName,
       clientWhatsapp: editForm.clientWhatsapp,
+      clientEmail: editForm.clientEmail,
       clientOrigin: editForm.clientOrigin,
       procedureName: editForm.procedureName,
       procedureValue: editForm.procedureValue,
@@ -471,9 +481,10 @@ const AgendaModule = () => {
   const filteredExternalClients = useMemo(() => {
     if (!clientSearch) return externalClients.slice(0, 20);
     const q = clientSearch.toLowerCase();
-    return externalClients.filter(c =>
-      c.nome?.toLowerCase().includes(q) || c.whatsapp?.includes(q)
-    ).slice(0, 20);
+    return externalClients.filter(c => {
+      const name = c.nome || c.nome_wpp || '';
+      return name.toLowerCase().includes(q) || c.whatsapp?.includes(q);
+    }).slice(0, 20);
   }, [externalClients, clientSearch]);
 
   const renderEventCard = (evt: MergedEvent) => {
@@ -575,7 +586,7 @@ const AgendaModule = () => {
             variant="ghost"
             size="sm"
             className="h-6 text-xs gap-1"
-            onClick={() => { setIsNewClient(!isNewClient); if (!isNewClient) setForm({ ...form, clientName: '', clientWhatsapp: '', clientOrigin: '' }); }}
+            onClick={() => { setIsNewClient(!isNewClient); if (!isNewClient) setForm({ ...form, clientName: '', clientWhatsapp: '', clientEmail: '', clientOrigin: '' }); }}
           >
             <UserPlus className="w-3 h-3" />
             {isNewClient ? 'Buscar existente' : 'Novo cliente'}
@@ -598,6 +609,15 @@ const AgendaModule = () => {
                 value={form.clientWhatsapp}
                 onChange={(e) => setForm({ ...form, clientWhatsapp: e.target.value })}
                 placeholder="5511999999999"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs flex items-center gap-1"><Mail className="w-3 h-3" /> Email</Label>
+              <Input
+                value={form.clientEmail}
+                onChange={(e) => setForm({ ...form, clientEmail: e.target.value })}
+                placeholder="email@exemplo.com"
+                type="email"
               />
             </div>
             <div className="space-y-1">
@@ -642,7 +662,7 @@ const AgendaModule = () => {
                         onSelect={() => handleSelectExternalClient(c)}
                         className="flex flex-col items-start"
                       >
-                        <span className="font-medium">{c.nome}</span>
+                        <span className="font-medium">{c.nome || c.nome_wpp || c.whatsapp}</span>
                         <span className="text-xs text-muted-foreground">{c.whatsapp}</span>
                       </CommandItem>
                     ))}
@@ -670,6 +690,16 @@ const AgendaModule = () => {
                 value={form.clientWhatsapp}
                 onChange={(e) => setForm({ ...form, clientWhatsapp: e.target.value })}
                 className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs flex items-center gap-1"><Mail className="w-3 h-3" /> Email</Label>
+              <Input
+                value={form.clientEmail}
+                onChange={(e) => setForm({ ...form, clientEmail: e.target.value })}
+                className="h-8 text-sm"
+                type="email"
+                placeholder="email@exemplo.com"
               />
             </div>
             <div className="space-y-1">
@@ -918,142 +948,193 @@ const AgendaModule = () => {
       {/* Edit Google Event Dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <Pencil className="w-5 h-5" />
-                Editar Evento
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setEventToDelete(editingEvent);
-                  setShowDeleteDialog(true);
-                }}
-                className="gap-2 text-destructive hover:text-destructive"
-              >
-                <Trash2 className="w-4 h-4" />
-                Excluir
-              </Button>
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {/* Procedimento */}
-            <div className="space-y-2">
-              <Label>Procedimento</Label>
-              <Select value={editForm.procedure_id} onValueChange={handleEditProcedureSelect}>
-                <SelectTrigger><SelectValue placeholder="Selecione o procedimento" /></SelectTrigger>
-                <SelectContent>
-                  {procedures.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name} — R$ {Number(p.price).toFixed(2)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          {(() => {
+            const isPast = editingEvent ? isEventPast(editingEvent) : false;
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      {isPast ? <Eye className="w-5 h-5" /> : <Pencil className="w-5 h-5" />}
+                      {isPast ? 'Visualizar Evento' : 'Editar Evento'}
+                    </span>
+                    {!isPast && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setEventToDelete(editingEvent);
+                          setShowDeleteDialog(true);
+                        }}
+                        className="gap-2 text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Excluir
+                      </Button>
+                    )}
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  {isPast && (
+                    <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">
+                      Evento passado — somente leitura. Você pode adicionar observações abaixo.
+                    </div>
+                  )}
 
-            {/* Client fields */}
-            <div className="space-y-2 p-3 border rounded-lg bg-muted/30">
-              <p className="text-xs font-medium text-muted-foreground mb-2">Dados do Cliente</p>
-              <div className="space-y-1">
-                <Label className="text-xs flex items-center gap-1"><User className="w-3 h-3" /> Nome</Label>
-                <Input
-                  value={editForm.clientName}
-                  onChange={(e) => setEditForm({ ...editForm, clientName: e.target.value })}
-                  className="h-8 text-sm"
-                  placeholder="Nome do cliente"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs flex items-center gap-1"><Phone className="w-3 h-3" /> WhatsApp</Label>
-                <Input
-                  value={editForm.clientWhatsapp}
-                  onChange={(e) => setEditForm({ ...editForm, clientWhatsapp: e.target.value })}
-                  className="h-8 text-sm"
-                  placeholder="5511999999999"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Origem</Label>
-                <Select value={editForm.clientOrigin} onValueChange={(v) => setEditForm({ ...editForm, clientOrigin: v })}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="indicacao">Indicação</SelectItem>
-                    <SelectItem value="instagram">Instagram</SelectItem>
-                    <SelectItem value="google">Google</SelectItem>
-                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                    <SelectItem value="cadastro">Cadastro</SelectItem>
-                    <SelectItem value="outro">Outro</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+                  {/* Procedimento */}
+                  <div className="space-y-2">
+                    <Label>Procedimento</Label>
+                    <Select value={editForm.procedure_id} onValueChange={handleEditProcedureSelect} disabled={isPast}>
+                      <SelectTrigger><SelectValue placeholder="Selecione o procedimento" /></SelectTrigger>
+                      <SelectContent>
+                        {procedures.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.name} — R$ {Number(p.price).toFixed(2)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-            {/* Título (auto) */}
-            <div className="space-y-2">
-              <Label>Título (auto)</Label>
-              <Input value={composedEditTitle} readOnly className="bg-muted/50" />
-            </div>
+                  {/* Client fields */}
+                  <div className="space-y-2 p-3 border rounded-lg bg-muted/30">
+                    <p className="text-xs font-medium text-muted-foreground mb-2">Dados do Cliente</p>
+                    <div className="space-y-1">
+                      <Label className="text-xs flex items-center gap-1"><User className="w-3 h-3" /> Nome</Label>
+                      <Input
+                        value={editForm.clientName}
+                        onChange={(e) => setEditForm({ ...editForm, clientName: e.target.value })}
+                        className="h-8 text-sm"
+                        placeholder="Nome do cliente"
+                        disabled={isPast}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs flex items-center gap-1"><Phone className="w-3 h-3" /> WhatsApp</Label>
+                      <Input
+                        value={editForm.clientWhatsapp}
+                        onChange={(e) => setEditForm({ ...editForm, clientWhatsapp: e.target.value })}
+                        className="h-8 text-sm"
+                        placeholder="5511999999999"
+                        disabled={isPast}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs flex items-center gap-1"><Mail className="w-3 h-3" /> Email</Label>
+                      <Input
+                        value={editForm.clientEmail}
+                        onChange={(e) => setEditForm({ ...editForm, clientEmail: e.target.value })}
+                        className="h-8 text-sm"
+                        placeholder="email@exemplo.com"
+                        type="email"
+                        disabled={isPast}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Origem</Label>
+                      <Select value={editForm.clientOrigin} onValueChange={(v) => setEditForm({ ...editForm, clientOrigin: v })} disabled={isPast}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="indicacao">Indicação</SelectItem>
+                          <SelectItem value="instagram">Instagram</SelectItem>
+                          <SelectItem value="google">Google</SelectItem>
+                          <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                          <SelectItem value="cadastro">Cadastro</SelectItem>
+                          <SelectItem value="outro">Outro</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
 
-            {/* Valor */}
-            <div className="space-y-2">
-              <Label className="flex items-center gap-1"><DollarSign className="w-3 h-3" /> Valor (R$)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={editForm.procedureValue}
-                onChange={(e) => setEditForm({ ...editForm, procedureValue: e.target.value })}
-                placeholder="0.00"
-              />
-            </div>
+                  {/* Título (auto) */}
+                  <div className="space-y-2">
+                    <Label>Título (auto)</Label>
+                    <Input value={composedEditTitle} readOnly className="bg-muted/50" />
+                  </div>
 
-            {/* Descrição */}
-            <div className="space-y-2">
-              <Label>Observações</Label>
-              <Textarea
-                value={editForm.description}
-                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                rows={2}
-              />
-            </div>
+                  {/* Valor */}
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-1"><DollarSign className="w-3 h-3" /> Valor (R$)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={editForm.procedureValue}
+                      onChange={(e) => setEditForm({ ...editForm, procedureValue: e.target.value })}
+                      placeholder="0.00"
+                      disabled={isPast}
+                    />
+                  </div>
 
-            {/* Date/Time */}
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label>Data</Label>
-                <Input type="date" value={editForm.date} onChange={(e) => setEditForm({ ...editForm, date: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Início</Label>
-                <Input type="time" value={editForm.startTime} onChange={(e) => setEditForm({ ...editForm, startTime: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Fim</Label>
-                <Input type="time" value={editForm.endTime} onChange={(e) => setEditForm({ ...editForm, endTime: e.target.value })} />
-              </div>
-            </div>
-          </div>
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleUpdateContact}
-              disabled={editLoading}
-              className="gap-1"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              Atualizar Contato
-            </Button>
-            <div className="flex gap-2 ml-auto">
-              <Button variant="outline" onClick={() => setIsEditOpen(false)} disabled={editLoading}>Cancelar</Button>
-              <Button onClick={handleSaveEdit} disabled={editLoading || !composedEditTitle}>
-                {editLoading ? "Salvando..." : "Salvar Evento"}
-              </Button>
-            </div>
-          </DialogFooter>
+                  {/* Observações — always editable, but for past events only append */}
+                  <div className="space-y-2">
+                    <Label>Observações {isPast && <span className="text-xs text-muted-foreground">(adicionar novas)</span>}</Label>
+                    <Textarea
+                      value={editForm.description}
+                      onChange={(e) => {
+                        if (isPast) {
+                          // For past events, only allow appending (can't remove existing content)
+                          const original = editingEvent?.description || '';
+                          if (e.target.value.startsWith(original)) {
+                            setEditForm({ ...editForm, description: e.target.value });
+                          }
+                        } else {
+                          setEditForm({ ...editForm, description: e.target.value });
+                        }
+                      }}
+                      rows={3}
+                    />
+                  </div>
+
+                  {/* Date/Time */}
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label>Data</Label>
+                      <Input type="date" value={editForm.date} onChange={(e) => setEditForm({ ...editForm, date: e.target.value })} disabled={isPast} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Início</Label>
+                      <Input type="time" value={editForm.startTime} onChange={(e) => setEditForm({ ...editForm, startTime: e.target.value })} disabled={isPast} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Fim</Label>
+                      <Input type="time" value={editForm.endTime} onChange={(e) => setEditForm({ ...editForm, endTime: e.target.value })} disabled={isPast} />
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter className="flex-col sm:flex-row gap-2">
+                  {!isPast && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleUpdateContact}
+                      disabled={editLoading}
+                      className="gap-1"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      Atualizar Contato
+                    </Button>
+                  )}
+                  <div className="flex gap-2 ml-auto">
+                    <Button variant="outline" onClick={() => setIsEditOpen(false)} disabled={editLoading}>
+                      {isPast ? 'Fechar' : 'Cancelar'}
+                    </Button>
+                    {isPast ? (
+                      editForm.description !== (editingEvent?.description || '') && (
+                        <Button onClick={handleSaveEdit} disabled={editLoading}>
+                          {editLoading ? "Salvando..." : "Salvar Observações"}
+                        </Button>
+                      )
+                    ) : (
+                      <Button onClick={handleSaveEdit} disabled={editLoading || !composedEditTitle}>
+                        {editLoading ? "Salvando..." : "Salvar Evento"}
+                      </Button>
+                    )}
+                  </div>
+                </DialogFooter>
+              </>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 

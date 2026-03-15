@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 export interface CalendarEventExtendedProps {
   clientName?: string;
   clientWhatsapp?: string;
+  clientEmail?: string;
   clientOrigin?: string;
   procedureName?: string;
   procedureValue?: string;

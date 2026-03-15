@@ -30,9 +30,9 @@ serve(async (req) => {
       SELECT 
         nome,
         whatsapp,
-        "nome-wpp",
+        "nome-wpp" AS nome_wpp,
         email,
-        "data-nasc"
+        "data-nasc" AS data_nasc
       FROM contatos
       ORDER BY nome
     `);
