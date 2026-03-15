@@ -444,7 +444,9 @@ const AgendaModule = () => {
             <h2 className="font-semibold">
               {view === "day"
                 ? format(selectedDate, "EEEE, dd 'de' MMMM", { locale: ptBR })
-                : `${format(weekStart, "dd/MM")} — ${format(weekEnd, "dd/MM/yyyy")}`}
+                : view === "week"
+                ? `${format(weekStart, "dd/MM")} — ${format(weekEnd, "dd/MM/yyyy")}`
+                : format(selectedDate, "MMMM 'de' yyyy", { locale: ptBR })}
             </h2>
           </div>
           <Button size="icon" variant="outline" onClick={() => navigate(1)}>
