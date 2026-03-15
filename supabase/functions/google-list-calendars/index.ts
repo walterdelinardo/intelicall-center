@@ -9,9 +9,24 @@ async function getValidAccessToken(supabase: any, account: any): Promise<string>
   const expiresAt = new Date(account.expires_at);
   if (expiresAt > new Date()) return account.access_token;
 
-  const clientId = Deno.env.get('GOOGLE_CLIENT_ID')!;
-  const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET')!;
+  // Read credentials from google_oauth_config (per-clinic)
+  let clientId = Deno.env.get('GOOGLE_CLIENT_ID') || '';
+  let clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET') || '';
 
+  if (account.clinic_id) {
+    const { data: config } = await supabase
+      .from('google_oauth_config')
+      .select('client_id, client_secret')
+      .eq('clinic_id', account.clinic_id)
+      .single();
+
+    if (config) {
+      clientId = config.client_id;
+      clientSecret = config.client_secret;
+    }
+  }
+
+  if (!clientId || !clientSecret) throw new Error('Missing Google OAuth credentials');
   if (!account.refresh_token) throw new Error('No refresh token available');
 
   const response = await fetch('https://oauth2.googleapis.com/token', {
@@ -95,7 +110,7 @@ Deno.serve(async (req) => {
     }
 
     if (!account.access_token || account.ical_url) {
-      return new Response(JSON.stringify({ error: 'This account does not support calendar listing (iCal)' }), {
+      return new Response(JSON.stringify({ error: 'This account does not support calendar listing' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

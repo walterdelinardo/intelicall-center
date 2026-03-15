@@ -21,10 +21,16 @@ export interface GoogleCalendarOption {
   accessRole: string;
 }
 
+interface GoogleOAuthConfig {
+  id: string;
+  client_id: string;
+}
+
 export const useGoogleOAuth = () => {
   const { profile } = useAuth();
   const [accounts, setAccounts] = useState<GoogleCalendarAccount[]>([]);
   const [loading, setLoading] = useState(true);
+  const [oauthConfig, setOauthConfig] = useState<GoogleOAuthConfig | null>(null);
 
   const fetchAccounts = async () => {
     try {
@@ -54,6 +60,18 @@ export const useGoogleOAuth = () => {
     }
   };
 
+  const fetchOAuthConfig = async () => {
+    if (!profile?.clinic_id) return null;
+    const { data } = await supabase
+      .from('google_oauth_config')
+      .select('id, client_id')
+      .eq('clinic_id', profile.clinic_id)
+      .maybeSingle();
+    const config = data ? { id: (data as any).id, client_id: (data as any).client_id } : null;
+    setOauthConfig(config);
+    return config;
+  };
+
   const initiateOAuth = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -62,14 +80,24 @@ export const useGoogleOAuth = () => {
         return;
       }
 
-      const clientId = '282570764186-4s0gf5qguon2ddfsocp41cphsq99ta50.apps.googleusercontent.com';
+      // Read client_id from config table
+      let config = oauthConfig;
+      if (!config) {
+        config = await fetchOAuthConfig();
+      }
+
+      if (!config?.client_id) {
+        toast.error('Configure as credenciais do Google primeiro');
+        return;
+      }
+
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const redirectUri = `${supabaseUrl}/functions/v1/google-oauth-callback`;
       const scope = 'https://www.googleapis.com/auth/calendar';
       const state = JSON.stringify({ user_id: user.id, clinic_id: profile.clinic_id, label: 'Conta Google' });
 
       const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-      authUrl.searchParams.append('client_id', clientId);
+      authUrl.searchParams.append('client_id', config.client_id);
       authUrl.searchParams.append('redirect_uri', redirectUri);
       authUrl.searchParams.append('response_type', 'code');
       authUrl.searchParams.append('scope', scope);
@@ -163,6 +191,7 @@ export const useGoogleOAuth = () => {
   useEffect(() => {
     if (profile?.clinic_id) {
       fetchAccounts();
+      fetchOAuthConfig();
     }
 
     const params = new URLSearchParams(window.location.search);
@@ -176,6 +205,7 @@ export const useGoogleOAuth = () => {
   return {
     accounts,
     loading,
+    oauthConfig,
     initiateOAuth,
     updateLabel,
     toggleAccount,
@@ -183,6 +213,8 @@ export const useGoogleOAuth = () => {
     fetchCalendars,
     updateCalendarId,
     fetchAccounts,
+    fetchOAuthConfig,
     isConnected: accounts.some((a) => a.is_active),
+    hasCredentials: !!oauthConfig?.client_id,
   };
 };

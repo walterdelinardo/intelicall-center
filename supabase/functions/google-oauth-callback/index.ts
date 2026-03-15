@@ -19,18 +19,16 @@ Deno.serve(async (req) => {
       throw new Error('No authorization code provided');
     }
 
-    // Parse state — JSON encoded { user_id, clinic_id, label }
     let userId: string;
     let clinicId: string;
-    let label = 'Principal';
+    let label = 'Conta Google';
 
     try {
       const stateData = JSON.parse(stateParam || '{}');
       userId = stateData.user_id;
       clinicId = stateData.clinic_id;
-      label = stateData.label || 'Principal';
+      label = stateData.label || 'Conta Google';
     } catch {
-      // Fallback for legacy state format (just user_id string)
       userId = stateParam || '';
       clinicId = '';
     }
@@ -39,13 +37,30 @@ Deno.serve(async (req) => {
       throw new Error('No user ID provided in state');
     }
 
-    const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
-    const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const redirectUri = `${supabaseUrl}/functions/v1/google-oauth-callback`;
 
+    // Read credentials from google_oauth_config table (per-clinic)
+    let clientId = Deno.env.get('GOOGLE_CLIENT_ID') || '';
+    let clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET') || '';
+
+    if (clinicId) {
+      const { data: config } = await supabase
+        .from('google_oauth_config')
+        .select('client_id, client_secret')
+        .eq('clinic_id', clinicId)
+        .single();
+
+      if (config) {
+        clientId = config.client_id;
+        clientSecret = config.client_secret;
+      }
+    }
+
     if (!clientId || !clientSecret) {
-      throw new Error('Missing Google OAuth credentials');
+      throw new Error('Missing Google OAuth credentials. Configure them in Settings.');
     }
 
     console.log('Exchanging code for tokens...');
@@ -71,13 +86,9 @@ Deno.serve(async (req) => {
     const tokens = await tokenResponse.json();
     console.log('Tokens received successfully');
 
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
     const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
 
     if (clinicId) {
-      // New multi-account flow → insert into google_calendar_accounts
       const { error: dbError } = await supabase
         .from('google_calendar_accounts')
         .insert({
@@ -96,7 +107,6 @@ Deno.serve(async (req) => {
         throw new Error('Failed to store tokens');
       }
     } else {
-      // Legacy flow → upsert into google_oauth_tokens
       const { error: dbError } = await supabase
         .from('google_oauth_tokens')
         .upsert({
@@ -115,7 +125,6 @@ Deno.serve(async (req) => {
 
     console.log('Tokens stored successfully');
 
-    // Redirect back to app — use origin from Referer or fallback
     const appUrl = Deno.env.get('APP_URL') || 'https://id-preview--c60d1b58-c36a-4470-8a43-03e327dda9dd.lovable.app';
     return new Response(null, {
       status: 302,
