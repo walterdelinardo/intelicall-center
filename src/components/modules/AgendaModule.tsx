@@ -89,6 +89,7 @@ const AgendaModule = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [view, setView] = useState<"day" | "week" | "month">("day");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
   const [filterAccount, setFilterAccount] = useState<string>("all");
 
@@ -262,6 +263,7 @@ const AgendaModule = () => {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
 
     // Block scheduling in the past (GMT-3)
     const eventDateTimeStr = `${form.date}T${form.start_time}:00-03:00`;
@@ -270,6 +272,8 @@ const AgendaModule = () => {
       toast.error("Não é possível agendar no passado");
       return;
     }
+
+    setIsSubmitting(true);
 
     if (useGoogleAsPrimary) {
       const accountId = selectedAccountId || activeAccounts[0]?.id;
@@ -301,6 +305,7 @@ const AgendaModule = () => {
         extendedProperties,
       });
 
+      setIsSubmitting(false);
       if (success) {
         setIsCreateOpen(false);
         resetForm();
@@ -325,6 +330,8 @@ const AgendaModule = () => {
         resetForm();
       } catch (err: any) {
         toast.error(err.message);
+      } finally {
+        setIsSubmitting(false);
       }
     }
   };
@@ -935,13 +942,13 @@ const AgendaModule = () => {
                 {useGoogleAsPrimary ? renderGoogleCreateForm() : renderLocalCreateForm()}
 
                 <div className="flex justify-end gap-3">
-                  <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>Cancelar</Button>
+                  <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)} disabled={isSubmitting}>Cancelar</Button>
                   <Button
                     type="submit"
                     className="bg-gradient-primary"
-                    disabled={useGoogleAsPrimary ? !composedTitle : !form.client_id}
+                    disabled={isSubmitting || (useGoogleAsPrimary ? !composedTitle : !form.client_id)}
                   >
-                    {useGoogleAsPrimary ? "Criar Evento" : "Agendar"}
+                    {isSubmitting ? "Criando..." : (useGoogleAsPrimary ? "Criar Evento" : "Agendar")}
                   </Button>
                 </div>
               </form>
