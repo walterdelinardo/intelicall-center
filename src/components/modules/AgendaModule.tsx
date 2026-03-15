@@ -76,7 +76,7 @@ const AgendaModule = () => {
   const { events: googleEvents, loading: googleLoading, fetchEvents: fetchGoogleEvents, createEvent: createGoogleEvent, updateEvent: updateGoogleEvent, deleteEvent: deleteGoogleEvent } = useGoogleCalendar();
   const { accounts, isConnected } = useGoogleOAuth();
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [view, setView] = useState<"day" | "week">("day");
+  const [view, setView] = useState<"day" | "week" | "month">("day");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
   const [filterAccount, setFilterAccount] = useState<string>("all");
