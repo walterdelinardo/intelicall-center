@@ -94,7 +94,7 @@ const AgendaModule = () => {
   const [eventToDelete, setEventToDelete] = useState<MergedEvent | null>(null);
   const [editForm, setEditForm] = useState({
     title: "", description: "", date: "", startTime: "", endTime: "",
-    clientName: "", clientWhatsapp: "", clientOrigin: "",
+    clientName: "", clientWhatsapp: "", clientEmail: "", clientOrigin: "",
     procedureName: "", procedureValue: "", procedure_id: "",
   });
   const [editLoading, setEditLoading] = useState(false);
