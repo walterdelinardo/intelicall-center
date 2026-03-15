@@ -11,6 +11,7 @@ interface GoogleCalendarAccount {
   expires_at: string | null;
   created_at: string;
   ical_url: string | null;
+  color: string | null;
 }
 
 export interface GoogleCalendarOption {

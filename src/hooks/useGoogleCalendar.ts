@@ -12,6 +12,7 @@ interface CalendarEvent {
   description?: string;
   account_id?: string;
   account_label?: string;
+  account_color?: string;
   startDateTime?: string;
   endDateTime?: string;
 }
