@@ -47,7 +47,7 @@ const ConfiguracoesModule = () => {
   const queryClient = useQueryClient();
   const isAdmin = hasRole("admin");
   const { inboxes, loading: inboxesLoading, createInbox, toggleInbox, deleteInbox } = useWhatsAppInboxes();
-  const { accounts: googleAccounts, loading: googleLoading, initiateOAuth, toggleAccount: toggleGoogleAccount, deleteAccount: deleteGoogleAccount } = useGoogleOAuth();
+  const { accounts: googleAccounts, loading: googleLoading, initiateOAuth, addICalAccount, toggleAccount: toggleGoogleAccount, deleteAccount: deleteGoogleAccount } = useGoogleOAuth();
 
   const [showAddInbox, setShowAddInbox] = useState(false);
   const [newLabel, setNewLabel] = useState("");
@@ -56,6 +56,8 @@ const ConfiguracoesModule = () => {
   const [savingInbox, setSavingInbox] = useState(false);
   const [showAddGoogle, setShowAddGoogle] = useState(false);
   const [newGoogleLabel, setNewGoogleLabel] = useState("");
+  const [addGoogleMode, setAddGoogleMode] = useState<"oauth" | "ical">("oauth");
+  const [newICalUrl, setNewICalUrl] = useState("");
 
   const { data: clinic, isLoading } = useQuery({
     queryKey: ["clinic", profile?.clinic_id],
@@ -575,7 +577,7 @@ const ConfiguracoesModule = () => {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Label</TableHead>
-                          <TableHead>Calendar ID</TableHead>
+                          <TableHead>Tipo</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead className="w-[80px]">Ações</TableHead>
                         </TableRow>
@@ -584,7 +586,11 @@ const ConfiguracoesModule = () => {
                         {googleAccounts.map((acc) => (
                           <TableRow key={acc.id}>
                             <TableCell className="font-medium">{acc.label}</TableCell>
-                            <TableCell className="font-mono text-xs">{acc.calendar_id}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-xs">
+                                {acc.ical_url ? "iCal" : "OAuth"}
+                              </Badge>
+                            </TableCell>
                             <TableCell>
                               <Badge variant={acc.is_active ? "default" : "secondary"}>
                                 {acc.is_active ? "Ativo" : "Inativo"}
@@ -638,7 +644,25 @@ const ConfiguracoesModule = () => {
 
                   {showAddGoogle ? (
                     <div className="border rounded-lg p-4 space-y-3">
-                      <h4 className="font-medium text-sm">Conectar Google Calendar</h4>
+                      <h4 className="font-medium text-sm">Adicionar Google Calendar</h4>
+                      
+                      <div className="flex gap-2">
+                        <Button
+                          variant={addGoogleMode === "oauth" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setAddGoogleMode("oauth")}
+                        >
+                          OAuth (acesso completo)
+                        </Button>
+                        <Button
+                          variant={addGoogleMode === "ical" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setAddGoogleMode("ical")}
+                        >
+                          Link iCal (somente leitura)
+                        </Button>
+                      </div>
+
                       <div className="space-y-1">
                         <Label htmlFor="google-label">Label *</Label>
                         <Input
@@ -648,20 +672,47 @@ const ConfiguracoesModule = () => {
                           onChange={(e) => setNewGoogleLabel(e.target.value)}
                         />
                       </div>
+
+                      {addGoogleMode === "ical" && (
+                        <div className="space-y-1">
+                          <Label htmlFor="ical-url">URL iCal *</Label>
+                          <Input
+                            id="ical-url"
+                            placeholder="https://calendar.google.com/calendar/ical/..."
+                            value={newICalUrl}
+                            onChange={(e) => setNewICalUrl(e.target.value)}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Cole o link iCal do Google Calendar (Configurações → Integrar agenda → Endereço secreto no formato iCal)
+                          </p>
+                        </div>
+                      )}
+
                       <div className="flex gap-2">
                         <Button
                           size="sm"
-                          onClick={() => {
+                          onClick={async () => {
                             if (!newGoogleLabel.trim()) {
                               toast.error("Preencha o label da conta");
                               return;
                             }
-                            initiateOAuth(newGoogleLabel.trim());
+                            if (addGoogleMode === "ical") {
+                              if (!newICalUrl.trim()) {
+                                toast.error("Preencha a URL iCal");
+                                return;
+                              }
+                              await addICalAccount(newGoogleLabel.trim(), newICalUrl.trim());
+                              setShowAddGoogle(false);
+                              setNewGoogleLabel("");
+                              setNewICalUrl("");
+                            } else {
+                              initiateOAuth(newGoogleLabel.trim());
+                            }
                           }}
                         >
-                          Conectar com Google
+                          {addGoogleMode === "ical" ? "Adicionar iCal" : "Conectar com Google"}
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => { setShowAddGoogle(false); setNewGoogleLabel(""); }}>
+                        <Button variant="outline" size="sm" onClick={() => { setShowAddGoogle(false); setNewGoogleLabel(""); setNewICalUrl(""); }}>
                           Cancelar
                         </Button>
                       </div>

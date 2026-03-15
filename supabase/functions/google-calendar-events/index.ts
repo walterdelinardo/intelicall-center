@@ -214,13 +214,22 @@ Deno.serve(async (req) => {
     }
 
     if (accounts.length === 0) {
+      // Return empty if no accounts (not an error - iCal accounts may exist separately)
+      if (action === 'list') {
+        return new Response(JSON.stringify({ events: [] }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
       throw new Error('Google Calendar not connected. Please connect your account first.');
     }
 
     if (action === 'list') {
-      // Fetch events from all accounts
       const allEvents: any[] = [];
       for (const account of accounts) {
+        // Skip iCal-only accounts (handled by fetch-ical-events)
+        if (account.ical_url && !account.access_token) continue;
+        if (!account.access_token) continue;
+
         try {
           const accessToken = await getValidAccessToken(supabase, account);
           const events = await listEvents(accessToken, account.calendar_id);
@@ -234,14 +243,13 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Sort by date+time
       allEvents.sort((a, b) => {
         const da = a.startDateTime || `${a.date}T${a.time}`;
         const db = b.startDateTime || `${b.date}T${b.time}`;
         return da.localeCompare(db);
       });
 
-      console.log(`Found ${allEvents.length} events from ${accounts.length} accounts`);
+      console.log(`Found ${allEvents.length} events from OAuth accounts`);
       return new Response(JSON.stringify({ events: allEvents }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

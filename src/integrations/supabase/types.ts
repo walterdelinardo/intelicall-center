@@ -512,11 +512,12 @@ export type Database = {
       }
       google_calendar_accounts: {
         Row: {
-          access_token: string
+          access_token: string | null
           calendar_id: string
           clinic_id: string
           created_at: string
-          expires_at: string
+          expires_at: string | null
+          ical_url: string | null
           id: string
           is_active: boolean
           label: string
@@ -526,11 +527,12 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          access_token: string
+          access_token?: string | null
           calendar_id?: string
           clinic_id: string
           created_at?: string
-          expires_at: string
+          expires_at?: string | null
+          ical_url?: string | null
           id?: string
           is_active?: boolean
           label?: string
@@ -540,11 +542,12 @@ export type Database = {
           user_id: string
         }
         Update: {
-          access_token?: string
+          access_token?: string | null
           calendar_id?: string
           clinic_id?: string
           created_at?: string
-          expires_at?: string
+          expires_at?: string | null
+          ical_url?: string | null
           id?: string
           is_active?: boolean
           label?: string
