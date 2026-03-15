@@ -923,6 +923,72 @@ export type Database = {
           },
         ]
       }
+      webhook_logs: {
+        Row: {
+          base64_length: number | null
+          base64_source: string | null
+          created_at: string
+          event: string | null
+          has_base64: boolean | null
+          has_media_url: boolean | null
+          id: string
+          instance_name: string | null
+          is_duplicate: boolean | null
+          media_url: string | null
+          merge_error: string | null
+          merge_result: string | null
+          message_id: string | null
+          message_type: string | null
+          mime_type: string | null
+          normalized_data: Json | null
+          payload_format: string | null
+          raw_payload: Json | null
+          remote_jid: string | null
+        }
+        Insert: {
+          base64_length?: number | null
+          base64_source?: string | null
+          created_at?: string
+          event?: string | null
+          has_base64?: boolean | null
+          has_media_url?: boolean | null
+          id?: string
+          instance_name?: string | null
+          is_duplicate?: boolean | null
+          media_url?: string | null
+          merge_error?: string | null
+          merge_result?: string | null
+          message_id?: string | null
+          message_type?: string | null
+          mime_type?: string | null
+          normalized_data?: Json | null
+          payload_format?: string | null
+          raw_payload?: Json | null
+          remote_jid?: string | null
+        }
+        Update: {
+          base64_length?: number | null
+          base64_source?: string | null
+          created_at?: string
+          event?: string | null
+          has_base64?: boolean | null
+          has_media_url?: boolean | null
+          id?: string
+          instance_name?: string | null
+          is_duplicate?: boolean | null
+          media_url?: string | null
+          merge_error?: string | null
+          merge_result?: string | null
+          message_id?: string | null
+          message_type?: string | null
+          mime_type?: string | null
+          normalized_data?: Json | null
+          payload_format?: string | null
+          raw_payload?: Json | null
+          remote_jid?: string | null
+        }
+        Relationships: []
+      }
       whatsapp_conversations: {
         Row: {
           assigned_to: string | null
