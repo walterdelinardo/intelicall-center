@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Settings, Building2, Clock, Phone, MapPin, Mail, Save, Loader2, Smartphone, Plus, Power, Plug, Trash2, Calendar, Pencil, Palette } from "lucide-react";
+import { Settings, Building2, Clock, Phone, MapPin, Mail, Save, Loader2, Smartphone, Plus, Power, Plug, Trash2, Calendar, Pencil, Palette, Check } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { type GoogleCalendarOption } from "@/hooks/useGoogleOAuth";
@@ -734,17 +734,29 @@ const ConfiguracoesModule = () => {
                                         Personalizada
                                         <input
                                           type="color"
+                                          id={`color-input-${acc.id}`}
                                           defaultValue={acc.color || '#039BE5'}
-                                          onBlur={(e) => {
-                                            const newColor = e.target.value;
-                                            if (newColor !== (acc.color || '#039BE5')) {
-                                              updateColor(acc.id, newColor);
-                                            }
-                                          }}
                                           onChange={(e) => e.stopPropagation()}
                                           className="w-7 h-7 rounded cursor-pointer border-0 p-0 bg-transparent"
                                         />
                                       </label>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 ml-auto"
+                                        onClick={() => {
+                                          const input = document.getElementById(`color-input-${acc.id}`) as HTMLInputElement;
+                                          if (input) {
+                                            const newColor = input.value;
+                                            if (newColor !== (acc.color || '#039BE5')) {
+                                              updateColor(acc.id, newColor);
+                                            }
+                                          }
+                                        }}
+                                        title="Confirmar cor"
+                                      >
+                                        <Check className="w-3.5 h-3.5" />
+                                      </Button>
                                     </div>
                                   </PopoverContent>
                                 </Popover>
