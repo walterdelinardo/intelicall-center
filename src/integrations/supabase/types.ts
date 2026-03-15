@@ -192,6 +192,7 @@ export type Database = {
           total_visits: number
           updated_at: string
           whatsapp: string | null
+          whatsapp_inbox_id: string | null
           zip_code: string | null
         }
         Insert: {
@@ -214,6 +215,7 @@ export type Database = {
           total_visits?: number
           updated_at?: string
           whatsapp?: string | null
+          whatsapp_inbox_id?: string | null
           zip_code?: string | null
         }
         Update: {
@@ -236,6 +238,7 @@ export type Database = {
           total_visits?: number
           updated_at?: string
           whatsapp?: string | null
+          whatsapp_inbox_id?: string | null
           zip_code?: string | null
         }
         Relationships: [
@@ -244,6 +247,13 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clients_whatsapp_inbox_id_fkey"
+            columns: ["whatsapp_inbox_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_inboxes"
             referencedColumns: ["id"]
           },
         ]

@@ -1,18 +1,18 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, Plus, Search, Phone, Mail, Calendar, MessageSquare, Edit, Eye, Trash2, RefreshCw } from "lucide-react";
+import { Plus, Search, MessageSquare, Edit, Eye, Trash2, RefreshCw, ArrowUpDown, ArrowUp, ArrowDown, Filter } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -38,7 +38,18 @@ interface Client {
   average_ticket: number;
   is_active: boolean;
   created_at: string;
+  whatsapp_inbox_id: string | null;
 }
+
+interface Inbox {
+  id: string;
+  instance_name: string;
+  label: string;
+  is_active: boolean;
+}
+
+type SortField = "name" | "total_visits" | "last_visit_at" | "created_at" | "average_ticket";
+type SortDir = "asc" | "desc";
 
 const emptyForm = {
   name: "", phone: "", whatsapp: "", email: "", birth_date: "",
@@ -49,12 +60,18 @@ const ClientesModule = () => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [editClient, setEditClient] = useState<Client | null>(null);
   const [deleteClientId, setDeleteClientId] = useState<string | null>(null);
+  const [sortField, setSortField] = useState<SortField>("name");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [filterSource, setFilterSource] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterInbox, setFilterInbox] = useState<string>("all");
 
   const [form, setForm] = useState({ ...emptyForm });
 
@@ -74,6 +91,19 @@ const ClientesModule = () => {
     setIsFormOpen(true);
   };
 
+  const { data: inboxes = [] } = useQuery({
+    queryKey: ["whatsapp-inboxes", profile?.clinic_id],
+    queryFn: async () => {
+      if (!profile?.clinic_id) return [];
+      const { data, error } = await supabase
+        .from("whatsapp_inboxes").select("id, instance_name, label, is_active")
+        .eq("clinic_id", profile.clinic_id).eq("is_active", true);
+      if (error) throw error;
+      return data as Inbox[];
+    },
+    enabled: !!profile?.clinic_id,
+  });
+
   const { data: clients = [], isLoading } = useQuery({
     queryKey: ["clients", profile?.clinic_id],
     queryFn: async () => {
@@ -85,6 +115,12 @@ const ClientesModule = () => {
     },
     enabled: !!profile?.clinic_id,
   });
+
+  const inboxMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    inboxes.forEach((i) => { map[i.id] = i.label; });
+    return map;
+  }, [inboxes]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -98,7 +134,6 @@ const ClientesModule = () => {
         zip_code: form.zip_code || null, notes: form.notes || null,
         lead_source: form.lead_source || null,
       };
-
       if (editClient) {
         const { error } = await supabase.from("clients").update(payload).eq("id", editClient.id);
         if (error) throw error;
@@ -129,26 +164,103 @@ const ClientesModule = () => {
     onError: (e: any) => toast.error(e.message),
   });
 
-  const filtered = clients.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.phone?.includes(search) ||
-    c.whatsapp?.includes(search) ||
-    c.email?.toLowerCase().includes(search.toLowerCase())
-  );
+  const handleSync = async (instanceName?: string) => {
+    setIsSyncing(true);
+    setIsSyncDialogOpen(false);
+    try {
+      const body = instanceName ? { instance_name: instanceName } : undefined;
+      const { data, error } = await supabase.functions.invoke("sync-evolution-contacts", { body });
+      if (error) throw error;
+      const r = data as { total_contacts: number; created: number; updated: number; skipped: number; errors: number };
+      toast.success(
+        `Sincronização concluída: ${r.created} criados, ${r.updated} atualizados, ${r.skipped} ignorados` +
+        (r.errors > 0 ? `, ${r.errors} erros` : "")
+      );
+      queryClient.invalidateQueries({ queryKey: ["clients"] });
+    } catch (e: any) {
+      toast.error("Erro na sincronização: " + (e.message || "Erro desconhecido"));
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const filtered = useMemo(() => {
+    let result = clients.filter((c) =>
+      c.name.toLowerCase().includes(search.toLowerCase()) ||
+      c.phone?.includes(search) ||
+      c.whatsapp?.includes(search) ||
+      c.email?.toLowerCase().includes(search.toLowerCase())
+    );
+
+    if (filterSource !== "all") {
+      result = result.filter((c) => (c.lead_source || "") === filterSource);
+    }
+    if (filterStatus !== "all") {
+      result = result.filter((c) => filterStatus === "active" ? c.is_active : !c.is_active);
+    }
+    if (filterInbox !== "all") {
+      if (filterInbox === "none") {
+        result = result.filter((c) => !c.whatsapp_inbox_id);
+      } else {
+        result = result.filter((c) => c.whatsapp_inbox_id === filterInbox);
+      }
+    }
+
+    result.sort((a, b) => {
+      let cmp = 0;
+      switch (sortField) {
+        case "name":
+          cmp = a.name.localeCompare(b.name);
+          break;
+        case "total_visits":
+          cmp = a.total_visits - b.total_visits;
+          break;
+        case "average_ticket":
+          cmp = (a.average_ticket || 0) - (b.average_ticket || 0);
+          break;
+        case "last_visit_at":
+          cmp = (a.last_visit_at || "").localeCompare(b.last_visit_at || "");
+          break;
+        case "created_at":
+          cmp = a.created_at.localeCompare(b.created_at);
+          break;
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+
+    return result;
+  }, [clients, search, filterSource, filterStatus, filterInbox, sortField, sortDir]);
+
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir(sortDir === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDir("asc");
+    }
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ArrowUpDown className="w-3 h-3 ml-1 opacity-40" />;
+    return sortDir === "asc"
+      ? <ArrowUp className="w-3 h-3 ml-1 text-primary" />
+      : <ArrowDown className="w-3 h-3 ml-1 text-primary" />;
+  };
 
   const today = new Date();
   const currentMonth = today.getMonth();
-  const birthdays = clients.filter((c) => {
-    if (!c.birth_date) return false;
-    return new Date(c.birth_date).getMonth() === currentMonth;
-  });
-
+  const birthdays = clients.filter((c) => c.birth_date && new Date(c.birth_date).getMonth() === currentMonth);
   const noReturnDays = 60;
   const noReturn = clients.filter((c) => {
     if (!c.last_visit_at) return true;
-    const diff = (today.getTime() - new Date(c.last_visit_at).getTime()) / (1000 * 60 * 60 * 24);
-    return diff > noReturnDays;
+    return (today.getTime() - new Date(c.last_visit_at).getTime()) / (1000 * 60 * 60 * 24) > noReturnDays;
   });
+
+  const leadSources = useMemo(() => {
+    const sources = new Set<string>();
+    clients.forEach((c) => { if (c.lead_source) sources.add(c.lead_source); });
+    return Array.from(sources).sort();
+  }, [clients]);
 
   return (
     <div className="space-y-6">
@@ -191,23 +303,7 @@ const ClientesModule = () => {
             variant="outline"
             className="gap-2"
             disabled={isSyncing}
-            onClick={async () => {
-              setIsSyncing(true);
-              try {
-                const { data, error } = await supabase.functions.invoke("sync-evolution-contacts");
-                if (error) throw error;
-                const r = data as { total_contacts: number; created: number; updated: number; skipped: number; errors: number };
-                toast.success(
-                  `Sincronização concluída: ${r.created} criados, ${r.updated} atualizados, ${r.skipped} ignorados` +
-                  (r.errors > 0 ? `, ${r.errors} erros` : "")
-                );
-                queryClient.invalidateQueries({ queryKey: ["clients"] });
-              } catch (e: any) {
-                toast.error("Erro na sincronização: " + (e.message || "Erro desconhecido"));
-              } finally {
-                setIsSyncing(false);
-              }
-            }}
+            onClick={() => setIsSyncDialogOpen(true)}
           >
             <RefreshCw className={`w-4 h-4 ${isSyncing ? "animate-spin" : ""}`} />
             {isSyncing ? "Sincronizando..." : "Sincronizar WhatsApp"}
@@ -218,16 +314,95 @@ const ClientesModule = () => {
         </div>
       </div>
 
-      {/* Form Dialog (Create + Edit) */}
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 items-center">
+        <Filter className="w-4 h-4 text-muted-foreground" />
+        <Select value={filterSource} onValueChange={setFilterSource}>
+          <SelectTrigger className="w-40 h-9 text-sm">
+            <SelectValue placeholder="Origem" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas origens</SelectItem>
+            {leadSources.map((s) => (
+              <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={filterStatus} onValueChange={setFilterStatus}>
+          <SelectTrigger className="w-36 h-9 text-sm">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="active">Ativos</SelectItem>
+            <SelectItem value="inactive">Inativos</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={filterInbox} onValueChange={setFilterInbox}>
+          <SelectTrigger className="w-44 h-9 text-sm">
+            <SelectValue placeholder="Instância" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas instâncias</SelectItem>
+            <SelectItem value="none">Sem instância</SelectItem>
+            {inboxes.map((i) => (
+              <SelectItem key={i.id} value={i.id}>{i.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {(filterSource !== "all" || filterStatus !== "all" || filterInbox !== "all") && (
+          <Button variant="ghost" size="sm" onClick={() => { setFilterSource("all"); setFilterStatus("all"); setFilterInbox("all"); }}>
+            Limpar filtros
+          </Button>
+        )}
+      </div>
+
+      {/* Sync Dialog */}
+      <Dialog open={isSyncDialogOpen} onOpenChange={setIsSyncDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Sincronizar Contatos do WhatsApp</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Selecione a instância para sincronizar os contatos ou sincronize todas de uma vez.
+          </p>
+          <div className="space-y-3 mt-2">
+            <Button
+              className="w-full justify-start gap-2"
+              variant="outline"
+              onClick={() => handleSync()}
+            >
+              <RefreshCw className="w-4 h-4" />
+              Sincronizar todas as instâncias
+            </Button>
+            {inboxes.map((inbox) => (
+              <Button
+                key={inbox.id}
+                className="w-full justify-start gap-2"
+                variant="outline"
+                onClick={() => handleSync(inbox.instance_name)}
+              >
+                <MessageSquare className="w-4 h-4 text-success" />
+                {inbox.label}
+                <span className="text-xs text-muted-foreground ml-auto">{inbox.instance_name}</span>
+              </Button>
+            ))}
+            {inboxes.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Nenhuma instância ativa encontrada. Configure nas Integrações.
+              </p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Form Dialog */}
       <Dialog open={isFormOpen} onOpenChange={(o) => { if (!o) resetForm(); setIsFormOpen(o); }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editClient ? "Editar Cliente" : "Cadastrar Novo Cliente"}</DialogTitle>
           </DialogHeader>
-          <form
-            onSubmit={(e) => { e.preventDefault(); saveMutation.mutate(); }}
-            className="grid grid-cols-1 sm:grid-cols-2 gap-4"
-          >
+          <form onSubmit={(e) => { e.preventDefault(); saveMutation.mutate(); }} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2 sm:col-span-2">
               <Label>Nome *</Label>
               <Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
@@ -299,17 +474,26 @@ const ClientesModule = () => {
             <div className="p-8 text-center text-muted-foreground">Carregando...</div>
           ) : filtered.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground">
-              {search ? "Nenhum cliente encontrado." : "Nenhum cliente cadastrado. Clique em 'Novo Cliente' para começar."}
+              {search || filterSource !== "all" || filterStatus !== "all" || filterInbox !== "all"
+                ? "Nenhum cliente encontrado com os filtros aplicados."
+                : "Nenhum cliente cadastrado. Clique em 'Novo Cliente' para começar."}
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nome</TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("name")}>
+                    <span className="flex items-center">Nome <SortIcon field="name" /></span>
+                  </TableHead>
                   <TableHead className="hidden md:table-cell">Telefone</TableHead>
                   <TableHead className="hidden lg:table-cell">Email</TableHead>
-                  <TableHead className="hidden sm:table-cell">Visitas</TableHead>
-                  <TableHead className="hidden lg:table-cell">Última Visita</TableHead>
+                  <TableHead className="hidden sm:table-cell cursor-pointer select-none" onClick={() => toggleSort("total_visits")}>
+                    <span className="flex items-center">Visitas <SortIcon field="total_visits" /></span>
+                  </TableHead>
+                  <TableHead className="hidden lg:table-cell cursor-pointer select-none" onClick={() => toggleSort("last_visit_at")}>
+                    <span className="flex items-center">Última Visita <SortIcon field="last_visit_at" /></span>
+                  </TableHead>
+                  <TableHead className="hidden lg:table-cell">Instância</TableHead>
                   <TableHead>Ações</TableHead>
                 </TableRow>
               </TableHeader>
@@ -331,6 +515,11 @@ const ClientesModule = () => {
                       {client.last_visit_at
                         ? format(new Date(client.last_visit_at), "dd/MM/yyyy", { locale: ptBR })
                         : "Nunca"}
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell">
+                      {client.whatsapp_inbox_id && inboxMap[client.whatsapp_inbox_id]
+                        ? <Badge variant="outline" className="text-xs">{inboxMap[client.whatsapp_inbox_id]}</Badge>
+                        : <span className="text-muted-foreground text-xs">—</span>}
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
@@ -371,7 +560,7 @@ const ClientesModule = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir Cliente</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir este cliente? Esta ação não pode ser desfeita. Todos os prontuários e agendamentos associados também serão removidos.
+              Tem certeza que deseja excluir este cliente? Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
