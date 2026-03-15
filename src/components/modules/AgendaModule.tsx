@@ -235,10 +235,12 @@ const AgendaModule = () => {
   }, [editForm.procedureName, editForm.clientName, editForm.title]);
 
   const handleSelectExternalClient = (client: typeof externalClients[0]) => {
+    const displayName = client.nome || client.nome_wpp || client.whatsapp || '';
     setForm({
       ...form,
-      clientName: client.nome,
+      clientName: displayName,
       clientWhatsapp: client.whatsapp || '',
+      clientEmail: client.email || '',
       clientOrigin: 'cadastro',
     });
     setIsNewClient(false);
