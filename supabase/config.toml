@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.evolution-webhook]
 verify_jwt = false
+
+[functions.sync-evolution-contacts]
+verify_jwt = true
