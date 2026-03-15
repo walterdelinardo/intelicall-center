@@ -612,6 +612,15 @@ const AgendaModule = () => {
               />
             </div>
             <div className="space-y-1">
+              <Label className="text-xs flex items-center gap-1"><Mail className="w-3 h-3" /> Email</Label>
+              <Input
+                value={form.clientEmail}
+                onChange={(e) => setForm({ ...form, clientEmail: e.target.value })}
+                placeholder="email@exemplo.com"
+                type="email"
+              />
+            </div>
+            <div className="space-y-1">
               <Label className="text-xs">Origem do Contato</Label>
               <Select value={form.clientOrigin} onValueChange={(v) => setForm({ ...form, clientOrigin: v })}>
                 <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecione" /></SelectTrigger>
