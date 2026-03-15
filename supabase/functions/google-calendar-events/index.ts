@@ -114,7 +114,7 @@ async function listEvents(accessToken: string, calendarId: string) {
   }) || [];
 }
 
-async function createEvent(accessToken: string, calendarId: string, body: any) {
+async function createEvent(accessToken: string, calendarId: string, body: any, locationUrl?: string) {
   const { title, description, startDateTime, endDateTime, extendedProperties } = body;
   if (!title || !startDateTime || !endDateTime) throw new Error('Missing required fields');
 
@@ -124,6 +124,10 @@ async function createEvent(accessToken: string, calendarId: string, body: any) {
     start: { dateTime: startDateTime, timeZone: 'America/Sao_Paulo' },
     end: { dateTime: endDateTime, timeZone: 'America/Sao_Paulo' },
   };
+
+  if (locationUrl) {
+    eventBody.location = locationUrl;
+  }
 
   if (extendedProperties) {
     eventBody.extendedProperties = { private: extendedProperties };
