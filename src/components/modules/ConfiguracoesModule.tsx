@@ -99,6 +99,7 @@ const ConfiguracoesModule = () => {
         phone: clinic.phone || "",
         email: clinic.email || "",
         address: clinic.address || "",
+        location_url: (clinic as any).location_url || "",
         city: clinic.city || "",
         state: clinic.state || "",
         zip_code: clinic.zip_code || "",
