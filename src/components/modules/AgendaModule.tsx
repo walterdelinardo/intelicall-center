@@ -341,7 +341,24 @@ const AgendaModule = () => {
   };
 
   const navigate = (dir: number) => {
-    setSelectedDate((d) => addDays(d, view === "day" ? dir : dir * 7));
+    setSelectedDate((d) => {
+      if (view === "month") return dir > 0 ? addMonths(d, 1) : subMonths(d, 1);
+      return addDays(d, view === "day" ? dir : dir * 7);
+    });
+  };
+
+  const handleSlotClick = (date: Date, time: string) => {
+    setForm({ ...form, date: format(date, "yyyy-MM-dd"), start_time: time });
+    setIsCreateOpen(true);
+  };
+
+  const handleDaySlotClick = (time: string) => {
+    handleSlotClick(selectedDate, time);
+  };
+
+  const handleMonthDayClick = (day: Date) => {
+    setSelectedDate(day);
+    setView("day");
   };
 
   const dayEvents = (day: Date) =>
