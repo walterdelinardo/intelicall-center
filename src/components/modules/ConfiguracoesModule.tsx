@@ -706,7 +706,18 @@ const ConfiguracoesModule = () => {
                                       title="Alterar cor"
                                     />
                                   </PopoverTrigger>
-                                  <PopoverContent side="top" sideOffset={8} className="w-auto p-3">
+                                  <PopoverContent
+                                    side="top"
+                                    sideOffset={8}
+                                    className="w-auto p-3"
+                                    onPointerDownOutside={(e) => {
+                                      // Prevent closing when native color picker dialog is open
+                                      const target = e.target as HTMLElement;
+                                      if (target?.closest?.('input[type="color"]')) {
+                                        e.preventDefault();
+                                      }
+                                    }}
+                                  >
                                     <div className="grid grid-cols-4 gap-1.5 mb-2">
                                       {['#7986CB', '#33B679', '#8E24AA', '#E67C73', '#F6BF26', '#F4511E', '#039BE5', '#616161', '#3F51B5', '#0B8043', '#D50000', '#795548'].map((c) => (
                                         <button
@@ -723,8 +734,14 @@ const ConfiguracoesModule = () => {
                                         Personalizada
                                         <input
                                           type="color"
-                                          value={acc.color || '#039BE5'}
-                                          onChange={(e) => updateColor(acc.id, e.target.value)}
+                                          defaultValue={acc.color || '#039BE5'}
+                                          onBlur={(e) => {
+                                            const newColor = e.target.value;
+                                            if (newColor !== (acc.color || '#039BE5')) {
+                                              updateColor(acc.id, newColor);
+                                            }
+                                          }}
+                                          onChange={(e) => e.stopPropagation()}
                                           className="w-7 h-7 rounded cursor-pointer border-0 p-0 bg-transparent"
                                         />
                                       </label>
