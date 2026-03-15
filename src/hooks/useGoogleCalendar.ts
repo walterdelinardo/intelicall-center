@@ -24,6 +24,7 @@ export interface CalendarEvent {
   account_color?: string;
   startDateTime?: string;
   endDateTime?: string;
+  location?: string;
   extendedProperties?: CalendarEventExtendedProps | null;
 }
 

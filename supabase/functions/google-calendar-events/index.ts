@@ -109,6 +109,7 @@ async function listEvents(accessToken: string, calendarId: string) {
       description: event.description || '',
       startDateTime: event.start?.dateTime || null,
       endDateTime: event.end?.dateTime || null,
+      location: event.location || null,
       extendedProperties: event.extendedProperties?.private || null,
     };
   }) || [];
