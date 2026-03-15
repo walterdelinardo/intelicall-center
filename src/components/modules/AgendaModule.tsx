@@ -968,28 +968,42 @@ const AgendaModule = () => {
         <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
           {(() => {
             const isPast = editingEvent ? isEventPast(editingEvent) : false;
+            const isDisabled = isPast || !editEnabled;
             return (
               <>
                 <DialogHeader>
                   <DialogTitle className="flex items-center justify-between">
                     <span className="flex items-center gap-2">
-                      {isPast ? <Eye className="w-5 h-5" /> : <Pencil className="w-5 h-5" />}
-                      {isPast ? 'Visualizar Evento' : 'Editar Evento'}
+                      {isPast ? <Eye className="w-5 h-5" /> : isDisabled ? <Lock className="w-5 h-5" /> : <Pencil className="w-5 h-5" />}
+                      {isPast ? 'Visualizar Evento' : isDisabled ? 'Detalhes do Evento' : 'Editar Evento'}
                     </span>
-                    {!isPast && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setEventToDelete(editingEvent);
-                          setShowDeleteDialog(true);
-                        }}
-                        className="gap-2 text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        Excluir
-                      </Button>
-                    )}
+                    <div className="flex gap-1">
+                      {!isPast && !editEnabled && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setEditEnabled(true)}
+                          className="gap-1 text-xs"
+                        >
+                          <Unlock className="w-3.5 h-3.5" />
+                          Habilitar Edição
+                        </Button>
+                      )}
+                      {!isPast && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setEventToDelete(editingEvent);
+                            setShowCancelDialog(true);
+                          }}
+                          className="gap-1 text-destructive hover:text-destructive text-xs"
+                        >
+                          <XCircle className="w-3.5 h-3.5" />
+                          Cancelar Evento
+                        </Button>
+                      )}
+                    </div>
                   </DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
