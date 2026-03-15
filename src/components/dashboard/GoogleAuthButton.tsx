@@ -3,7 +3,7 @@ import { useGoogleOAuth } from '@/hooks/useGoogleOAuth';
 import { Loader2 } from 'lucide-react';
 
 export const GoogleAuthButton = () => {
-  const { isConnected, loading, initiateOAuth, disconnect } = useGoogleOAuth();
+  const { isConnected, loading, initiateOAuth } = useGoogleOAuth();
 
   if (loading) {
     return (
@@ -16,14 +16,14 @@ export const GoogleAuthButton = () => {
 
   if (isConnected) {
     return (
-      <Button onClick={disconnect} variant="outline">
-        Desconectar Google Calendar
+      <Button variant="outline" disabled>
+        Google Calendar Conectado
       </Button>
     );
   }
 
   return (
-    <Button onClick={initiateOAuth} variant="default">
+    <Button onClick={() => initiateOAuth()} variant="default">
       Conectar Google Calendar
     </Button>
   );

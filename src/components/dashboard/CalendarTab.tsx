@@ -120,7 +120,7 @@ const CalendarTab = () => {
               <Button
                 variant="outline" 
                 size="sm"
-                onClick={fetchEvents}
+                onClick={() => fetchEvents()}
                 disabled={loading}
                 className="gap-2"
               >
