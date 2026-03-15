@@ -303,11 +303,27 @@ Deno.serve(async (req) => {
     const account = accounts[0];
     const accessToken = await getValidAccessToken(supabase, account);
 
+    // Fetch location_url from clinic
+    let locationUrl: string | undefined;
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('clinic_id')
+      .eq('id', userId)
+      .single();
+    if (profileData?.clinic_id) {
+      const { data: clinicData } = await supabase
+        .from('clinics')
+        .select('location_url')
+        .eq('id', profileData.clinic_id)
+        .single();
+      locationUrl = clinicData?.location_url || undefined;
+    }
+
     let result;
     if (action === 'create') {
-      result = await createEvent(accessToken, account.calendar_id, body);
+      result = await createEvent(accessToken, account.calendar_id, body, locationUrl);
     } else if (action === 'update') {
-      result = await updateEvent(accessToken, account.calendar_id, body);
+      result = await updateEvent(accessToken, account.calendar_id, body, locationUrl);
     } else if (action === 'delete') {
       result = await deleteEvent(accessToken, account.calendar_id, body.eventId);
     } else {
