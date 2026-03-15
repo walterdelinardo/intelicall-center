@@ -1,0 +1,1 @@
+ALTER TABLE public.google_calendar_accounts ADD COLUMN color text DEFAULT NULL;

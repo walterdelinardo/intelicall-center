@@ -65,6 +65,7 @@ interface MergedEvent {
   description?: string;
   accountLabel?: string;
   accountId?: string;
+  accountColor?: string;
   appointment?: Appointment;
   startDateTime?: string;
   endDateTime?: string;
@@ -182,6 +183,7 @@ const AgendaModule = () => {
           description: e.description,
           accountLabel: e.account_label,
           accountId: e.account_id,
+          accountColor: e.account_color,
           startDateTime: e.startDateTime,
           endDateTime: e.endDateTime,
         }));

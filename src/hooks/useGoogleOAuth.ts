@@ -11,6 +11,7 @@ interface GoogleCalendarAccount {
   expires_at: string | null;
   created_at: string;
   ical_url: string | null;
+  color: string | null;
 }
 
 export interface GoogleCalendarOption {
@@ -42,7 +43,7 @@ export const useGoogleOAuth = () => {
 
       const { data, error } = await supabase
         .from('google_calendar_accounts')
-        .select('id, label, calendar_id, is_active, expires_at, created_at, ical_url')
+        .select('id, label, calendar_id, is_active, expires_at, created_at, ical_url, color')
         .order('created_at');
 
       if (error) {
@@ -153,6 +154,29 @@ export const useGoogleOAuth = () => {
     await fetchAccounts();
   };
 
+  const updateColor = async (accountId: string, color: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { toast.error('Sessão expirada'); return; }
+
+      const { error } = await supabase.functions.invoke('google-update-calendar-color', {
+        body: { account_id: accountId, color },
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+
+      if (error) {
+        toast.error('Erro ao atualizar cor');
+        return;
+      }
+
+      toast.success('Cor atualizada!');
+      await fetchAccounts();
+    } catch (err) {
+      console.error('Error updating color:', err);
+      toast.error('Erro ao atualizar cor');
+    }
+  };
+
   const fetchCalendars = async (accountId: string): Promise<GoogleCalendarOption[]> => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
@@ -210,6 +234,7 @@ export const useGoogleOAuth = () => {
     updateLabel,
     toggleAccount,
     deleteAccount,
+    updateColor,
     fetchCalendars,
     updateCalendarId,
     fetchAccounts,

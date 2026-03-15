@@ -50,7 +50,7 @@ const ConfiguracoesModule = () => {
   const queryClient = useQueryClient();
   const isAdmin = hasRole("admin");
   const { inboxes, loading: inboxesLoading, createInbox, toggleInbox, deleteInbox } = useWhatsAppInboxes();
-  const { accounts: googleAccounts, loading: googleLoading, initiateOAuth, toggleAccount: toggleGoogleAccount, deleteAccount: deleteGoogleAccount, fetchCalendars, updateCalendarId, updateLabel, hasCredentials, fetchOAuthConfig } = useGoogleOAuth();
+  const { accounts: googleAccounts, loading: googleLoading, initiateOAuth, toggleAccount: toggleGoogleAccount, deleteAccount: deleteGoogleAccount, fetchCalendars, updateCalendarId, updateLabel, updateColor, hasCredentials, fetchOAuthConfig } = useGoogleOAuth();
 
   const [showAddInbox, setShowAddInbox] = useState(false);
   const [newLabel, setNewLabel] = useState("");
@@ -581,6 +581,7 @@ const ConfiguracoesModule = () => {
                         <TableRow>
                           <TableHead>Label</TableHead>
                           <TableHead>Agenda</TableHead>
+                          <TableHead>Cor</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead className="w-[80px]">Ações</TableHead>
                         </TableRow>
@@ -694,6 +695,34 @@ const ConfiguracoesModule = () => {
                                     )}
                                   </SelectContent>
                                 </Select>
+                              </TableCell>
+                              <TableCell>
+                                <div className="relative">
+                                  <button
+                                    className="w-7 h-7 rounded-full border-2 border-border hover:scale-110 transition-transform"
+                                    style={{ backgroundColor: acc.color || '#039BE5' }}
+                                    onClick={(e) => {
+                                      const popover = (e.currentTarget.nextElementSibling as HTMLElement);
+                                      popover.classList.toggle('hidden');
+                                    }}
+                                    title="Alterar cor"
+                                  />
+                                  <div data-color-popover={acc.id} className="hidden absolute z-50 top-9 left-0 bg-popover border border-border rounded-lg p-2 shadow-lg grid grid-cols-4 gap-1.5 w-[140px]">
+                                    {['#7986CB', '#33B679', '#8E24AA', '#E67C73', '#F6BF26', '#F4511E', '#039BE5', '#616161', '#3F51B5', '#0B8043', '#D50000', '#795548'].map((c) => (
+                                      <button
+                                        key={c}
+                                        className={`w-7 h-7 rounded-full border-2 hover:scale-110 transition-transform ${acc.color === c ? 'border-foreground ring-2 ring-ring' : 'border-transparent'}`}
+                                        style={{ backgroundColor: c }}
+                                        onClick={async () => {
+                                          await updateColor(acc.id, c);
+                                          // Hide popover
+                                          const popover = (document.querySelector(`[data-color-popover="${acc.id}"]`) as HTMLElement);
+                                          if (popover) popover.classList.add('hidden');
+                                        }}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
                               </TableCell>
                               <TableCell>
                                 <Badge variant={acc.is_active ? "default" : "secondary"}>

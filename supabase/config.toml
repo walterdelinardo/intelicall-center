@@ -26,3 +26,6 @@ verify_jwt = true
 
 [functions.google-list-calendars]
 verify_jwt = false
+
+[functions.google-update-calendar-color]
+verify_jwt = false

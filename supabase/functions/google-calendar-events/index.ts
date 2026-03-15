@@ -262,6 +262,7 @@ Deno.serve(async (req) => {
             ...e,
             account_id: account.id,
             account_label: account.label,
+            account_color: account.color || null,
           })));
         } catch (err) {
           console.error(`Error fetching from account ${account.id}:`, err);

@@ -12,6 +12,7 @@ interface MergedEvent {
   description?: string;
   accountLabel?: string;
   accountId?: string;
+  accountColor?: string;
 }
 
 interface MonthViewProps {
@@ -29,6 +30,8 @@ const statusDotColors: Record<string, string> = {
   confirmed: "bg-blue-500",
   pending: "bg-yellow-500",
 };
+
+const DEFAULT_COLOR = '#039BE5';
 
 export const MonthView = ({ currentMonth, events, onDayClick }: MonthViewProps) => {
   const monthStart = startOfMonth(currentMonth);
@@ -74,19 +77,37 @@ export const MonthView = ({ currentMonth, events, onDayClick }: MonthViewProps) 
 
               {/* Event previews */}
               <div className="space-y-0.5">
-                {dayEvents.slice(0, 3).map((evt) => (
-                  <div
-                    key={`${evt.type}-${evt.id}`}
-                    className={`text-[10px] px-1 py-0.5 rounded truncate ${
-                      evt.type === 'google'
-                        ? 'bg-blue-100 text-blue-800'
-                        : `${statusDotColors[evt.status]?.replace('bg-', 'bg-opacity-10 bg-') || 'bg-muted'} text-foreground`
-                    }`}
-                  >
-                    <span className="font-medium">{evt.time}</span>{' '}
-                    {evt.title}
-                  </div>
-                ))}
+                {dayEvents.slice(0, 3).map((evt) => {
+                  if (evt.type === 'google') {
+                    const color = evt.accountColor || DEFAULT_COLOR;
+                    return (
+                      <div
+                        key={`${evt.type}-${evt.id}`}
+                        className="text-[10px] px-1 py-0.5 rounded truncate"
+                        style={{
+                          backgroundColor: `${color}20`,
+                          borderLeft: `2px solid ${color}`,
+                          color: color,
+                        }}
+                      >
+                        <span className="font-medium">{evt.time}</span>{' '}
+                        {evt.title}
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={`${evt.type}-${evt.id}`}
+                      className={`text-[10px] px-1 py-0.5 rounded truncate ${
+                        `${statusDotColors[evt.status]?.replace('bg-', 'bg-opacity-10 bg-') || 'bg-muted'} text-foreground`
+                      }`}
+                    >
+                      <span className="font-medium">{evt.time}</span>{' '}
+                      {evt.title}
+                    </div>
+                  );
+                })}
                 {dayEvents.length > 3 && (
                   <div className="text-[10px] text-muted-foreground px-1">
                     +{dayEvents.length - 3} mais
