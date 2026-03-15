@@ -622,45 +622,26 @@ const AgendaModule = () => {
       {(isLoading || googleLoading) ? (
         <div className="p-8 text-center text-muted-foreground">Carregando...</div>
       ) : view === "day" ? (
-        <div className="space-y-3">
-          {dayEvents(selectedDate).length === 0 ? (
-            <Card className="shadow-card">
-              <CardContent className="p-8 text-center text-muted-foreground">
-                Nenhum agendamento para este dia.
-              </CardContent>
-            </Card>
-          ) : (
-            dayEvents(selectedDate).map(renderEventCard)
-          )}
-        </div>
+        <TimeGrid
+          events={dayEvents(selectedDate)}
+          onSlotClick={handleDaySlotClick}
+          onEventClick={(evt) => evt.type === 'google' ? handleEditEvent(evt) : undefined}
+          onStatusChange={!useGoogleAsPrimary ? (id, status) => updateStatusMutation.mutate({ id, status }) : undefined}
+        />
+      ) : view === "week" ? (
+        <WeekTimeGrid
+          days={weekDays}
+          getEventsForDay={dayEvents}
+          onSlotClick={handleSlotClick}
+          onEventClick={(evt) => evt.type === 'google' ? handleEditEvent(evt) : undefined}
+          isToday={isToday}
+        />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-7 gap-3">
-          {weekDays.map((day) => (
-            <div key={day.toISOString()} className="space-y-2">
-              <div className={`text-center text-sm font-medium p-2 rounded-lg ${isToday(day) ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-                <div className="text-xs opacity-75">{format(day, "EEE", { locale: ptBR })}</div>
-                <div>{format(day, "dd")}</div>
-              </div>
-              <div className="space-y-2 min-h-[60px]">
-                {dayEvents(day).map((evt) => (
-                  <Card
-                    key={`${evt.type}-${evt.id}`}
-                    className={`border text-xs cursor-pointer hover:shadow-md transition-shadow ${evt.type === 'google' ? 'border-blue-200 bg-blue-50/50' : statusColors[evt.status]}`}
-                    onClick={() => evt.type === 'google' && handleEditEvent(evt)}
-                  >
-                    <CardContent className="p-2">
-                      <p className="font-medium truncate">{evt.title}</p>
-                      <p className="opacity-75">{evt.time}</p>
-                      {evt.type === 'google' && evt.accountLabel && (
-                        <p className="text-[10px] text-blue-500 truncate">{evt.accountLabel}</p>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
+        <MonthView
+          currentMonth={selectedDate}
+          events={mergedEvents}
+          onDayClick={handleMonthDayClick}
+        />
       )}
 
       {/* Edit Google Event Dialog */}
