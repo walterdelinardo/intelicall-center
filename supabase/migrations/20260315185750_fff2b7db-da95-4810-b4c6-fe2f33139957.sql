@@ -1,0 +1,1 @@
+ALTER TABLE public.clinics ADD COLUMN location_url text;
