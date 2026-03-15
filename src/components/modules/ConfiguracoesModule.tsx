@@ -47,12 +47,15 @@ const ConfiguracoesModule = () => {
   const queryClient = useQueryClient();
   const isAdmin = hasRole("admin");
   const { inboxes, loading: inboxesLoading, createInbox, toggleInbox, deleteInbox } = useWhatsAppInboxes();
+  const { accounts: googleAccounts, loading: googleLoading, initiateOAuth, toggleAccount: toggleGoogleAccount, deleteAccount: deleteGoogleAccount } = useGoogleOAuth();
 
   const [showAddInbox, setShowAddInbox] = useState(false);
   const [newLabel, setNewLabel] = useState("");
   const [newInstanceName, setNewInstanceName] = useState("");
   const [newPhone, setNewPhone] = useState("");
   const [savingInbox, setSavingInbox] = useState(false);
+  const [showAddGoogle, setShowAddGoogle] = useState(false);
+  const [newGoogleLabel, setNewGoogleLabel] = useState("");
 
   const { data: clinic, isLoading } = useQuery({
     queryKey: ["clinic", profile?.clinic_id],
