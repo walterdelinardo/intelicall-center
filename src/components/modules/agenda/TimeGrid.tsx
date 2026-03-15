@@ -224,7 +224,7 @@ export const WeekTimeGrid = ({ days, getEventsForDay, onSlotClick, onEventClick,
             const top = slotIndex * SLOT_HEIGHT;
             const height = Math.max((durationMin / 30) * SLOT_HEIGHT - 2, SLOT_HEIGHT - 2);
 
-            if (evtMinutes < gridStartMin || evtMinutes >= END_HOUR * 60) return null;
+            if (evtMinutes < gridStartMin || evtMinutes >= END_HOUR * 60 || top < 0) return null;
 
             return (
               <div
