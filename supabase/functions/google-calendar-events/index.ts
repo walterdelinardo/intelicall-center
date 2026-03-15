@@ -61,7 +61,7 @@ async function getValidAccessToken(
 }
 
 async function listEvents(accessToken: string, calendarId: string) {
-  const timeMin = new Date().toISOString();
+  const timeMin = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
   const timeMax = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
   const response = await fetch(
