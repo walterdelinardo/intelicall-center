@@ -327,7 +327,12 @@ const AgendaModule = () => {
     });
   };
 
-  // Edit Google event
+  // Determine if event is in the past
+  const isEventPast = (evt: MergedEvent) => {
+    if (!evt.startDateTime) return false;
+    return new Date(evt.startDateTime) < new Date();
+  };
+
   const handleEditEvent = (evt: MergedEvent) => {
     if (evt.type !== 'google') return;
     setEditingEvent(evt);
@@ -346,6 +351,7 @@ const AgendaModule = () => {
       })(),
       clientName: ep.clientName || '',
       clientWhatsapp: ep.clientWhatsapp || '',
+      clientEmail: ep.clientEmail || '',
       clientOrigin: ep.clientOrigin || '',
       procedureName: ep.procedureName || '',
       procedureValue: ep.procedureValue || '',
