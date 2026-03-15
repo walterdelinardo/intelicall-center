@@ -305,6 +305,7 @@ const AgendaModule = () => {
         extendedProperties,
       });
 
+      setIsSubmitting(false);
       if (success) {
         setIsCreateOpen(false);
         resetForm();
