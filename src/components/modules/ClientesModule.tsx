@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, Plus, Search, Phone, Mail, Calendar, MessageSquare, Edit, Eye, Trash2 } from "lucide-react";
+import { Users, Plus, Search, Phone, Mail, Calendar, MessageSquare, Edit, Eye, Trash2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -48,6 +48,7 @@ const emptyForm = {
 const ClientesModule = () => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
+  const [isSyncing, setIsSyncing] = useState(false);
   const [search, setSearch] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
@@ -185,9 +186,36 @@ const ClientesModule = () => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input placeholder="Buscar por nome, telefone, email..." className="pl-10" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <Button className="bg-gradient-primary gap-2 shadow-card" onClick={() => { resetForm(); setIsFormOpen(true); }}>
-          <Plus className="w-4 h-4" /> Novo Cliente
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="gap-2"
+            disabled={isSyncing}
+            onClick={async () => {
+              setIsSyncing(true);
+              try {
+                const { data, error } = await supabase.functions.invoke("sync-evolution-contacts");
+                if (error) throw error;
+                const r = data as { total_contacts: number; created: number; updated: number; skipped: number; errors: number };
+                toast.success(
+                  `Sincronização concluída: ${r.created} criados, ${r.updated} atualizados, ${r.skipped} ignorados` +
+                  (r.errors > 0 ? `, ${r.errors} erros` : "")
+                );
+                queryClient.invalidateQueries({ queryKey: ["clients"] });
+              } catch (e: any) {
+                toast.error("Erro na sincronização: " + (e.message || "Erro desconhecido"));
+              } finally {
+                setIsSyncing(false);
+              }
+            }}
+          >
+            <RefreshCw className={`w-4 h-4 ${isSyncing ? "animate-spin" : ""}`} />
+            {isSyncing ? "Sincronizando..." : "Sincronizar WhatsApp"}
+          </Button>
+          <Button className="bg-gradient-primary gap-2 shadow-card" onClick={() => { resetForm(); setIsFormOpen(true); }}>
+            <Plus className="w-4 h-4" /> Novo Cliente
+          </Button>
+        </div>
       </div>
 
       {/* Form Dialog (Create + Edit) */}
