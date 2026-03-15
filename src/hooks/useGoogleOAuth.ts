@@ -84,37 +84,19 @@ export const useGoogleOAuth = () => {
     }
   };
 
-  const addICalAccount = async (label: string, icalUrl: string) => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user || !profile?.clinic_id) {
-        toast.error('Você precisa estar logado');
-        return;
-      }
+  const updateLabel = async (accountId: string, label: string) => {
+    const { error } = await supabase
+      .from('google_calendar_accounts')
+      .update({ label })
+      .eq('id', accountId);
 
-      const { error } = await supabase
-        .from('google_calendar_accounts')
-        .insert({
-          clinic_id: profile.clinic_id,
-          user_id: user.id,
-          label,
-          calendar_id: 'ical',
-          ical_url: icalUrl,
-          scope: 'ical',
-        } as any);
-
-      if (error) {
-        console.error('Error adding iCal account:', error);
-        toast.error('Erro ao adicionar calendário iCal');
-        return;
-      }
-
-      toast.success('Calendário iCal adicionado!');
-      await fetchAccounts();
-    } catch (error) {
-      console.error('Error:', error);
-      toast.error('Erro ao adicionar calendário');
+    if (error) {
+      toast.error('Erro ao atualizar label');
+      throw error;
     }
+
+    toast.success('Label atualizado!');
+    await fetchAccounts();
   };
 
   const toggleAccount = async (accountId: string, isActive: boolean) => {
