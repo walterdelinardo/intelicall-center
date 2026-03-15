@@ -999,20 +999,33 @@ const AgendaModule = () => {
                       {isPast ? 'Visualizar Evento' : isDisabled ? 'Detalhes do Evento' : 'Editar Evento'}
                     </span>
                     <div className="flex gap-1">
-                      {!isPast && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setBillingEvent(editingEvent);
-                            setIsBillingOpen(true);
-                          }}
-                          className="gap-1 text-xs"
-                        >
-                          <Receipt className="w-3.5 h-3.5" />
-                          Faturar
-                        </Button>
-                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          if (!editingEvent) return;
+                          // Check if already billed
+                          const { data: existing } = await supabase
+                            .from("financial_transactions")
+                            .select("id")
+                            .eq("clinic_id", profile?.clinic_id || "")
+                            .eq("description", editingEvent.title)
+                            .eq("date", editingEvent.date)
+                            .eq("category", "atendimento")
+                            .neq("status", "cancelado")
+                            .limit(1);
+                          if (existing && existing.length > 0) {
+                            toast.error("Este evento já foi faturado. Para refaturar, exclua a transação no módulo Financeiro primeiro.");
+                            return;
+                          }
+                          setBillingEvent(editingEvent);
+                          setIsBillingOpen(true);
+                        }}
+                        className="gap-1 text-xs"
+                      >
+                        <Receipt className="w-3.5 h-3.5" />
+                        Faturar
+                      </Button>
                       {!isPast && !editEnabled && (
                         <Button
                           variant="outline"
