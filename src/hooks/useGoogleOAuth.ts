@@ -156,13 +156,10 @@ export const useGoogleOAuth = () => {
 
   const updateColor = async (accountId: string, color: string) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { toast.error('Sessão expirada'); return; }
-
-      const { error } = await supabase.functions.invoke('google-update-calendar-color', {
-        body: { account_id: accountId, color },
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
+      const { error } = await supabase
+        .from('google_calendar_accounts')
+        .update({ color })
+        .eq('id', accountId);
 
       if (error) {
         toast.error('Erro ao atualizar cor');
