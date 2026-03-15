@@ -10,7 +10,9 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Settings, Building2, Clock, Phone, MapPin, Mail, Save, Loader2, Smartphone, Plus, Power, Plug, Trash2, Calendar } from "lucide-react";
+import { Settings, Building2, Clock, Phone, MapPin, Mail, Save, Loader2, Smartphone, Plus, Power, Plug, Trash2, Calendar, ChevronDown } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { type GoogleCalendarOption } from "@/hooks/useGoogleOAuth";
 import { toast } from "sonner";
 import { useWhatsAppInboxes } from "@/hooks/useWhatsApp";
 import { useGoogleOAuth } from "@/hooks/useGoogleOAuth";
@@ -47,7 +49,7 @@ const ConfiguracoesModule = () => {
   const queryClient = useQueryClient();
   const isAdmin = hasRole("admin");
   const { inboxes, loading: inboxesLoading, createInbox, toggleInbox, deleteInbox } = useWhatsAppInboxes();
-  const { accounts: googleAccounts, loading: googleLoading, initiateOAuth, addICalAccount, toggleAccount: toggleGoogleAccount, deleteAccount: deleteGoogleAccount } = useGoogleOAuth();
+  const { accounts: googleAccounts, loading: googleLoading, initiateOAuth, addICalAccount, toggleAccount: toggleGoogleAccount, deleteAccount: deleteGoogleAccount, fetchCalendars, updateCalendarId } = useGoogleOAuth();
 
   const [showAddInbox, setShowAddInbox] = useState(false);
   const [newLabel, setNewLabel] = useState("");
@@ -58,7 +60,8 @@ const ConfiguracoesModule = () => {
   const [newGoogleLabel, setNewGoogleLabel] = useState("");
   const [addGoogleMode, setAddGoogleMode] = useState<"oauth" | "ical">("oauth");
   const [newICalUrl, setNewICalUrl] = useState("");
-
+  const [calendarsMap, setCalendarsMap] = useState<Record<string, GoogleCalendarOption[]>>({});
+  const [loadingCalendars, setLoadingCalendars] = useState<Record<string, boolean>>({});
   const { data: clinic, isLoading } = useQuery({
     queryKey: ["clinic", profile?.clinic_id],
     queryFn: async () => {
@@ -578,62 +581,133 @@ const ConfiguracoesModule = () => {
                         <TableRow>
                           <TableHead>Label</TableHead>
                           <TableHead>Tipo</TableHead>
+                          <TableHead>Agenda</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead className="w-[80px]">Ações</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {googleAccounts.map((acc) => (
-                          <TableRow key={acc.id}>
-                            <TableCell className="font-medium">{acc.label}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline" className="text-xs">
-                                {acc.ical_url ? "iCal" : "OAuth"}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={acc.is_active ? "default" : "secondary"}>
-                                {acc.is_active ? "Ativo" : "Inativo"}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={async () => {
-                                    try {
-                                      await toggleGoogleAccount(acc.id, !acc.is_active);
-                                      toast.success(acc.is_active ? "Conta desativada" : "Conta ativada");
-                                    } catch (error: any) {
-                                      toast.error("Erro: " + error.message);
-                                    }
-                                  }}
-                                  title={acc.is_active ? "Desativar" : "Ativar"}
-                                >
-                                  <Power className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="text-destructive hover:text-destructive"
-                                  onClick={async () => {
-                                    if (!confirm(`Excluir a conta "${acc.label}"?`)) return;
-                                    try {
-                                      await deleteGoogleAccount(acc.id);
-                                      toast.success("Conta excluída");
-                                    } catch (error: any) {
-                                      toast.error("Erro: " + error.message);
-                                    }
-                                  }}
-                                  title="Excluir"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        {googleAccounts.map((acc) => {
+                          const isOAuth = !acc.ical_url;
+                          const calendars = calendarsMap[acc.id] || [];
+                          const isLoadingCals = loadingCalendars[acc.id] || false;
+
+                          const handleLoadCalendars = async () => {
+                            if (calendars.length > 0) return; // already loaded
+                            setLoadingCalendars(prev => ({ ...prev, [acc.id]: true }));
+                            try {
+                              const cals = await fetchCalendars(acc.id);
+                              setCalendarsMap(prev => ({ ...prev, [acc.id]: cals }));
+                            } finally {
+                              setLoadingCalendars(prev => ({ ...prev, [acc.id]: false }));
+                            }
+                          };
+
+                          return (
+                            <TableRow key={acc.id}>
+                              <TableCell className="font-medium">{acc.label}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className="text-xs">
+                                  {acc.ical_url ? "iCal" : "OAuth"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                {isOAuth ? (
+                                  <Select
+                                    value={acc.calendar_id}
+                                    onValueChange={async (value) => {
+                                      try {
+                                        await updateCalendarId(acc.id, value);
+                                      } catch (e: any) {
+                                        toast.error("Erro: " + e.message);
+                                      }
+                                    }}
+                                    onOpenChange={(open) => {
+                                      if (open) handleLoadCalendars();
+                                    }}
+                                  >
+                                    <SelectTrigger className="w-[200px] h-8 text-xs">
+                                      <SelectValue placeholder={isLoadingCals ? "Carregando..." : acc.calendar_id === "primary" ? "Principal" : acc.calendar_id}>
+                                        {isLoadingCals
+                                          ? "Carregando..."
+                                          : calendars.find(c => c.id === acc.calendar_id)?.summary
+                                            || (acc.calendar_id === "primary" ? "Principal" : acc.calendar_id)}
+                                      </SelectValue>
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {isLoadingCals ? (
+                                        <div className="flex items-center justify-center p-2">
+                                          <Loader2 className="w-4 h-4 animate-spin" />
+                                        </div>
+                                      ) : calendars.length > 0 ? (
+                                        calendars.map((cal) => (
+                                          <SelectItem key={cal.id} value={cal.id}>
+                                            <div className="flex items-center gap-2">
+                                              {cal.backgroundColor && (
+                                                <span
+                                                  className="w-3 h-3 rounded-full inline-block flex-shrink-0"
+                                                  style={{ backgroundColor: cal.backgroundColor }}
+                                                />
+                                              )}
+                                              <span>{cal.summary}{cal.primary ? " (Principal)" : ""}</span>
+                                            </div>
+                                          </SelectItem>
+                                        ))
+                                      ) : (
+                                        <div className="p-2 text-xs text-muted-foreground">
+                                          Clique para carregar calendários
+                                        </div>
+                                      )}
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={acc.is_active ? "default" : "secondary"}>
+                                  {acc.is_active ? "Ativo" : "Inativo"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={async () => {
+                                      try {
+                                        await toggleGoogleAccount(acc.id, !acc.is_active);
+                                        toast.success(acc.is_active ? "Conta desativada" : "Conta ativada");
+                                      } catch (error: any) {
+                                        toast.error("Erro: " + error.message);
+                                      }
+                                    }}
+                                    title={acc.is_active ? "Desativar" : "Ativar"}
+                                  >
+                                    <Power className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-destructive hover:text-destructive"
+                                    onClick={async () => {
+                                      if (!confirm(`Excluir a conta "${acc.label}"?`)) return;
+                                      try {
+                                        await deleteGoogleAccount(acc.id);
+                                        toast.success("Conta excluída");
+                                      } catch (error: any) {
+                                        toast.error("Erro: " + error.message);
+                                      }
+                                    }}
+                                    title="Excluir"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   )}
