@@ -384,6 +384,7 @@ const AgendaModule = () => {
     const extendedProperties: CalendarEventExtendedProps = {
       clientName: editForm.clientName,
       clientWhatsapp: editForm.clientWhatsapp,
+      clientEmail: editForm.clientEmail,
       clientOrigin: editForm.clientOrigin,
       procedureName: editForm.procedureName,
       procedureValue: editForm.procedureValue,
