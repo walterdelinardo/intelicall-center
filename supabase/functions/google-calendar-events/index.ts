@@ -64,24 +64,31 @@ async function listEvents(accessToken: string, calendarId: string) {
   const timeMin = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
   const timeMax = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
-  const response = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime&maxResults=50`,
-    {
+  let allItems: any[] = [];
+  let pageToken = '';
+
+  do {
+    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime&maxResults=2500${pageToken ? `&pageToken=${pageToken}` : ''}`;
+
+    const response = await fetch(url, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Google Calendar API error:', errorText);
+      throw new Error(`Google Calendar API error: ${response.status}`);
     }
-  );
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('Google Calendar API error:', errorText);
-    throw new Error(`Google Calendar API error: ${response.status}`);
-  }
+    const data = await response.json();
+    allItems.push(...(data.items || []));
+    pageToken = data.nextPageToken || '';
+  } while (pageToken);
 
-  const data = await response.json();
-  return data.items?.map((event: any) => {
+  return allItems.map((event: any) => {
     const startDT = event.start?.dateTime ? new Date(event.start.dateTime) : null;
     const endDT = event.end?.dateTime ? new Date(event.end.dateTime) : null;
 
@@ -112,7 +119,7 @@ async function listEvents(accessToken: string, calendarId: string) {
       location: event.location || null,
       extendedProperties: event.extendedProperties?.private || null,
     };
-  }) || [];
+  });
 }
 
 async function createEvent(accessToken: string, calendarId: string, body: any, locationUrl?: string) {
