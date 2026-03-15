@@ -1140,7 +1140,7 @@ const AgendaModule = () => {
                   </div>
                 </div>
                 <DialogFooter className="flex-col sm:flex-row gap-2">
-                  {!isPast && (
+                  {!isPast && editEnabled && (
                     <Button
                       type="button"
                       variant="outline"
@@ -1155,7 +1155,7 @@ const AgendaModule = () => {
                   )}
                   <div className="flex gap-2 ml-auto">
                     <Button variant="outline" onClick={() => setIsEditOpen(false)} disabled={editLoading}>
-                      {isPast ? 'Fechar' : 'Cancelar'}
+                      {isPast || !editEnabled ? 'Fechar' : 'Cancelar'}
                     </Button>
                     {isPast ? (
                       editForm.description !== (editingEvent?.description || '') && (
@@ -1163,11 +1163,11 @@ const AgendaModule = () => {
                           {editLoading ? "Salvando..." : "Salvar Observações"}
                         </Button>
                       )
-                    ) : (
+                    ) : editEnabled ? (
                       <Button onClick={handleSaveEdit} disabled={editLoading || !composedEditTitle}>
                         {editLoading ? "Salvando..." : "Salvar Evento"}
                       </Button>
-                    )}
+                    ) : null}
                   </div>
                 </DialogFooter>
               </>
@@ -1176,7 +1176,40 @@ const AgendaModule = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
+      {/* Cancel Event Confirmation */}
+      <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancelar Evento</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja cancelar o evento "{eventToDelete?.title}"? Esta ação não pode ser desfeita e o evento será removido do Google Calendar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={editLoading}>Voltar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (!eventToDelete) return;
+                setEditLoading(true);
+                const success = await deleteGoogleEvent(eventToDelete.id, eventToDelete.accountId);
+                setEditLoading(false);
+                if (success) {
+                  setShowCancelDialog(false);
+                  setEventToDelete(null);
+                  setIsEditOpen(false);
+                  setEditingEvent(null);
+                }
+              }}
+              disabled={editLoading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {editLoading ? "Cancelando..." : "Sim, Cancelar Evento"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Confirmation (legacy) */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
