@@ -65,6 +65,7 @@ interface MergedEvent {
   description?: string;
   accountLabel?: string;
   accountId?: string;
+  accountColor?: string;
   appointment?: Appointment;
   startDateTime?: string;
   endDateTime?: string;
