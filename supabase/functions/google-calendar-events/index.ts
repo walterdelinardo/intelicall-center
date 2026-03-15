@@ -109,12 +109,13 @@ async function listEvents(accessToken: string, calendarId: string) {
       description: event.description || '',
       startDateTime: event.start?.dateTime || null,
       endDateTime: event.end?.dateTime || null,
+      location: event.location || null,
       extendedProperties: event.extendedProperties?.private || null,
     };
   }) || [];
 }
 
-async function createEvent(accessToken: string, calendarId: string, body: any) {
+async function createEvent(accessToken: string, calendarId: string, body: any, locationUrl?: string) {
   const { title, description, startDateTime, endDateTime, extendedProperties } = body;
   if (!title || !startDateTime || !endDateTime) throw new Error('Missing required fields');
 
@@ -124,6 +125,10 @@ async function createEvent(accessToken: string, calendarId: string, body: any) {
     start: { dateTime: startDateTime, timeZone: 'America/Sao_Paulo' },
     end: { dateTime: endDateTime, timeZone: 'America/Sao_Paulo' },
   };
+
+  if (locationUrl) {
+    eventBody.location = locationUrl;
+  }
 
   if (extendedProperties) {
     eventBody.extendedProperties = { private: extendedProperties };
@@ -143,7 +148,7 @@ async function createEvent(accessToken: string, calendarId: string, body: any) {
   return { success: true, event: { id: created.id, title: created.summary, htmlLink: created.htmlLink } };
 }
 
-async function updateEvent(accessToken: string, calendarId: string, body: any) {
+async function updateEvent(accessToken: string, calendarId: string, body: any, locationUrl?: string) {
   const { eventId, title, description, startDateTime, endDateTime, extendedProperties } = body;
   if (!eventId || !title || !startDateTime || !endDateTime) throw new Error('Missing required fields');
 
@@ -153,6 +158,10 @@ async function updateEvent(accessToken: string, calendarId: string, body: any) {
     start: { dateTime: startDateTime, timeZone: 'America/Sao_Paulo' },
     end: { dateTime: endDateTime, timeZone: 'America/Sao_Paulo' },
   };
+
+  if (locationUrl) {
+    eventBody.location = locationUrl;
+  }
 
   if (extendedProperties) {
     eventBody.extendedProperties = { private: extendedProperties };
@@ -294,11 +303,27 @@ Deno.serve(async (req) => {
     const account = accounts[0];
     const accessToken = await getValidAccessToken(supabase, account);
 
+    // Fetch location_url from clinic
+    let locationUrl: string | undefined;
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('clinic_id')
+      .eq('id', userId)
+      .single();
+    if (profileData?.clinic_id) {
+      const { data: clinicData } = await supabase
+        .from('clinics')
+        .select('location_url')
+        .eq('id', profileData.clinic_id)
+        .single();
+      locationUrl = clinicData?.location_url || undefined;
+    }
+
     let result;
     if (action === 'create') {
-      result = await createEvent(accessToken, account.calendar_id, body);
+      result = await createEvent(accessToken, account.calendar_id, body, locationUrl);
     } else if (action === 'update') {
-      result = await updateEvent(accessToken, account.calendar_id, body);
+      result = await updateEvent(accessToken, account.calendar_id, body, locationUrl);
     } else if (action === 'delete') {
       result = await deleteEvent(accessToken, account.calendar_id, body.eventId);
     } else {

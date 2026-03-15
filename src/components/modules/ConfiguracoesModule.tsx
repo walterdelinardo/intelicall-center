@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Settings, Building2, Clock, Phone, MapPin, Mail, Save, Loader2, Smartphone, Plus, Power, Plug, Trash2, Calendar, Pencil, Palette, Check } from "lucide-react";
+import { Settings, Building2, Clock, Phone, MapPin, Mail, Save, Loader2, Smartphone, Plus, Power, Plug, Trash2, Calendar, Pencil, Palette, Check, Globe } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { type GoogleCalendarOption } from "@/hooks/useGoogleOAuth";
@@ -83,6 +83,7 @@ const ConfiguracoesModule = () => {
     phone: "",
     email: "",
     address: "",
+    location_url: "",
     city: "",
     state: "",
     zip_code: "",
@@ -98,6 +99,7 @@ const ConfiguracoesModule = () => {
         phone: clinic.phone || "",
         email: clinic.email || "",
         address: clinic.address || "",
+        location_url: (clinic as any).location_url || "",
         city: clinic.city || "",
         state: clinic.state || "",
         zip_code: clinic.zip_code || "",
@@ -119,6 +121,7 @@ const ConfiguracoesModule = () => {
           phone: form.phone || null,
           email: form.email || null,
           address: form.address || null,
+          location_url: form.location_url || null,
           city: form.city || null,
           state: form.state || null,
           zip_code: form.zip_code || null,
@@ -266,6 +269,22 @@ const ConfiguracoesModule = () => {
                     onChange={(e) => setForm({ ...form, address: e.target.value })}
                     placeholder="Rua, número, complemento"
                   />
+                </div>
+
+                {/* Location URL */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Globe className="w-4 h-4 text-muted-foreground" />
+                    URL do Local (Google Maps)
+                  </Label>
+                  <Input
+                    value={form.location_url}
+                    onChange={(e) => setForm({ ...form, location_url: e.target.value })}
+                    placeholder="https://maps.google.com/..."
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Este link será usado como localização nos eventos do Google Calendar.
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

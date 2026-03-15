@@ -17,7 +17,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar, Plus, ChevronLeft, ChevronRight, Clock, Globe, Pencil, Trash2, Search, UserPlus, User, Phone, DollarSign, RefreshCw, Mail, Eye } from "lucide-react";
+import { Calendar, Plus, ChevronLeft, ChevronRight, Clock, Globe, Pencil, Trash2, Search, UserPlus, User, Phone, DollarSign, RefreshCw, Mail, Eye, XCircle, Lock, Unlock } from "lucide-react";
 import { toast } from "sonner";
 import { format, addDays, addMonths, subMonths, startOfWeek, endOfWeek, eachDayOfInterval, isToday, isSameDay, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -91,7 +91,9 @@ const AgendaModule = () => {
   const [editingEvent, setEditingEvent] = useState<MergedEvent | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [eventToDelete, setEventToDelete] = useState<MergedEvent | null>(null);
+  const [editEnabled, setEditEnabled] = useState(false);
   const [editForm, setEditForm] = useState({
     title: "", description: "", date: "", startTime: "", endTime: "",
     clientName: "", clientWhatsapp: "", clientEmail: "", clientOrigin: "",
@@ -250,6 +252,14 @@ const AgendaModule = () => {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Block scheduling in the past (GMT-3)
+    const eventDateTimeStr = `${form.date}T${form.start_time}:00-03:00`;
+    const eventDateTime = new Date(eventDateTimeStr);
+    if (eventDateTime < new Date()) {
+      toast.error("Não é possível agendar no passado");
+      return;
+    }
+
     if (useGoogleAsPrimary) {
       const accountId = selectedAccountId || activeAccounts[0]?.id;
       if (!accountId) { toast.error("Selecione uma agenda"); return; }
@@ -357,6 +367,7 @@ const AgendaModule = () => {
       procedureValue: ep.procedureValue || '',
       procedure_id: procedures.find(p => p.name === ep.procedureName)?.id || '',
     });
+    setEditEnabled(false);
     setIsEditOpen(true);
   };
 
@@ -461,6 +472,13 @@ const AgendaModule = () => {
   };
 
   const handleSlotClick = (date: Date, time: string) => {
+    // Block past slots (GMT-3)
+    const slotStr = `${format(date, "yyyy-MM-dd")}T${time}:00-03:00`;
+    const slotDateTime = new Date(slotStr);
+    if (slotDateTime < new Date()) {
+      toast.error("Não é possível agendar no passado");
+      return;
+    }
     setForm({ ...form, date: format(date, "yyyy-MM-dd"), start_time: time });
     setIsCreateOpen(true);
   };
@@ -950,28 +968,42 @@ const AgendaModule = () => {
         <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
           {(() => {
             const isPast = editingEvent ? isEventPast(editingEvent) : false;
+            const isDisabled = isPast || !editEnabled;
             return (
               <>
                 <DialogHeader>
                   <DialogTitle className="flex items-center justify-between">
                     <span className="flex items-center gap-2">
-                      {isPast ? <Eye className="w-5 h-5" /> : <Pencil className="w-5 h-5" />}
-                      {isPast ? 'Visualizar Evento' : 'Editar Evento'}
+                      {isPast ? <Eye className="w-5 h-5" /> : isDisabled ? <Lock className="w-5 h-5" /> : <Pencil className="w-5 h-5" />}
+                      {isPast ? 'Visualizar Evento' : isDisabled ? 'Detalhes do Evento' : 'Editar Evento'}
                     </span>
-                    {!isPast && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setEventToDelete(editingEvent);
-                          setShowDeleteDialog(true);
-                        }}
-                        className="gap-2 text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        Excluir
-                      </Button>
-                    )}
+                    <div className="flex gap-1">
+                      {!isPast && !editEnabled && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setEditEnabled(true)}
+                          className="gap-1 text-xs"
+                        >
+                          <Unlock className="w-3.5 h-3.5" />
+                          Habilitar Edição
+                        </Button>
+                      )}
+                      {!isPast && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setEventToDelete(editingEvent);
+                            setShowCancelDialog(true);
+                          }}
+                          className="gap-1 text-destructive hover:text-destructive text-xs"
+                        >
+                          <XCircle className="w-3.5 h-3.5" />
+                          Cancelar Evento
+                        </Button>
+                      )}
+                    </div>
                   </DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
@@ -980,11 +1012,17 @@ const AgendaModule = () => {
                       Evento passado — somente leitura. Você pode adicionar observações abaixo.
                     </div>
                   )}
+                  {!isPast && !editEnabled && (
+                    <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg px-3 py-2 flex items-center gap-2">
+                      <Lock className="w-3.5 h-3.5" />
+                      Evento em modo leitura. Clique em "Habilitar Edição" para alterar.
+                    </div>
+                  )}
 
                   {/* Procedimento */}
                   <div className="space-y-2">
                     <Label>Procedimento</Label>
-                    <Select value={editForm.procedure_id} onValueChange={handleEditProcedureSelect} disabled={isPast}>
+                    <Select value={editForm.procedure_id} onValueChange={handleEditProcedureSelect} disabled={isDisabled}>
                       <SelectTrigger><SelectValue placeholder="Selecione o procedimento" /></SelectTrigger>
                       <SelectContent>
                         {procedures.map((p) => (
@@ -1006,7 +1044,7 @@ const AgendaModule = () => {
                         onChange={(e) => setEditForm({ ...editForm, clientName: e.target.value })}
                         className="h-8 text-sm"
                         placeholder="Nome do cliente"
-                        disabled={isPast}
+                        disabled={isDisabled}
                       />
                     </div>
                     <div className="space-y-1">
@@ -1016,7 +1054,7 @@ const AgendaModule = () => {
                         onChange={(e) => setEditForm({ ...editForm, clientWhatsapp: e.target.value })}
                         className="h-8 text-sm"
                         placeholder="5511999999999"
-                        disabled={isPast}
+                        disabled={isDisabled}
                       />
                     </div>
                     <div className="space-y-1">
@@ -1027,12 +1065,12 @@ const AgendaModule = () => {
                         className="h-8 text-sm"
                         placeholder="email@exemplo.com"
                         type="email"
-                        disabled={isPast}
+                        disabled={isDisabled}
                       />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Origem</Label>
-                      <Select value={editForm.clientOrigin} onValueChange={(v) => setEditForm({ ...editForm, clientOrigin: v })} disabled={isPast}>
+                      <Select value={editForm.clientOrigin} onValueChange={(v) => setEditForm({ ...editForm, clientOrigin: v })} disabled={isDisabled}>
                         <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecione" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="indicacao">Indicação</SelectItem>
@@ -1061,7 +1099,7 @@ const AgendaModule = () => {
                       value={editForm.procedureValue}
                       onChange={(e) => setEditForm({ ...editForm, procedureValue: e.target.value })}
                       placeholder="0.00"
-                      disabled={isPast}
+                      disabled={isDisabled}
                     />
                   </div>
 
@@ -1072,7 +1110,6 @@ const AgendaModule = () => {
                       value={editForm.description}
                       onChange={(e) => {
                         if (isPast) {
-                          // For past events, only allow appending (can't remove existing content)
                           const original = editingEvent?.description || '';
                           if (e.target.value.startsWith(original)) {
                             setEditForm({ ...editForm, description: e.target.value });
@@ -1082,6 +1119,7 @@ const AgendaModule = () => {
                         }
                       }}
                       rows={3}
+                      disabled={isPast ? false : isDisabled}
                     />
                   </div>
 
@@ -1089,20 +1127,20 @@ const AgendaModule = () => {
                   <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label>Data</Label>
-                      <Input type="date" value={editForm.date} onChange={(e) => setEditForm({ ...editForm, date: e.target.value })} disabled={isPast} />
+                      <Input type="date" value={editForm.date} onChange={(e) => setEditForm({ ...editForm, date: e.target.value })} disabled={isDisabled} />
                     </div>
                     <div className="space-y-2">
                       <Label>Início</Label>
-                      <Input type="time" value={editForm.startTime} onChange={(e) => setEditForm({ ...editForm, startTime: e.target.value })} disabled={isPast} />
+                      <Input type="time" value={editForm.startTime} onChange={(e) => setEditForm({ ...editForm, startTime: e.target.value })} disabled={isDisabled} />
                     </div>
                     <div className="space-y-2">
                       <Label>Fim</Label>
-                      <Input type="time" value={editForm.endTime} onChange={(e) => setEditForm({ ...editForm, endTime: e.target.value })} disabled={isPast} />
+                      <Input type="time" value={editForm.endTime} onChange={(e) => setEditForm({ ...editForm, endTime: e.target.value })} disabled={isDisabled} />
                     </div>
                   </div>
                 </div>
                 <DialogFooter className="flex-col sm:flex-row gap-2">
-                  {!isPast && (
+                  {!isPast && editEnabled && (
                     <Button
                       type="button"
                       variant="outline"
@@ -1117,7 +1155,7 @@ const AgendaModule = () => {
                   )}
                   <div className="flex gap-2 ml-auto">
                     <Button variant="outline" onClick={() => setIsEditOpen(false)} disabled={editLoading}>
-                      {isPast ? 'Fechar' : 'Cancelar'}
+                      {isPast || !editEnabled ? 'Fechar' : 'Cancelar'}
                     </Button>
                     {isPast ? (
                       editForm.description !== (editingEvent?.description || '') && (
@@ -1125,11 +1163,11 @@ const AgendaModule = () => {
                           {editLoading ? "Salvando..." : "Salvar Observações"}
                         </Button>
                       )
-                    ) : (
+                    ) : editEnabled ? (
                       <Button onClick={handleSaveEdit} disabled={editLoading || !composedEditTitle}>
                         {editLoading ? "Salvando..." : "Salvar Evento"}
                       </Button>
-                    )}
+                    ) : null}
                   </div>
                 </DialogFooter>
               </>
@@ -1138,7 +1176,40 @@ const AgendaModule = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
+      {/* Cancel Event Confirmation */}
+      <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancelar Evento</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja cancelar o evento "{eventToDelete?.title}"? Esta ação não pode ser desfeita e o evento será removido do Google Calendar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={editLoading}>Voltar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (!eventToDelete) return;
+                setEditLoading(true);
+                const success = await deleteGoogleEvent(eventToDelete.id, eventToDelete.accountId);
+                setEditLoading(false);
+                if (success) {
+                  setShowCancelDialog(false);
+                  setEventToDelete(null);
+                  setIsEditOpen(false);
+                  setEditingEvent(null);
+                }
+              }}
+              disabled={editLoading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {editLoading ? "Cancelando..." : "Sim, Cancelar Evento"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Confirmation (legacy) */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
