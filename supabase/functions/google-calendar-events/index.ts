@@ -47,7 +47,6 @@ async function getValidAccessToken(
 
   console.log('Access token expired for account', account.id, ', refreshing...');
 
-  // Fetch credentials from google_oauth_config per clinic
   const { data: oauthConfig, error: configError } = await supabase
     .from('google_oauth_config')
     .select('client_id, client_secret')
@@ -83,15 +82,13 @@ async function listEvents(accessToken: string, calendarId: string) {
 
   const data = await response.json();
   return data.items?.map((event: any) => {
-    // Convert to GMT-3 (America/Sao_Paulo)
     const startDT = event.start?.dateTime ? new Date(event.start.dateTime) : null;
     const endDT = event.end?.dateTime ? new Date(event.end.dateTime) : null;
 
     let date: string;
     let time: string;
     if (startDT) {
-      // Format in America/Sao_Paulo timezone
-      date = startDT.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }); // yyyy-MM-dd
+      date = startDT.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
       time = startDT.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
     } else {
       date = event.start?.date || '';
@@ -112,25 +109,32 @@ async function listEvents(accessToken: string, calendarId: string) {
       description: event.description || '',
       startDateTime: event.start?.dateTime || null,
       endDateTime: event.end?.dateTime || null,
+      extendedProperties: event.extendedProperties?.private || null,
     };
   }) || [];
 }
 
 async function createEvent(accessToken: string, calendarId: string, body: any) {
-  const { title, description, startDateTime, endDateTime } = body;
+  const { title, description, startDateTime, endDateTime, extendedProperties } = body;
   if (!title || !startDateTime || !endDateTime) throw new Error('Missing required fields');
+
+  const eventBody: any = {
+    summary: title,
+    description: description || '',
+    start: { dateTime: startDateTime, timeZone: 'America/Sao_Paulo' },
+    end: { dateTime: endDateTime, timeZone: 'America/Sao_Paulo' },
+  };
+
+  if (extendedProperties) {
+    eventBody.extendedProperties = { private: extendedProperties };
+  }
 
   const response = await fetch(
     `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
     {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        summary: title,
-        description: description || '',
-        start: { dateTime: startDateTime, timeZone: 'America/Sao_Paulo' },
-        end: { dateTime: endDateTime, timeZone: 'America/Sao_Paulo' },
-      }),
+      body: JSON.stringify(eventBody),
     }
   );
 
@@ -140,20 +144,26 @@ async function createEvent(accessToken: string, calendarId: string, body: any) {
 }
 
 async function updateEvent(accessToken: string, calendarId: string, body: any) {
-  const { eventId, title, description, startDateTime, endDateTime } = body;
+  const { eventId, title, description, startDateTime, endDateTime, extendedProperties } = body;
   if (!eventId || !title || !startDateTime || !endDateTime) throw new Error('Missing required fields');
+
+  const eventBody: any = {
+    summary: title,
+    description: description || '',
+    start: { dateTime: startDateTime, timeZone: 'America/Sao_Paulo' },
+    end: { dateTime: endDateTime, timeZone: 'America/Sao_Paulo' },
+  };
+
+  if (extendedProperties) {
+    eventBody.extendedProperties = { private: extendedProperties };
+  }
 
   const response = await fetch(
     `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${eventId}`,
     {
       method: 'PUT',
       headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        summary: title,
-        description: description || '',
-        start: { dateTime: startDateTime, timeZone: 'America/Sao_Paulo' },
-        end: { dateTime: endDateTime, timeZone: 'America/Sao_Paulo' },
-      }),
+      body: JSON.stringify(eventBody),
     }
   );
 
