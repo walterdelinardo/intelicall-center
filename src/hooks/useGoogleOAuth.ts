@@ -13,6 +13,14 @@ interface GoogleCalendarAccount {
   ical_url: string | null;
 }
 
+export interface GoogleCalendarOption {
+  id: string;
+  summary: string;
+  primary: boolean;
+  backgroundColor: string | null;
+  accessRole: string;
+}
+
 export const useGoogleOAuth = () => {
   const { profile } = useAuth();
   const [accounts, setAccounts] = useState<GoogleCalendarAccount[]>([]);
@@ -135,6 +143,41 @@ export const useGoogleOAuth = () => {
     await fetchAccounts();
   };
 
+  const fetchCalendars = async (accountId: string): Promise<GoogleCalendarOption[]> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      toast.error('Sessão expirada');
+      return [];
+    }
+
+    const { data, error } = await supabase.functions.invoke('google-list-calendars', {
+      body: { account_id: accountId },
+    });
+
+    if (error) {
+      console.error('Error fetching calendars:', error);
+      toast.error('Erro ao buscar calendários');
+      return [];
+    }
+
+    return data?.calendars || [];
+  };
+
+  const updateCalendarId = async (accountId: string, calendarId: string) => {
+    const { error } = await supabase
+      .from('google_calendar_accounts')
+      .update({ calendar_id: calendarId })
+      .eq('id', accountId);
+
+    if (error) {
+      toast.error('Erro ao atualizar calendário');
+      throw error;
+    }
+
+    toast.success('Calendário atualizado!');
+    await fetchAccounts();
+  };
+
   useEffect(() => {
     if (profile?.clinic_id) {
       fetchAccounts();
@@ -155,6 +198,8 @@ export const useGoogleOAuth = () => {
     addICalAccount,
     toggleAccount,
     deleteAccount,
+    fetchCalendars,
+    updateCalendarId,
     fetchAccounts,
     isConnected: accounts.some((a) => a.is_active),
   };
