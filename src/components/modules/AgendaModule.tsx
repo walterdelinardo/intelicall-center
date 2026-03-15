@@ -369,6 +369,7 @@ const AgendaModule = () => {
     });
     setEditEnabled(false);
     setIsEditOpen(true);
+  };
 
   const handleEditProcedureSelect = (procId: string) => {
     const proc = procedures.find(p => p.id === procId);
