@@ -271,6 +271,22 @@ const ConfiguracoesModule = () => {
                   />
                 </div>
 
+                {/* Location URL */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Globe className="w-4 h-4 text-muted-foreground" />
+                    URL do Local (Google Maps)
+                  </Label>
+                  <Input
+                    value={form.location_url}
+                    onChange={(e) => setForm({ ...form, location_url: e.target.value })}
+                    placeholder="https://maps.google.com/..."
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Este link será usado como localização nos eventos do Google Calendar.
+                  </p>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label>Cidade</Label>
