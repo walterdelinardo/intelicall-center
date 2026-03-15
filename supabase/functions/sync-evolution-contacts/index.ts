@@ -14,7 +14,6 @@ function normalizeJid(jid: string): string {
   return jid.replace(/@.*$/, "");
 }
 
-/** Compare two phone numbers by their last 10-11 digits (ignoring country code) */
 function phonesMatch(a: string, b: string): boolean {
   const da = extractDigits(a);
   const db = extractDigits(b);
@@ -42,7 +41,6 @@ Deno.serve(async (req) => {
     const evolutionApiUrl = Deno.env.get("EVOLUTION_API_URL")!;
     const evolutionApiKey = Deno.env.get("EVOLUTION_API_KEY")!;
 
-    // Auth client to get user
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
@@ -55,10 +53,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Service role client for DB operations
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Get user's clinic_id
     const { data: profile } = await supabase
       .from("profiles")
       .select("clinic_id")
@@ -74,12 +70,27 @@ Deno.serve(async (req) => {
 
     const clinicId = profile.clinic_id;
 
-    // Get active inboxes
-    const { data: inboxes } = await supabase
+    // Parse body to get optional instance_name filter
+    let selectedInstanceName: string | null = null;
+    try {
+      const body = await req.json();
+      selectedInstanceName = body?.instance_name || null;
+    } catch {
+      // No body or invalid JSON, sync all inboxes
+    }
+
+    // Get inboxes (filtered if instance_name provided)
+    let inboxQuery = supabase
       .from("whatsapp_inboxes")
-      .select("instance_name")
+      .select("id, instance_name, label")
       .eq("clinic_id", clinicId)
       .eq("is_active", true);
+
+    if (selectedInstanceName) {
+      inboxQuery = inboxQuery.eq("instance_name", selectedInstanceName);
+    }
+
+    const { data: inboxes } = await inboxQuery;
 
     if (!inboxes || inboxes.length === 0) {
       return new Response(
@@ -88,7 +99,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get existing clients for matching
     const { data: existingClients } = await supabase
       .from("clients")
       .select("id, name, phone, whatsapp, email")
@@ -103,7 +113,6 @@ Deno.serve(async (req) => {
     let errors = 0;
 
     for (const inbox of inboxes) {
-      // Fetch contacts from Evolution API
       let contacts: any[] = [];
       try {
         const res = await fetch(
@@ -138,7 +147,6 @@ Deno.serve(async (req) => {
       for (const contact of contacts) {
         try {
           const jid = contact.remoteJid || contact.id || "";
-          // Skip groups and status broadcasts
           if (jid.includes("@g.us") || jid.includes("@broadcast") || jid === "status@broadcast") {
             skipped++;
             continue;
@@ -152,7 +160,6 @@ Deno.serve(async (req) => {
             continue;
           }
 
-          // Find matching client
           const match = existing.find(
             (c) =>
               (c.whatsapp && phonesMatch(c.whatsapp, phone)) ||
@@ -160,12 +167,13 @@ Deno.serve(async (req) => {
           );
 
           if (match) {
-            // Update only empty fields
             const updates: Record<string, any> = {};
             if (!match.whatsapp) updates.whatsapp = phone;
             if (!match.name || match.name === phone) {
               if (pushName) updates.name = pushName;
             }
+            // Always update inbox reference
+            updates.whatsapp_inbox_id = inbox.id;
 
             if (Object.keys(updates).length > 0) {
               const { error } = await supabase
@@ -182,20 +190,18 @@ Deno.serve(async (req) => {
               skipped++;
             }
           } else {
-            // Create new client
             const { error } = await supabase.from("clients").insert({
               clinic_id: clinicId,
               name: pushName || phone,
               whatsapp: phone,
               lead_source: "whatsapp",
+              whatsapp_inbox_id: inbox.id,
             });
             if (error) {
-              // Might be a duplicate we missed
               console.error("Insert error:", error);
               errors++;
             } else {
               created++;
-              // Add to existing array to prevent duplicates within same batch
               existing.push({ id: "new", name: pushName || phone, whatsapp: phone, phone: null, email: null });
             }
           }
