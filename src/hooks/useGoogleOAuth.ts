@@ -54,7 +54,7 @@ export const useGoogleOAuth = () => {
     }
   };
 
-  const initiateOAuth = async (label: string = 'Principal') => {
+  const initiateOAuth = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || !profile?.clinic_id) {
@@ -66,7 +66,7 @@ export const useGoogleOAuth = () => {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const redirectUri = `${supabaseUrl}/functions/v1/google-oauth-callback`;
       const scope = 'https://www.googleapis.com/auth/calendar';
-      const state = JSON.stringify({ user_id: user.id, clinic_id: profile.clinic_id, label });
+      const state = JSON.stringify({ user_id: user.id, clinic_id: profile.clinic_id, label: 'Conta Google' });
 
       const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
       authUrl.searchParams.append('client_id', clientId);
