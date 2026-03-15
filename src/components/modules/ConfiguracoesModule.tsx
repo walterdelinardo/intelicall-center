@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Settings, Building2, Clock, Phone, MapPin, Mail, Save, Loader2, Smartphone, Plus, Power, Plug, Trash2, Calendar, ChevronDown } from "lucide-react";
+import { Settings, Building2, Clock, Phone, MapPin, Mail, Save, Loader2, Smartphone, Plus, Power, Plug, Trash2, Calendar, Pencil } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { type GoogleCalendarOption } from "@/hooks/useGoogleOAuth";
 import { toast } from "sonner";
@@ -49,19 +49,17 @@ const ConfiguracoesModule = () => {
   const queryClient = useQueryClient();
   const isAdmin = hasRole("admin");
   const { inboxes, loading: inboxesLoading, createInbox, toggleInbox, deleteInbox } = useWhatsAppInboxes();
-  const { accounts: googleAccounts, loading: googleLoading, initiateOAuth, addICalAccount, toggleAccount: toggleGoogleAccount, deleteAccount: deleteGoogleAccount, fetchCalendars, updateCalendarId } = useGoogleOAuth();
+  const { accounts: googleAccounts, loading: googleLoading, initiateOAuth, toggleAccount: toggleGoogleAccount, deleteAccount: deleteGoogleAccount, fetchCalendars, updateCalendarId, updateLabel } = useGoogleOAuth();
 
   const [showAddInbox, setShowAddInbox] = useState(false);
   const [newLabel, setNewLabel] = useState("");
   const [newInstanceName, setNewInstanceName] = useState("");
   const [newPhone, setNewPhone] = useState("");
   const [savingInbox, setSavingInbox] = useState(false);
-  const [showAddGoogle, setShowAddGoogle] = useState(false);
-  const [newGoogleLabel, setNewGoogleLabel] = useState("");
-  const [addGoogleMode, setAddGoogleMode] = useState<"oauth" | "ical">("oauth");
-  const [newICalUrl, setNewICalUrl] = useState("");
   const [calendarsMap, setCalendarsMap] = useState<Record<string, GoogleCalendarOption[]>>({});
   const [loadingCalendars, setLoadingCalendars] = useState<Record<string, boolean>>({});
+  const [editingLabel, setEditingLabel] = useState<string | null>(null);
+  const [editLabelValue, setEditLabelValue] = useState("");
   const { data: clinic, isLoading } = useQuery({
     queryKey: ["clinic", profile?.clinic_id],
     queryFn: async () => {
@@ -580,7 +578,6 @@ const ConfiguracoesModule = () => {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Label</TableHead>
-                          <TableHead>Tipo</TableHead>
                           <TableHead>Agenda</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead className="w-[80px]">Ações</TableHead>
@@ -588,12 +585,11 @@ const ConfiguracoesModule = () => {
                       </TableHeader>
                       <TableBody>
                         {googleAccounts.map((acc) => {
-                          const isOAuth = !acc.ical_url;
                           const calendars = calendarsMap[acc.id] || [];
                           const isLoadingCals = loadingCalendars[acc.id] || false;
 
                           const handleLoadCalendars = async () => {
-                            if (calendars.length > 0) return; // already loaded
+                            if (calendars.length > 0) return;
                             setLoadingCalendars(prev => ({ ...prev, [acc.id]: true }));
                             try {
                               const cals = await fetchCalendars(acc.id);
@@ -605,64 +601,97 @@ const ConfiguracoesModule = () => {
 
                           return (
                             <TableRow key={acc.id}>
-                              <TableCell className="font-medium">{acc.label}</TableCell>
                               <TableCell>
-                                <Badge variant="outline" className="text-xs">
-                                  {acc.ical_url ? "iCal" : "OAuth"}
-                                </Badge>
+                                {editingLabel === acc.id ? (
+                                  <div className="flex items-center gap-1">
+                                    <Input
+                                      value={editLabelValue}
+                                      onChange={(e) => setEditLabelValue(e.target.value)}
+                                      className="h-7 text-xs w-[140px]"
+                                      autoFocus
+                                      onKeyDown={async (e) => {
+                                        if (e.key === 'Enter' && editLabelValue.trim()) {
+                                          await updateLabel(acc.id, editLabelValue.trim());
+                                          setEditingLabel(null);
+                                        }
+                                        if (e.key === 'Escape') setEditingLabel(null);
+                                      }}
+                                    />
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      onClick={async () => {
+                                        if (editLabelValue.trim()) {
+                                          await updateLabel(acc.id, editLabelValue.trim());
+                                          setEditingLabel(null);
+                                        }
+                                      }}
+                                    >
+                                      <Save className="w-3 h-3" />
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    className="font-medium text-left hover:underline cursor-pointer"
+                                    onClick={() => {
+                                      setEditingLabel(acc.id);
+                                      setEditLabelValue(acc.label);
+                                    }}
+                                    title="Clique para editar"
+                                  >
+                                    {acc.label} <Pencil className="w-3 h-3 inline ml-1 text-muted-foreground" />
+                                  </button>
+                                )}
                               </TableCell>
                               <TableCell>
-                                {isOAuth ? (
-                                  <Select
-                                    value={acc.calendar_id}
-                                    onValueChange={async (value) => {
-                                      try {
-                                        await updateCalendarId(acc.id, value);
-                                      } catch (e: any) {
-                                        toast.error("Erro: " + e.message);
-                                      }
-                                    }}
-                                    onOpenChange={(open) => {
-                                      if (open) handleLoadCalendars();
-                                    }}
-                                  >
-                                    <SelectTrigger className="w-[200px] h-8 text-xs">
-                                      <SelectValue placeholder={isLoadingCals ? "Carregando..." : acc.calendar_id === "primary" ? "Principal" : acc.calendar_id}>
-                                        {isLoadingCals
-                                          ? "Carregando..."
-                                          : calendars.find(c => c.id === acc.calendar_id)?.summary
-                                            || (acc.calendar_id === "primary" ? "Principal" : acc.calendar_id)}
-                                      </SelectValue>
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {isLoadingCals ? (
-                                        <div className="flex items-center justify-center p-2">
-                                          <Loader2 className="w-4 h-4 animate-spin" />
-                                        </div>
-                                      ) : calendars.length > 0 ? (
-                                        calendars.map((cal) => (
-                                          <SelectItem key={cal.id} value={cal.id}>
-                                            <div className="flex items-center gap-2">
-                                              {cal.backgroundColor && (
-                                                <span
-                                                  className="w-3 h-3 rounded-full inline-block flex-shrink-0"
-                                                  style={{ backgroundColor: cal.backgroundColor }}
-                                                />
-                                              )}
-                                              <span>{cal.summary}{cal.primary ? " (Principal)" : ""}</span>
-                                            </div>
-                                          </SelectItem>
-                                        ))
-                                      ) : (
-                                        <div className="p-2 text-xs text-muted-foreground">
-                                          Clique para carregar calendários
-                                        </div>
-                                      )}
-                                    </SelectContent>
-                                  </Select>
-                                ) : (
-                                  <span className="text-xs text-muted-foreground">—</span>
-                                )}
+                                <Select
+                                  value={acc.calendar_id}
+                                  onValueChange={async (value) => {
+                                    try {
+                                      await updateCalendarId(acc.id, value);
+                                    } catch (e: any) {
+                                      toast.error("Erro: " + e.message);
+                                    }
+                                  }}
+                                  onOpenChange={(open) => {
+                                    if (open) handleLoadCalendars();
+                                  }}
+                                >
+                                  <SelectTrigger className="w-[200px] h-8 text-xs">
+                                    <SelectValue placeholder={isLoadingCals ? "Carregando..." : acc.calendar_id === "primary" ? "Principal" : acc.calendar_id}>
+                                      {isLoadingCals
+                                        ? "Carregando..."
+                                        : calendars.find(c => c.id === acc.calendar_id)?.summary
+                                          || (acc.calendar_id === "primary" ? "Principal" : acc.calendar_id)}
+                                    </SelectValue>
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {isLoadingCals ? (
+                                      <div className="flex items-center justify-center p-2">
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                      </div>
+                                    ) : calendars.length > 0 ? (
+                                      calendars.map((cal) => (
+                                        <SelectItem key={cal.id} value={cal.id}>
+                                          <div className="flex items-center gap-2">
+                                            {cal.backgroundColor && (
+                                              <span
+                                                className="w-3 h-3 rounded-full inline-block flex-shrink-0"
+                                                style={{ backgroundColor: cal.backgroundColor }}
+                                              />
+                                            )}
+                                            <span>{cal.summary}{cal.primary ? " (Principal)" : ""}</span>
+                                          </div>
+                                        </SelectItem>
+                                      ))
+                                    ) : (
+                                      <div className="p-2 text-xs text-muted-foreground">
+                                        Clique para carregar calendários
+                                      </div>
+                                    )}
+                                  </SelectContent>
+                                </Select>
                               </TableCell>
                               <TableCell>
                                 <Badge variant={acc.is_active ? "default" : "secondary"}>
@@ -712,90 +741,13 @@ const ConfiguracoesModule = () => {
                     </Table>
                   )}
 
-                  {googleAccounts.length === 0 && !showAddGoogle && (
+                  {googleAccounts.length === 0 && (
                     <p className="text-sm text-muted-foreground">Nenhuma conta Google Calendar conectada.</p>
                   )}
 
-                  {showAddGoogle ? (
-                    <div className="border rounded-lg p-4 space-y-3">
-                      <h4 className="font-medium text-sm">Adicionar Google Calendar</h4>
-                      
-                      <div className="flex gap-2">
-                        <Button
-                          variant={addGoogleMode === "oauth" ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setAddGoogleMode("oauth")}
-                        >
-                          OAuth (acesso completo)
-                        </Button>
-                        <Button
-                          variant={addGoogleMode === "ical" ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setAddGoogleMode("ical")}
-                        >
-                          Link iCal (somente leitura)
-                        </Button>
-                      </div>
-
-                      <div className="space-y-1">
-                        <Label htmlFor="google-label">Label *</Label>
-                        <Input
-                          id="google-label"
-                          placeholder="Ex: Dr. João"
-                          value={newGoogleLabel}
-                          onChange={(e) => setNewGoogleLabel(e.target.value)}
-                        />
-                      </div>
-
-                      {addGoogleMode === "ical" && (
-                        <div className="space-y-1">
-                          <Label htmlFor="ical-url">URL iCal *</Label>
-                          <Input
-                            id="ical-url"
-                            placeholder="https://calendar.google.com/calendar/ical/..."
-                            value={newICalUrl}
-                            onChange={(e) => setNewICalUrl(e.target.value)}
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Cole o link iCal do Google Calendar (Configurações → Integrar agenda → Endereço secreto no formato iCal)
-                          </p>
-                        </div>
-                      )}
-
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          onClick={async () => {
-                            if (!newGoogleLabel.trim()) {
-                              toast.error("Preencha o label da conta");
-                              return;
-                            }
-                            if (addGoogleMode === "ical") {
-                              if (!newICalUrl.trim()) {
-                                toast.error("Preencha a URL iCal");
-                                return;
-                              }
-                              await addICalAccount(newGoogleLabel.trim(), newICalUrl.trim());
-                              setShowAddGoogle(false);
-                              setNewGoogleLabel("");
-                              setNewICalUrl("");
-                            } else {
-                              initiateOAuth(newGoogleLabel.trim());
-                            }
-                          }}
-                        >
-                          {addGoogleMode === "ical" ? "Adicionar iCal" : "Conectar com Google"}
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => { setShowAddGoogle(false); setNewGoogleLabel(""); setNewICalUrl(""); }}>
-                          Cancelar
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <Button variant="outline" size="sm" onClick={() => setShowAddGoogle(true)}>
-                      <Plus className="w-4 h-4 mr-1" /> Conectar Conta
-                    </Button>
-                  )}
+                  <Button variant="outline" size="sm" onClick={() => initiateOAuth()}>
+                    <Plus className="w-4 h-4 mr-1" /> Conectar Conta Google
+                  </Button>
                 </>
               )}
             </CardContent>
