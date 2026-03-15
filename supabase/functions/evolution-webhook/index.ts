@@ -386,7 +386,7 @@ async function findOrCreateConversation(
   return created;
 }
 
-async function upsertMessage(supabase: any, messageData: Record<string, any>): Promise<{ isDuplicate: boolean }> {
+async function upsertMessage(supabase: any, messageData: Record<string, any>): Promise<{ isDuplicate: boolean; mergeResult: string; mergeError: string | null }> {
   const { data: existing } = await supabase.from("whatsapp_messages")
     .select("id").eq("message_id", messageData.message_id).maybeSingle();
 
@@ -401,14 +401,34 @@ async function upsertMessage(supabase: any, messageData: Record<string, any>): P
         mergedUpdate[key] = val;
       }
     }
+
+    const mergeKeys = Object.keys(mergedUpdate);
+    const hasBase64InMerge = "base64" in mergedUpdate;
+    const base64LenInMerge = mergedUpdate.base64?.length || 0;
+
+    console.log(JSON.stringify({
+      action: "merge_debug",
+      messageId: messageData.message_id,
+      mergeKeys,
+      hasBase64InMerge,
+      base64LenInMerge,
+      existingId: existing.id,
+    }));
+
     const { error } = await supabase.from("whatsapp_messages").update(mergedUpdate).eq("id", existing.id);
-    if (error) throw error;
-    return { isDuplicate: true };
+    if (error) {
+      console.error(JSON.stringify({ action: "merge_error", messageId: messageData.message_id, error: error.message }));
+      return { isDuplicate: true, mergeResult: "error", mergeError: error.message };
+    }
+    return { isDuplicate: true, mergeResult: `merged_${mergeKeys.length}_fields${hasBase64InMerge ? '_with_base64' : ''}`, mergeError: null };
   }
 
   const { error } = await supabase.from("whatsapp_messages").insert(messageData);
-  if (error) throw error;
-  return { isDuplicate: false };
+  if (error) {
+    console.error(JSON.stringify({ action: "insert_error", messageId: messageData.message_id, error: error.message }));
+    return { isDuplicate: false, mergeResult: "insert_error", mergeError: error.message };
+  }
+  return { isDuplicate: false, mergeResult: "inserted", mergeError: null };
 }
 
 // ── Main handler ────────────────────────────────────────────────────
