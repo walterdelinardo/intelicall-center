@@ -7,6 +7,7 @@ export interface CalendarEventExtendedProps {
   clientWhatsapp?: string;
   clientEmail?: string;
   clientOrigin?: string;
+  clientBirthdate?: string;
   procedureName?: string;
   procedureValue?: string;
 }

@@ -17,7 +17,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar, Plus, ChevronLeft, ChevronRight, Clock, Globe, Pencil, Trash2, Search, UserPlus, User, Phone, DollarSign, RefreshCw, Mail, Eye, XCircle, Lock, Unlock } from "lucide-react";
+import { Calendar, Plus, ChevronLeft, ChevronRight, Clock, Globe, Pencil, Trash2, Search, UserPlus, User, Phone, DollarSign, RefreshCw, Mail, Eye, XCircle, Lock, Unlock, CalendarDays, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import { format, addDays, addMonths, subMonths, startOfWeek, endOfWeek, eachDayOfInterval, isToday, isSameDay, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -40,6 +40,11 @@ const statusLabels: Record<string, string> = {
   compareceu: "Compareceu",
   faltou: "Faltou",
   cancelado: "Cancelado",
+};
+
+const paymentMethods: Record<string, string> = {
+  dinheiro: "Dinheiro", pix: "PIX", cartao_credito: "Cartão Crédito",
+  cartao_debito: "Cartão Débito", transferencia: "Transferência", boleto: "Boleto",
 };
 
 interface Appointment {
@@ -92,6 +97,7 @@ const AgendaModule = () => {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
   const [eventToDelete, setEventToDelete] = useState<MergedEvent | null>(null);
   const [editEnabled, setEditEnabled] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -101,12 +107,17 @@ const AgendaModule = () => {
   });
   const [editLoading, setEditLoading] = useState(false);
 
+  // Billing state
+  const [isBillingOpen, setIsBillingOpen] = useState(false);
+  const [billingEvent, setBillingEvent] = useState<MergedEvent | null>(null);
+
   // Create form state
   const [form, setForm] = useState({
     title: "", description: "", client_id: "", procedure_id: "",
     date: format(new Date(), "yyyy-MM-dd"), start_time: "09:00",
     duration_minutes: "30", estimated_price: "", notes: "",
     clientName: "", clientWhatsapp: "", clientEmail: "", clientOrigin: "",
+    clientBirthdate: "",
   });
   const [isNewClient, setIsNewClient] = useState(false);
   const [clientSearchOpen, setClientSearchOpen] = useState(false);
@@ -276,6 +287,7 @@ const AgendaModule = () => {
         clientWhatsapp: form.clientWhatsapp,
         clientEmail: form.clientEmail,
         clientOrigin: form.clientOrigin,
+        clientBirthdate: isNewClient ? form.clientBirthdate : undefined,
         procedureName: proc?.name || '',
         procedureValue: form.estimated_price || (proc ? String(proc.price) : ''),
       };
@@ -323,6 +335,7 @@ const AgendaModule = () => {
       date: format(selectedDate, "yyyy-MM-dd"), start_time: "09:00",
       duration_minutes: "30", estimated_price: "", notes: "",
       clientName: "", clientWhatsapp: "", clientEmail: "", clientOrigin: "",
+      clientBirthdate: "",
     });
     setIsNewClient(false);
   };
@@ -418,27 +431,40 @@ const AgendaModule = () => {
     }
   };
 
-  const handleUpdateContact = async () => {
-    if (!editForm.clientWhatsapp || !editForm.clientName) {
-      toast.error("Nome e WhatsApp são obrigatórios para atualizar contato");
+  const handleCancelEvent = async () => {
+    if (!eventToDelete || !cancelReason.trim()) {
+      toast.error("Informe o motivo do cancelamento");
       return;
     }
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-      
-      const { error } = await supabase.functions.invoke('update-whatsapp-contact', {
-        body: {
-          name: editForm.clientName,
-          whatsapp: editForm.clientWhatsapp,
-          origin: editForm.clientOrigin,
-        },
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      if (error) throw error;
-      toast.success("Contato atualizado!");
-    } catch (err) {
-      toast.error("Erro ao atualizar contato");
+    setEditLoading(true);
+    const success = await deleteGoogleEvent(eventToDelete.id, eventToDelete.accountId);
+    if (success && profile?.clinic_id) {
+      // Insert financial transaction for cancellation
+      try {
+        await supabase.from("financial_transactions").insert({
+          clinic_id: profile.clinic_id,
+          type: "receita",
+          category: "atendimento",
+          description: eventToDelete.title,
+          amount: 0,
+          status: "cancelado",
+          date: eventToDelete.date,
+          notes: `Motivo do cancelamento: ${cancelReason}`,
+          payment_method: null,
+        });
+      } catch (err) {
+        console.error("Error inserting cancel transaction:", err);
+      }
+      queryClient.invalidateQueries({ queryKey: ["financial-daily"] });
+      queryClient.invalidateQueries({ queryKey: ["financial-monthly"] });
+    }
+    setEditLoading(false);
+    if (success) {
+      setShowCancelDialog(false);
+      setEventToDelete(null);
+      setCancelReason("");
+      setIsEditOpen(false);
+      setEditingEvent(null);
     }
   };
 
@@ -599,16 +625,17 @@ const AgendaModule = () => {
       <div className="space-y-2">
         <Label className="flex items-center justify-between">
           <span>Cliente</span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-6 text-xs gap-1"
-            onClick={() => { setIsNewClient(!isNewClient); if (!isNewClient) setForm({ ...form, clientName: '', clientWhatsapp: '', clientEmail: '', clientOrigin: '' }); }}
-          >
-            <UserPlus className="w-3 h-3" />
-            {isNewClient ? 'Buscar existente' : 'Novo cliente'}
-          </Button>
+          <span className="inline-flex">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-auto py-0.5 px-2 text-xs gap-1"
+              onClick={() => { setIsNewClient(!isNewClient); if (!isNewClient) setForm({ ...form, clientName: '', clientWhatsapp: '', clientEmail: '', clientOrigin: '', clientBirthdate: '' }); }}
+            >
+              {isNewClient ? <><Search className="w-3 h-3" /> Buscar existente</> : <><UserPlus className="w-3 h-3" /> Novo cliente</>}
+            </Button>
+          </span>
         </Label>
 
         {isNewClient ? (
@@ -636,6 +663,14 @@ const AgendaModule = () => {
                 onChange={(e) => setForm({ ...form, clientEmail: e.target.value })}
                 placeholder="email@exemplo.com"
                 type="email"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs flex items-center gap-1"><CalendarDays className="w-3 h-3" /> Data de Nascimento</Label>
+              <Input
+                type="date"
+                value={form.clientBirthdate}
+                onChange={(e) => setForm({ ...form, clientBirthdate: e.target.value })}
               />
             </div>
             <div className="space-y-1">
@@ -691,7 +726,7 @@ const AgendaModule = () => {
           </Popover>
         )}
 
-        {/* Show selected client details (editable) */}
+        {/* Show selected client details (editable) — no origin field for existing clients */}
         {!isNewClient && form.clientName && (
           <div className="space-y-2 p-3 border rounded-lg bg-muted/30">
             <div className="space-y-1">
@@ -719,20 +754,6 @@ const AgendaModule = () => {
                 type="email"
                 placeholder="email@exemplo.com"
               />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Origem</Label>
-              <Select value={form.clientOrigin} onValueChange={(v) => setForm({ ...form, clientOrigin: v })}>
-                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="indicacao">Indicação</SelectItem>
-                  <SelectItem value="instagram">Instagram</SelectItem>
-                  <SelectItem value="google">Google</SelectItem>
-                  <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                  <SelectItem value="cadastro">Cadastro</SelectItem>
-                  <SelectItem value="outro">Outro</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
           </div>
         )}
@@ -978,6 +999,20 @@ const AgendaModule = () => {
                       {isPast ? 'Visualizar Evento' : isDisabled ? 'Detalhes do Evento' : 'Editar Evento'}
                     </span>
                     <div className="flex gap-1">
+                      {!isPast && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setBillingEvent(editingEvent);
+                            setIsBillingOpen(true);
+                          }}
+                          className="gap-1 text-xs"
+                        >
+                          <Receipt className="w-3.5 h-3.5" />
+                          Faturar
+                        </Button>
+                      )}
                       {!isPast && !editEnabled && (
                         <Button
                           variant="outline"
@@ -995,6 +1030,7 @@ const AgendaModule = () => {
                           size="sm"
                           onClick={() => {
                             setEventToDelete(editingEvent);
+                            setCancelReason("");
                             setShowCancelDialog(true);
                           }}
                           className="gap-1 text-destructive hover:text-destructive text-xs"
@@ -1034,7 +1070,7 @@ const AgendaModule = () => {
                     </Select>
                   </div>
 
-                  {/* Client fields */}
+                  {/* Client fields — no origin field in edit */}
                   <div className="space-y-2 p-3 border rounded-lg bg-muted/30">
                     <p className="text-xs font-medium text-muted-foreground mb-2">Dados do Cliente</p>
                     <div className="space-y-1">
@@ -1067,20 +1103,6 @@ const AgendaModule = () => {
                         type="email"
                         disabled={isDisabled}
                       />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Origem</Label>
-                      <Select value={editForm.clientOrigin} onValueChange={(v) => setEditForm({ ...editForm, clientOrigin: v })} disabled={isDisabled}>
-                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecione" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="indicacao">Indicação</SelectItem>
-                          <SelectItem value="instagram">Instagram</SelectItem>
-                          <SelectItem value="google">Google</SelectItem>
-                          <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                          <SelectItem value="cadastro">Cadastro</SelectItem>
-                          <SelectItem value="outro">Outro</SelectItem>
-                        </SelectContent>
-                      </Select>
                     </div>
                   </div>
 
@@ -1140,19 +1162,6 @@ const AgendaModule = () => {
                   </div>
                 </div>
                 <DialogFooter className="flex-col sm:flex-row gap-2">
-                  {!isPast && editEnabled && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={handleUpdateContact}
-                      disabled={editLoading}
-                      className="gap-1"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5" />
-                      Atualizar Contato
-                    </Button>
-                  )}
                   <div className="flex gap-2 ml-auto">
                     <Button variant="outline" onClick={() => setIsEditOpen(false)} disabled={editLoading}>
                       {isPast || !editEnabled ? 'Fechar' : 'Cancelar'}
@@ -1176,8 +1185,8 @@ const AgendaModule = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Cancel Event Confirmation */}
-      <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+      {/* Cancel Event Confirmation with Reason */}
+      <AlertDialog open={showCancelDialog} onOpenChange={(open) => { if (!open) setCancelReason(""); setShowCancelDialog(open); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Cancelar Evento</AlertDialogTitle>
@@ -1185,22 +1194,20 @@ const AgendaModule = () => {
               Tem certeza que deseja cancelar o evento "{eventToDelete?.title}"? Esta ação não pode ser desfeita e o evento será removido do Google Calendar.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="space-y-2 py-2">
+            <Label>Motivo do cancelamento *</Label>
+            <Textarea
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="Informe o motivo do cancelamento..."
+              rows={3}
+            />
+          </div>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={editLoading}>Voltar</AlertDialogCancel>
+            <AlertDialogCancel disabled={editLoading} onClick={() => setCancelReason("")}>Voltar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={async () => {
-                if (!eventToDelete) return;
-                setEditLoading(true);
-                const success = await deleteGoogleEvent(eventToDelete.id, eventToDelete.accountId);
-                setEditLoading(false);
-                if (success) {
-                  setShowCancelDialog(false);
-                  setEventToDelete(null);
-                  setIsEditOpen(false);
-                  setEditingEvent(null);
-                }
-              }}
-              disabled={editLoading}
+              onClick={handleCancelEvent}
+              disabled={editLoading || !cancelReason.trim()}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {editLoading ? "Cancelando..." : "Sim, Cancelar Evento"}
@@ -1230,8 +1237,163 @@ const AgendaModule = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Billing Dialog */}
+      <BillingDialog
+        open={isBillingOpen}
+        onOpenChange={setIsBillingOpen}
+        event={billingEvent}
+        clinicId={profile?.clinic_id || ""}
+      />
     </div>
   );
 };
+
+// ===================== BILLING DIALOG =====================
+function BillingDialog({ open, onOpenChange, event, clinicId }: {
+  open: boolean; onOpenChange: (o: boolean) => void; event: MergedEvent | null; clinicId: string;
+}) {
+  const queryClient = useQueryClient();
+  const [form, setForm] = useState({
+    type: "receita", category: "atendimento", description: "",
+    amount: "", payment_method: "pix", status: "pago",
+    date: format(new Date(), "yyyy-MM-dd"), notes: "",
+  });
+  const [initialized, setInitialized] = useState(false);
+
+  // Pre-fill from event
+  useEffect(() => {
+    if (open && event && !initialized) {
+      const ep = event.extendedProperties;
+      setForm({
+        type: "receita",
+        category: "atendimento",
+        description: event.title || "",
+        amount: ep?.procedureValue || "",
+        payment_method: "pix",
+        status: "pago",
+        date: event.date || format(new Date(), "yyyy-MM-dd"),
+        notes: "",
+      });
+      setInitialized(true);
+    }
+    if (!open) setInitialized(false);
+  }, [open, event, initialized]);
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!clinicId) throw new Error("Sem clínica");
+      const { error } = await supabase.from("financial_transactions").insert({
+        clinic_id: clinicId,
+        type: form.type,
+        category: form.category,
+        description: form.description,
+        amount: parseFloat(form.amount) || 0,
+        payment_method: form.payment_method,
+        status: form.status,
+        date: form.date,
+        notes: form.notes || null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["financial-daily"] });
+      queryClient.invalidateQueries({ queryKey: ["financial-monthly"] });
+      toast.success("Transação criada com sucesso!");
+      onOpenChange(false);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Receipt className="w-5 h-5 text-primary" />
+            Faturar Evento
+          </DialogTitle>
+        </DialogHeader>
+        <form onSubmit={(e) => { e.preventDefault(); saveMutation.mutate(); }} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Tipo *</Label>
+              <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="receita">Receita</SelectItem>
+                  <SelectItem value="despesa">Despesa</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Categoria</Label>
+              <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="atendimento">Atendimento</SelectItem>
+                  <SelectItem value="produto">Produto</SelectItem>
+                  <SelectItem value="aluguel">Aluguel</SelectItem>
+                  <SelectItem value="material">Material</SelectItem>
+                  <SelectItem value="salario">Salário</SelectItem>
+                  <SelectItem value="marketing">Marketing</SelectItem>
+                  <SelectItem value="outros">Outros</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Descrição *</Label>
+            <Input required value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Valor (R$) *</Label>
+              <Input type="number" step="0.01" required value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Data *</Label>
+              <Input type="date" required value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Forma de Pagamento</Label>
+              <Select value={form.payment_method} onValueChange={(v) => setForm({ ...form, payment_method: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(paymentMethods).map(([k, v]) => (
+                    <SelectItem key={k} value={k}>{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pendente">Pendente</SelectItem>
+                  <SelectItem value="pago">Pago</SelectItem>
+                  <SelectItem value="cancelado">Cancelado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Observações</Label>
+            <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} />
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+            <Button type="submit" className="bg-gradient-primary" disabled={saveMutation.isPending}>
+              {saveMutation.isPending ? "Salvando..." : "Criar Transação"}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export default AgendaModule;
