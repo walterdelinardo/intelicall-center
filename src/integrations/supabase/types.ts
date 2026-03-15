@@ -566,6 +566,41 @@ export type Database = {
           },
         ]
       }
+      google_oauth_config: {
+        Row: {
+          client_id: string
+          client_secret: string
+          clinic_id: string
+          created_at: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          client_secret: string
+          clinic_id: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          client_secret?: string
+          clinic_id?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_oauth_config_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: true
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       google_oauth_tokens: {
         Row: {
           access_token: string
