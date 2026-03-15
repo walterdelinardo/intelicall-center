@@ -26,27 +26,78 @@ export const useGoogleCalendar = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
+      const authHeaders = { Authorization: `Bearer ${session.access_token}` };
+
+      // Fetch from OAuth accounts
       const body: any = {};
       if (accountId) body.account_id = accountId;
 
-      const { data, error } = await supabase.functions.invoke('google-calendar-events', {
-        body,
-        headers: { Authorization: `Bearer ${session.access_token}` },
+      const [oauthResult, icalResult] = await Promise.allSettled([
+        supabase.functions.invoke('google-calendar-events', { body, headers: authHeaders }),
+        // Fetch iCal accounts list first, then fetch events for each
+        fetchICalEvents(session.access_token),
+      ]);
+
+      const allEvents: CalendarEvent[] = [];
+
+      if (oauthResult.status === 'fulfilled' && oauthResult.value.data?.events) {
+        allEvents.push(...oauthResult.value.data.events);
+      }
+
+      if (icalResult.status === 'fulfilled') {
+        allEvents.push(...icalResult.value);
+      }
+
+      // Sort combined events
+      allEvents.sort((a, b) => {
+        if (a.date !== b.date) return a.date.localeCompare(b.date);
+        return a.time.localeCompare(b.time);
       });
 
-      if (error) {
-        console.error('Error fetching events:', error);
-        return;
-      }
-
-      if (data?.events) {
-        setEvents(data.events);
-      }
+      setEvents(allEvents);
     } catch (error) {
       console.error('Error:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchICalEvents = async (accessToken: string): Promise<CalendarEvent[]> => {
+    // Get iCal accounts from the database
+    const { data: accounts } = await supabase
+      .from('google_calendar_accounts')
+      .select('id, label, ical_url, is_active');
+
+    const icalAccounts = ((accounts as any[]) || []).filter(
+      (a: any) => a.ical_url && a.is_active
+    );
+
+    if (icalAccounts.length === 0) return [];
+
+    const allICalEvents: CalendarEvent[] = [];
+
+    for (const account of icalAccounts) {
+      try {
+        const { data, error } = await supabase.functions.invoke('fetch-ical-events', {
+          body: { account_id: account.id },
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+
+        if (!error && data?.events) {
+          allICalEvents.push(
+            ...data.events.map((e: any) => ({
+              ...e,
+              account_id: account.id,
+              account_label: account.label,
+            }))
+          );
+        }
+      } catch (err) {
+        console.error(`Error fetching iCal for account ${account.id}:`, err);
+      }
+    }
+
+    return allICalEvents;
   };
 
   const createEvent = async (eventData: {
