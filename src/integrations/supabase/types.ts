@@ -515,6 +515,7 @@ export type Database = {
           access_token: string | null
           calendar_id: string
           clinic_id: string
+          color: string | null
           created_at: string
           expires_at: string | null
           ical_url: string | null
@@ -530,6 +531,7 @@ export type Database = {
           access_token?: string | null
           calendar_id?: string
           clinic_id: string
+          color?: string | null
           created_at?: string
           expires_at?: string | null
           ical_url?: string | null
@@ -545,6 +547,7 @@ export type Database = {
           access_token?: string | null
           calendar_id?: string
           clinic_id?: string
+          color?: string | null
           created_at?: string
           expires_at?: string | null
           ical_url?: string | null
