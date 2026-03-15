@@ -145,6 +145,14 @@ const ClientesModule = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clients"] });
       toast.success(editClient ? "Cliente atualizado!" : "Cliente cadastrado com sucesso!");
+      // Sync name/phone to WhatsApp conversations if client has a WhatsApp inbox
+      if (editClient?.whatsapp_inbox_id) {
+        supabase.functions.invoke("update-whatsapp-contact", {
+          body: { client_id: editClient.id },
+        }).then(({ error }) => {
+          if (error) console.error("Erro ao sincronizar contato WhatsApp:", error);
+        });
+      }
       setIsFormOpen(false);
       resetForm();
     },
