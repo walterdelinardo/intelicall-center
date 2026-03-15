@@ -234,6 +234,7 @@ export const useGoogleOAuth = () => {
     updateLabel,
     toggleAccount,
     deleteAccount,
+    updateColor,
     fetchCalendars,
     updateCalendarId,
     fetchAccounts,
