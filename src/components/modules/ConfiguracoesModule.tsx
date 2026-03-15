@@ -743,13 +743,30 @@ const ConfiguracoesModule = () => {
                     </Table>
                   )}
 
-                  {googleAccounts.length === 0 && (
+                  {googleAccounts.length === 0 && !hasCredentials && (
+                    <p className="text-sm text-muted-foreground">Configure as credenciais do Google para conectar agendas.</p>
+                  )}
+
+                  {googleAccounts.length === 0 && hasCredentials && (
                     <p className="text-sm text-muted-foreground">Nenhuma conta Google Calendar conectada.</p>
                   )}
 
-                  <Button variant="outline" size="sm" onClick={() => initiateOAuth()}>
-                    <Plus className="w-4 h-4 mr-1" /> Conectar Conta Google
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setShowGoogleConfig(true)}>
+                      <KeyRound className="w-4 h-4 mr-1" /> {hasCredentials ? "Editar Credenciais" : "Configurar Credenciais"}
+                    </Button>
+                    {hasCredentials && (
+                      <Button variant="outline" size="sm" onClick={() => initiateOAuth()}>
+                        <Plus className="w-4 h-4 mr-1" /> Conectar Conta Google
+                      </Button>
+                    )}
+                  </div>
+
+                  <GoogleOAuthConfigDialog
+                    open={showGoogleConfig}
+                    onOpenChange={setShowGoogleConfig}
+                    onSaved={() => fetchOAuthConfig()}
+                  />
                 </>
               )}
             </CardContent>
