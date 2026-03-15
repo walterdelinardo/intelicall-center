@@ -471,6 +471,13 @@ const AgendaModule = () => {
   };
 
   const handleSlotClick = (date: Date, time: string) => {
+    // Block past slots (GMT-3)
+    const slotStr = `${format(date, "yyyy-MM-dd")}T${time}:00-03:00`;
+    const slotDateTime = new Date(slotStr);
+    if (slotDateTime < new Date()) {
+      toast.error("Não é possível agendar no passado");
+      return;
+    }
     setForm({ ...form, date: format(date, "yyyy-MM-dd"), start_time: time });
     setIsCreateOpen(true);
   };
