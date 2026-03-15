@@ -942,13 +942,13 @@ const AgendaModule = () => {
                 {useGoogleAsPrimary ? renderGoogleCreateForm() : renderLocalCreateForm()}
 
                 <div className="flex justify-end gap-3">
-                  <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>Cancelar</Button>
+                  <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)} disabled={isSubmitting}>Cancelar</Button>
                   <Button
                     type="submit"
                     className="bg-gradient-primary"
-                    disabled={useGoogleAsPrimary ? !composedTitle : !form.client_id}
+                    disabled={isSubmitting || (useGoogleAsPrimary ? !composedTitle : !form.client_id)}
                   >
-                    {useGoogleAsPrimary ? "Criar Evento" : "Agendar"}
+                    {isSubmitting ? "Criando..." : (useGoogleAsPrimary ? "Criar Evento" : "Agendar")}
                   </Button>
                 </div>
               </form>
