@@ -555,7 +555,7 @@ serve(async (req) => {
 
       const timestamp = messageTimestamp ? new Date(messageTimestamp * 1000).toISOString() : new Date().toISOString();
 
-      const { isDuplicate } = await upsertMessage(supabase, {
+      const { isDuplicate, mergeResult, mergeError } = await upsertMessage(supabase, {
         conversation_id: conv.id, message_id: messageId, content: content || null,
         message_type: messageType, is_from_me: isFromMe, sender_name: displayName,
         media_url: mediaUrl, media_type: mediaType, mime_type: mimeType,
@@ -565,8 +565,30 @@ serve(async (req) => {
         status: isFromMe ? "sent" : "received", timestamp,
       });
 
+      // Log to webhook_logs
+      const normalizedForLog = { ...normalized, base64: undefined };
+      await supabase.from("webhook_logs").insert({
+        message_id: messageId,
+        payload_format: normalized.payloadFormat,
+        event: normalized.event,
+        instance_name: normalized.instanceName,
+        remote_jid: remoteJid,
+        message_type: messageType,
+        has_base64: !!base64,
+        base64_length: base64?.length || 0,
+        base64_source: normalized.sourceUsed,
+        has_media_url: !!mediaUrl,
+        media_url: mediaUrl,
+        mime_type: mimeType,
+        is_duplicate: isDuplicate,
+        merge_result: mergeResult,
+        merge_error: mergeError,
+        raw_payload: payload,
+        normalized_data: normalizedForLog,
+      });
+
       if (isDuplicate) {
-        console.log(JSON.stringify({ action: "duplicate_merged", messageId, format: normalized.payloadFormat }));
+        console.log(JSON.stringify({ action: "duplicate_merged", messageId, mergeResult, mergeError, format: normalized.payloadFormat }));
       }
 
       if (!isFromMe && !isDuplicate) {
