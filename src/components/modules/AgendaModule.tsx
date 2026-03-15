@@ -586,7 +586,7 @@ const AgendaModule = () => {
             variant="ghost"
             size="sm"
             className="h-6 text-xs gap-1"
-            onClick={() => { setIsNewClient(!isNewClient); if (!isNewClient) setForm({ ...form, clientName: '', clientWhatsapp: '', clientOrigin: '' }); }}
+            onClick={() => { setIsNewClient(!isNewClient); if (!isNewClient) setForm({ ...form, clientName: '', clientWhatsapp: '', clientEmail: '', clientOrigin: '' }); }}
           >
             <UserPlus className="w-3 h-3" />
             {isNewClient ? 'Buscar existente' : 'Novo cliente'}
