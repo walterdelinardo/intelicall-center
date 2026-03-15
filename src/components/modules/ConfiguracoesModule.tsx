@@ -10,7 +10,8 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Settings, Building2, Clock, Phone, MapPin, Mail, Save, Loader2, Smartphone, Plus, Power, Plug, Trash2, Calendar, Pencil } from "lucide-react";
+import { Settings, Building2, Clock, Phone, MapPin, Mail, Save, Loader2, Smartphone, Plus, Power, Plug, Trash2, Calendar, Pencil, Palette } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { type GoogleCalendarOption } from "@/hooks/useGoogleOAuth";
 import { toast } from "sonner";
@@ -697,32 +698,39 @@ const ConfiguracoesModule = () => {
                                 </Select>
                               </TableCell>
                               <TableCell>
-                                <div className="relative">
-                                  <button
-                                    className="w-7 h-7 rounded-full border-2 border-border hover:scale-110 transition-transform"
-                                    style={{ backgroundColor: acc.color || '#039BE5' }}
-                                    onClick={(e) => {
-                                      const popover = (e.currentTarget.nextElementSibling as HTMLElement);
-                                      popover.classList.toggle('hidden');
-                                    }}
-                                    title="Alterar cor"
-                                  />
-                                  <div data-color-popover={acc.id} className="hidden absolute z-50 top-9 left-0 bg-popover border border-border rounded-lg p-2 shadow-lg grid grid-cols-4 gap-1.5 w-[140px]">
-                                    {['#7986CB', '#33B679', '#8E24AA', '#E67C73', '#F6BF26', '#F4511E', '#039BE5', '#616161', '#3F51B5', '#0B8043', '#D50000', '#795548'].map((c) => (
-                                      <button
-                                        key={c}
-                                        className={`w-7 h-7 rounded-full border-2 hover:scale-110 transition-transform ${acc.color === c ? 'border-foreground ring-2 ring-ring' : 'border-transparent'}`}
-                                        style={{ backgroundColor: c }}
-                                        onClick={async () => {
-                                          await updateColor(acc.id, c);
-                                          // Hide popover
-                                          const popover = (document.querySelector(`[data-color-popover="${acc.id}"]`) as HTMLElement);
-                                          if (popover) popover.classList.add('hidden');
-                                        }}
-                                      />
-                                    ))}
-                                  </div>
-                                </div>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <button
+                                      className="w-7 h-7 rounded-full border-2 border-border hover:scale-110 transition-transform"
+                                      style={{ backgroundColor: acc.color || '#039BE5' }}
+                                      title="Alterar cor"
+                                    />
+                                  </PopoverTrigger>
+                                  <PopoverContent side="top" sideOffset={8} className="w-auto p-3">
+                                    <div className="grid grid-cols-4 gap-1.5 mb-2">
+                                      {['#7986CB', '#33B679', '#8E24AA', '#E67C73', '#F6BF26', '#F4511E', '#039BE5', '#616161', '#3F51B5', '#0B8043', '#D50000', '#795548'].map((c) => (
+                                        <button
+                                          key={c}
+                                          className={`w-7 h-7 rounded-full border-2 hover:scale-110 transition-transform ${acc.color === c ? 'border-foreground ring-2 ring-ring' : 'border-transparent'}`}
+                                          style={{ backgroundColor: c }}
+                                          onClick={() => updateColor(acc.id, c)}
+                                        />
+                                      ))}
+                                    </div>
+                                    <div className="flex items-center gap-2 pt-2 border-t border-border">
+                                      <Palette className="w-4 h-4 text-muted-foreground" />
+                                      <label className="text-xs text-muted-foreground cursor-pointer flex items-center gap-2">
+                                        Personalizada
+                                        <input
+                                          type="color"
+                                          value={acc.color || '#039BE5'}
+                                          onChange={(e) => updateColor(acc.id, e.target.value)}
+                                          className="w-7 h-7 rounded cursor-pointer border-0 p-0 bg-transparent"
+                                        />
+                                      </label>
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
                               </TableCell>
                               <TableCell>
                                 <Badge variant={acc.is_active ? "default" : "secondary"}>
