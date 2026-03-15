@@ -16,8 +16,10 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Calendar, Plus, ChevronLeft, ChevronRight, Clock, Globe, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { format, addDays, startOfWeek, endOfWeek, eachDayOfInterval, isToday, isSameDay, parseISO } from "date-fns";
+import { format, addDays, addMonths, subMonths, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isToday, isSameDay, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { TimeGrid, WeekTimeGrid } from "./agenda/TimeGrid";
+import { MonthView } from "./agenda/MonthView";
 
 const statusColors: Record<string, string> = {
   agendado: "bg-primary/10 text-primary border-primary/30",
