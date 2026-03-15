@@ -662,7 +662,7 @@ const AgendaModule = () => {
                         onSelect={() => handleSelectExternalClient(c)}
                         className="flex flex-col items-start"
                       >
-                        <span className="font-medium">{c.nome}</span>
+                        <span className="font-medium">{c.nome || c.nome_wpp || c.whatsapp}</span>
                         <span className="text-xs text-muted-foreground">{c.whatsapp}</span>
                       </CommandItem>
                     ))}
