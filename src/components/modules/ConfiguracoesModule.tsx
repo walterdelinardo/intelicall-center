@@ -581,6 +581,7 @@ const ConfiguracoesModule = () => {
                         <TableRow>
                           <TableHead>Label</TableHead>
                           <TableHead>Agenda</TableHead>
+                          <TableHead>Cor</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead className="w-[80px]">Ações</TableHead>
                         </TableRow>
