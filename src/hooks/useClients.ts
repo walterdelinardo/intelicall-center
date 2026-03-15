@@ -6,7 +6,7 @@ export interface Client {
   whatsapp: string;
   nome_wpp: string;
   email: string | null;
-  "data-nasc": string | null;
+  data_nasc: string | null;
 }
 
 export const useClients = () => {
