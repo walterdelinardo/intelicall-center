@@ -177,7 +177,7 @@ export const useGoogleOAuth = () => {
     accounts,
     loading,
     initiateOAuth,
-    addICalAccount,
+    updateLabel,
     toggleAccount,
     deleteAccount,
     fetchCalendars,
