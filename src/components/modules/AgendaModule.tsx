@@ -89,6 +89,7 @@ const AgendaModule = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [view, setView] = useState<"day" | "week" | "month">("day");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
   const [filterAccount, setFilterAccount] = useState<string>("all");
 
