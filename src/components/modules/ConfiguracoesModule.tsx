@@ -50,7 +50,7 @@ const ConfiguracoesModule = () => {
   const queryClient = useQueryClient();
   const isAdmin = hasRole("admin");
   const { inboxes, loading: inboxesLoading, createInbox, toggleInbox, deleteInbox } = useWhatsAppInboxes();
-  const { accounts: googleAccounts, loading: googleLoading, initiateOAuth, toggleAccount: toggleGoogleAccount, deleteAccount: deleteGoogleAccount, fetchCalendars, updateCalendarId, updateLabel } = useGoogleOAuth();
+  const { accounts: googleAccounts, loading: googleLoading, initiateOAuth, toggleAccount: toggleGoogleAccount, deleteAccount: deleteGoogleAccount, fetchCalendars, updateCalendarId, updateLabel, hasCredentials, fetchOAuthConfig } = useGoogleOAuth();
 
   const [showAddInbox, setShowAddInbox] = useState(false);
   const [newLabel, setNewLabel] = useState("");
@@ -61,6 +61,7 @@ const ConfiguracoesModule = () => {
   const [loadingCalendars, setLoadingCalendars] = useState<Record<string, boolean>>({});
   const [editingLabel, setEditingLabel] = useState<string | null>(null);
   const [editLabelValue, setEditLabelValue] = useState("");
+  const [showGoogleConfig, setShowGoogleConfig] = useState(false);
   const { data: clinic, isLoading } = useQuery({
     queryKey: ["clinic", profile?.clinic_id],
     queryFn: async () => {
