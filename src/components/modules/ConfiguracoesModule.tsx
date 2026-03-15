@@ -577,7 +577,7 @@ const ConfiguracoesModule = () => {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Label</TableHead>
-                          <TableHead>Calendar ID</TableHead>
+                          <TableHead>Tipo</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead className="w-[80px]">Ações</TableHead>
                         </TableRow>
@@ -586,7 +586,11 @@ const ConfiguracoesModule = () => {
                         {googleAccounts.map((acc) => (
                           <TableRow key={acc.id}>
                             <TableCell className="font-medium">{acc.label}</TableCell>
-                            <TableCell className="font-mono text-xs">{acc.calendar_id}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-xs">
+                                {acc.ical_url ? "iCal" : "OAuth"}
+                              </Badge>
+                            </TableCell>
                             <TableCell>
                               <Badge variant={acc.is_active ? "default" : "secondary"}>
                                 {acc.is_active ? "Ativo" : "Inativo"}
