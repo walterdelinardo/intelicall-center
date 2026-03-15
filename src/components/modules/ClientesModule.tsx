@@ -48,6 +48,7 @@ const emptyForm = {
 const ClientesModule = () => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
+  const [isSyncing, setIsSyncing] = useState(false);
   const [search, setSearch] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
