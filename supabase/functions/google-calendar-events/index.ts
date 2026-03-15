@@ -82,19 +82,38 @@ async function listEvents(accessToken: string, calendarId: string) {
   }
 
   const data = await response.json();
-  return data.items?.map((event: any) => ({
-    id: event.id,
-    title: event.summary || 'Sem título',
-    date: event.start?.dateTime ? new Date(event.start.dateTime).toISOString().split('T')[0] : event.start?.date,
-    time: event.start?.dateTime ? new Date(event.start.dateTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'Dia inteiro',
-    duration: event.start?.dateTime && event.end?.dateTime
-      ? `${Math.round((new Date(event.end.dateTime).getTime() - new Date(event.start.dateTime).getTime()) / 60000)} min`
-      : 'Dia inteiro',
-    status: event.status === 'confirmed' ? 'confirmed' : 'pending',
-    description: event.description || '',
-    startDateTime: event.start?.dateTime || null,
-    endDateTime: event.end?.dateTime || null,
-  })) || [];
+  return data.items?.map((event: any) => {
+    // Convert to GMT-3 (America/Sao_Paulo)
+    const startDT = event.start?.dateTime ? new Date(event.start.dateTime) : null;
+    const endDT = event.end?.dateTime ? new Date(event.end.dateTime) : null;
+
+    let date: string;
+    let time: string;
+    if (startDT) {
+      // Format in America/Sao_Paulo timezone
+      date = startDT.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }); // yyyy-MM-dd
+      time = startDT.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+    } else {
+      date = event.start?.date || '';
+      time = 'Dia inteiro';
+    }
+
+    const duration = startDT && endDT
+      ? `${Math.round((endDT.getTime() - startDT.getTime()) / 60000)} min`
+      : 'Dia inteiro';
+
+    return {
+      id: event.id,
+      title: event.summary || 'Sem título',
+      date,
+      time,
+      duration,
+      status: event.status === 'confirmed' ? 'confirmed' : 'pending',
+      description: event.description || '',
+      startDateTime: event.start?.dateTime || null,
+      endDateTime: event.end?.dateTime || null,
+    };
+  }) || [];
 }
 
 async function createEvent(accessToken: string, calendarId: string, body: any) {

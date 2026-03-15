@@ -30,9 +30,9 @@ const statusColors: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-700 border-yellow-300",
 };
 
-const START_HOUR = 7;
-const END_HOUR = 21;
-const SLOT_HEIGHT = 48; // px per 30min slot
+const START_HOUR = 0;
+const END_HOUR = 24;
+const SLOT_HEIGHT = 32; // px per 30min slot
 
 function generateTimeSlots() {
   const slots: string[] = [];
