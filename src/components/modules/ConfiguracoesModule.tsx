@@ -707,7 +707,7 @@ const ConfiguracoesModule = () => {
                                     }}
                                     title="Alterar cor"
                                   />
-                                  <div className="hidden absolute z-50 top-9 left-0 bg-popover border border-border rounded-lg p-2 shadow-lg grid grid-cols-4 gap-1.5 w-[140px]">
+                                  <div data-color-popover={acc.id} className="hidden absolute z-50 top-9 left-0 bg-popover border border-border rounded-lg p-2 shadow-lg grid grid-cols-4 gap-1.5 w-[140px]">
                                     {['#7986CB', '#33B679', '#8E24AA', '#E67C73', '#F6BF26', '#F4511E', '#039BE5', '#616161', '#3F51B5', '#0B8043', '#D50000', '#795548'].map((c) => (
                                       <button
                                         key={c}
