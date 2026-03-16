@@ -149,6 +149,43 @@ const EstoqueModule = () => {
       setExitItem(null);
       setExitQty("1");
       setExitType("uso_interno");
+      setExitSalePrice("0");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const entryMutation = useMutation({
+    mutationFn: async () => {
+      if (!entryItem || !profile?.clinic_id) throw new Error("Dados inválidos");
+      const qty = parseFloat(entryQty) || 0;
+      if (qty <= 0) throw new Error("Quantidade inválida");
+      const unitCost = parseFloat(entryCost) || 0;
+
+      const newQty = (entryItem.quantity || 0) + qty;
+      const { error } = await supabase.from("stock_items").update({ quantity: newQty }).eq("id", entryItem.id);
+      if (error) throw error;
+
+      if (unitCost > 0) {
+        await supabase.from("financial_transactions").insert({
+          clinic_id: profile.clinic_id,
+          type: "despesa",
+          category: entryItem.category === "produto" ? "produto" : "material",
+          description: entryItem.name,
+          amount: qty * unitCost,
+          status: "pendente",
+          date: format(new Date(), "yyyy-MM-dd"),
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["stock"] });
+      queryClient.invalidateQueries({ queryKey: ["financial-daily"] });
+      queryClient.invalidateQueries({ queryKey: ["financial-monthly"] });
+      toast.success("Entrada registrada!");
+      setEntryOpen(false);
+      setEntryItem(null);
+      setEntryQty("1");
+      setEntryCost("0");
     },
     onError: (e: any) => toast.error(e.message),
   });
