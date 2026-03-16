@@ -431,9 +431,13 @@ const EstoqueModule = () => {
                 </Select>
               </div>
               {exitType === "venda" && (
-                <p className="text-xs text-muted-foreground">
-                  Valor da venda: R$ {((parseFloat(exitQty) || 0) * (exitItem.sale_price || exitItem.cost_price || 0)).toFixed(2)}
-                </p>
+                <div className="space-y-2">
+                  <Label>Valor de Venda Unitário (R$)</Label>
+                  <Input type="number" min="0" step="0.01" value={exitSalePrice} onChange={(e) => setExitSalePrice(e.target.value)} />
+                  <p className="text-xs text-muted-foreground">
+                    Total da venda: R$ {((parseFloat(exitQty) || 0) * (parseFloat(exitSalePrice) || 0)).toFixed(2)}
+                  </p>
+                </div>
               )}
               <div className="flex justify-end gap-3">
                 <Button variant="outline" onClick={() => setExitOpen(false)}>Cancelar</Button>
