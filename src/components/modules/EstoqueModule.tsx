@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Package, Plus, Search, AlertTriangle, Pencil, Trash2, LogOut } from "lucide-react";
+import { Package, Plus, Search, AlertTriangle, Pencil, Trash2, LogOut, LogIn } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -33,6 +33,13 @@ const EstoqueModule = () => {
   const [exitItem, setExitItem] = useState<any>(null);
   const [exitQty, setExitQty] = useState("1");
   const [exitType, setExitType] = useState<"uso_interno" | "venda">("uso_interno");
+  const [exitSalePrice, setExitSalePrice] = useState("0");
+
+  // Entry dialog state
+  const [entryOpen, setEntryOpen] = useState(false);
+  const [entryItem, setEntryItem] = useState<any>(null);
+  const [entryQty, setEntryQty] = useState("1");
+  const [entryCost, setEntryCost] = useState("0");
 
   const { data: items = [], isLoading } = useQuery({
     queryKey: ["stock", profile?.clinic_id],
@@ -121,13 +128,13 @@ const EstoqueModule = () => {
 
       // If sale, create revenue transaction
       if (exitType === "venda") {
-        const salePrice = exitItem.sale_price || exitItem.cost_price || 0;
+        const price = parseFloat(exitSalePrice) || 0;
         await supabase.from("financial_transactions").insert({
           clinic_id: profile.clinic_id,
           type: "receita",
           category: "produto",
           description: exitItem.name,
-          amount: qty * salePrice,
+          amount: qty * price,
           status: "pendente",
           date: format(new Date(), "yyyy-MM-dd"),
         });
@@ -142,6 +149,43 @@ const EstoqueModule = () => {
       setExitItem(null);
       setExitQty("1");
       setExitType("uso_interno");
+      setExitSalePrice("0");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const entryMutation = useMutation({
+    mutationFn: async () => {
+      if (!entryItem || !profile?.clinic_id) throw new Error("Dados inválidos");
+      const qty = parseFloat(entryQty) || 0;
+      if (qty <= 0) throw new Error("Quantidade inválida");
+      const unitCost = parseFloat(entryCost) || 0;
+
+      const newQty = (entryItem.quantity || 0) + qty;
+      const { error } = await supabase.from("stock_items").update({ quantity: newQty }).eq("id", entryItem.id);
+      if (error) throw error;
+
+      if (unitCost > 0) {
+        await supabase.from("financial_transactions").insert({
+          clinic_id: profile.clinic_id,
+          type: "despesa",
+          category: entryItem.category === "produto" ? "produto" : "material",
+          description: entryItem.name,
+          amount: qty * unitCost,
+          status: "pendente",
+          date: format(new Date(), "yyyy-MM-dd"),
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["stock"] });
+      queryClient.invalidateQueries({ queryKey: ["financial-daily"] });
+      queryClient.invalidateQueries({ queryKey: ["financial-monthly"] });
+      toast.success("Entrada registrada!");
+      setEntryOpen(false);
+      setEntryItem(null);
+      setEntryQty("1");
+      setEntryCost("0");
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -160,7 +204,15 @@ const EstoqueModule = () => {
     setExitItem(item);
     setExitQty("1");
     setExitType("uso_interno");
+    setExitSalePrice(String(item.sale_price || 0));
     setExitOpen(true);
+  };
+
+  const openEntry = (item: any) => {
+    setEntryItem(item);
+    setEntryQty("1");
+    setEntryCost(String(item.cost_price || 0));
+    setEntryOpen(true);
   };
 
   const closeDialog = () => {
@@ -322,6 +374,9 @@ const EstoqueModule = () => {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
+                        <Button size="icon" variant="ghost" onClick={() => openEntry(item)} title="Entrada">
+                          <LogIn className="w-4 h-4" />
+                        </Button>
                         <Button size="icon" variant="ghost" onClick={() => openExit(item)} title="Saída">
                           <LogOut className="w-4 h-4" />
                         </Button>
@@ -351,6 +406,38 @@ const EstoqueModule = () => {
         </CardContent>
       </Card>
 
+      {/* Entry Dialog */}
+      <Dialog open={entryOpen} onOpenChange={(o) => { if (!o) { setEntryOpen(false); setEntryItem(null); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Entrada de Estoque</DialogTitle></DialogHeader>
+          {entryItem && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Item: <span className="font-medium text-foreground">{entryItem.name}</span>
+                <br />Estoque atual: <span className="font-medium">{entryItem.quantity} {entryItem.unit}</span>
+              </p>
+              <div className="space-y-2">
+                <Label>Quantidade de Entrada</Label>
+                <Input type="number" step="0.01" value={entryQty} onChange={(e) => setEntryQty(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Custo Unitário (R$)</Label>
+                <Input type="number" min="0" step="0.01" value={entryCost} onChange={(e) => setEntryCost(e.target.value)} />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Total da despesa: R$ {((parseFloat(entryQty) || 0) * (parseFloat(entryCost) || 0)).toFixed(2)}
+              </p>
+              <div className="flex justify-end gap-3">
+                <Button variant="outline" onClick={() => setEntryOpen(false)}>Cancelar</Button>
+                <Button onClick={() => entryMutation.mutate()} disabled={entryMutation.isPending} className="bg-gradient-primary">
+                  {entryMutation.isPending ? "Processando..." : "Confirmar Entrada"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Exit Dialog */}
       <Dialog open={exitOpen} onOpenChange={(o) => { if (!o) { setExitOpen(false); setExitItem(null); } }}>
         <DialogContent className="max-w-sm">
@@ -376,9 +463,13 @@ const EstoqueModule = () => {
                 </Select>
               </div>
               {exitType === "venda" && (
-                <p className="text-xs text-muted-foreground">
-                  Valor da venda: R$ {((parseFloat(exitQty) || 0) * (exitItem.sale_price || exitItem.cost_price || 0)).toFixed(2)}
-                </p>
+                <div className="space-y-2">
+                  <Label>Valor de Venda Unitário (R$)</Label>
+                  <Input type="number" min="0" step="0.01" value={exitSalePrice} onChange={(e) => setExitSalePrice(e.target.value)} />
+                  <p className="text-xs text-muted-foreground">
+                    Total da venda: R$ {((parseFloat(exitQty) || 0) * (parseFloat(exitSalePrice) || 0)).toFixed(2)}
+                  </p>
+                </div>
               )}
               <div className="flex justify-end gap-3">
                 <Button variant="outline" onClick={() => setExitOpen(false)}>Cancelar</Button>

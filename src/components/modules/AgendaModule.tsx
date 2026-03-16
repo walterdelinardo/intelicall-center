@@ -1370,7 +1370,7 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
         stockId: item.id,
         name: item.name,
         qty: 1,
-        price: item.sale_price || item.cost_price || 0,
+        price: item.sale_price || 0,
       }]);
     }
     setItemSearch("");
@@ -1555,7 +1555,7 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
                       {filteredStock.map((s: any) => (
                         <CommandItem key={s.id} onSelect={() => addSaleItem(s)} className="flex justify-between">
                           <span>{s.name}</span>
-                          <span className="text-xs text-muted-foreground">R$ {Number(s.sale_price || s.cost_price || 0).toFixed(2)}</span>
+                          <span className="text-xs text-muted-foreground">R$ {Number(s.sale_price || 0).toFixed(2)}</span>
                         </CommandItem>
                       ))}
                     </CommandGroup>
