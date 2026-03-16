@@ -128,13 +128,13 @@ const EstoqueModule = () => {
 
       // If sale, create revenue transaction
       if (exitType === "venda") {
-        const salePrice = exitItem.sale_price || exitItem.cost_price || 0;
+        const price = parseFloat(exitSalePrice) || 0;
         await supabase.from("financial_transactions").insert({
           clinic_id: profile.clinic_id,
           type: "receita",
           category: "produto",
           description: exitItem.name,
-          amount: qty * salePrice,
+          amount: qty * price,
           status: "pendente",
           date: format(new Date(), "yyyy-MM-dd"),
         });
