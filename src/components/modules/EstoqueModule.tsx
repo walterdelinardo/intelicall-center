@@ -374,6 +374,9 @@ const EstoqueModule = () => {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
+                        <Button size="icon" variant="ghost" onClick={() => openEntry(item)} title="Entrada">
+                          <LogIn className="w-4 h-4" />
+                        </Button>
                         <Button size="icon" variant="ghost" onClick={() => openExit(item)} title="Saída">
                           <LogOut className="w-4 h-4" />
                         </Button>
