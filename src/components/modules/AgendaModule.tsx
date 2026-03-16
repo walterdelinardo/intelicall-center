@@ -1370,7 +1370,7 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
         stockId: item.id,
         name: item.name,
         qty: 1,
-        price: item.sale_price || item.cost_price || 0,
+        price: item.sale_price || 0,
       }]);
     }
     setItemSearch("");
