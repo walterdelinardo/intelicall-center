@@ -1,0 +1,1 @@
+ALTER TABLE public.stock_items ADD COLUMN sale_price numeric DEFAULT 0;
