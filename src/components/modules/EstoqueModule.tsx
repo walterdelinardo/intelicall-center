@@ -33,6 +33,13 @@ const EstoqueModule = () => {
   const [exitItem, setExitItem] = useState<any>(null);
   const [exitQty, setExitQty] = useState("1");
   const [exitType, setExitType] = useState<"uso_interno" | "venda">("uso_interno");
+  const [exitSalePrice, setExitSalePrice] = useState("0");
+
+  // Entry dialog state
+  const [entryOpen, setEntryOpen] = useState(false);
+  const [entryItem, setEntryItem] = useState<any>(null);
+  const [entryQty, setEntryQty] = useState("1");
+  const [entryCost, setEntryCost] = useState("0");
 
   const { data: items = [], isLoading } = useQuery({
     queryKey: ["stock", profile?.clinic_id],
