@@ -1270,6 +1270,9 @@ const AgendaModule = () => {
 };
 
 // ===================== BILLING DIALOG =====================
+interface SaleItem { stockId: string; name: string; qty: number; price: number; }
+interface ExtraProcedure { procedureId: string; name: string; price: number; }
+
 function BillingDialog({ open, onOpenChange, event, clinicId }: {
   open: boolean; onOpenChange: (o: boolean) => void; event: MergedEvent | null; clinicId: string;
 }) {
@@ -1280,6 +1283,46 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
     date: format(new Date(), "yyyy-MM-dd"), notes: "",
   });
   const [initialized, setInitialized] = useState(false);
+  const [saleItems, setSaleItems] = useState<SaleItem[]>([]);
+  const [extraProcedures, setExtraProcedures] = useState<ExtraProcedure[]>([]);
+  const [itemSearch, setItemSearch] = useState("");
+  const [procSearch, setProcSearch] = useState("");
+  const [showItemPicker, setShowItemPicker] = useState(false);
+  const [showProcPicker, setShowProcPicker] = useState(false);
+
+  // Fetch stock items
+  const { data: stockItems = [] } = useQuery({
+    queryKey: ["stock-for-billing", clinicId],
+    queryFn: async () => {
+      if (!clinicId) return [];
+      const { data, error } = await supabase
+        .from("stock_items")
+        .select("id, name, sale_price, cost_price, quantity, unit, category")
+        .eq("clinic_id", clinicId)
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!clinicId && open,
+  });
+
+  // Fetch procedures
+  const { data: billingProcedures = [] } = useQuery({
+    queryKey: ["procedures-for-billing", clinicId],
+    queryFn: async () => {
+      if (!clinicId) return [];
+      const { data, error } = await supabase
+        .from("procedures")
+        .select("id, name, price")
+        .eq("clinic_id", clinicId)
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!clinicId && open,
+  });
 
   // Pre-fill from event
   useEffect(() => {
@@ -1295,31 +1338,113 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
         date: event.date || format(new Date(), "yyyy-MM-dd"),
         notes: "",
       });
+      setSaleItems([]);
+      setExtraProcedures([]);
       setInitialized(true);
     }
     if (!open) setInitialized(false);
   }, [open, event, initialized]);
 
+  // Calculate total
+  const baseAmount = parseFloat(form.amount) || 0;
+  const itemsTotal = saleItems.reduce((s, i) => s + i.qty * i.price, 0);
+  const procsTotal = extraProcedures.reduce((s, p) => s + p.price, 0);
+  const grandTotal = baseAmount + itemsTotal + procsTotal;
+
+  const filteredStock = useMemo(() => {
+    const q = itemSearch.toLowerCase();
+    return stockItems.filter((s: any) => s.name.toLowerCase().includes(q)).slice(0, 10);
+  }, [stockItems, itemSearch]);
+
+  const filteredProcs = useMemo(() => {
+    const q = procSearch.toLowerCase();
+    return billingProcedures.filter((p: any) => p.name.toLowerCase().includes(q)).slice(0, 10);
+  }, [billingProcedures, procSearch]);
+
+  const addSaleItem = (item: any) => {
+    const existing = saleItems.find(s => s.stockId === item.id);
+    if (existing) {
+      setSaleItems(saleItems.map(s => s.stockId === item.id ? { ...s, qty: s.qty + 1 } : s));
+    } else {
+      setSaleItems([...saleItems, {
+        stockId: item.id,
+        name: item.name,
+        qty: 1,
+        price: item.sale_price || item.cost_price || 0,
+      }]);
+    }
+    setItemSearch("");
+    setShowItemPicker(false);
+  };
+
+  const addExtraProcedure = (proc: any) => {
+    setExtraProcedures([...extraProcedures, {
+      procedureId: proc.id,
+      name: proc.name,
+      price: proc.price || 0,
+    }]);
+    setProcSearch("");
+    setShowProcPicker(false);
+  };
+
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!clinicId) throw new Error("Sem clínica");
+
+      // Main transaction (atendimento)
       const { error } = await supabase.from("financial_transactions").insert({
         clinic_id: clinicId,
         type: form.type,
         category: form.category,
         description: form.description,
-        amount: parseFloat(form.amount) || 0,
+        amount: grandTotal,
         payment_method: form.payment_method,
         status: form.status,
         date: form.date,
         notes: form.notes || null,
       });
       if (error) throw error;
+
+      // Product sale transactions + stock deduction
+      for (const item of saleItems) {
+        await supabase.from("financial_transactions").insert({
+          clinic_id: clinicId,
+          type: "receita",
+          category: "produto",
+          description: `Venda: ${item.name}`,
+          amount: item.qty * item.price,
+          payment_method: form.payment_method,
+          status: form.status,
+          date: form.date,
+        });
+        // Deduct stock
+        const stockItem = stockItems.find((s: any) => s.id === item.stockId);
+        if (stockItem) {
+          await supabase.from("stock_items").update({
+            quantity: (stockItem as any).quantity - item.qty,
+          }).eq("id", item.stockId);
+        }
+      }
+
+      // Extra procedure transactions
+      for (const proc of extraProcedures) {
+        await supabase.from("financial_transactions").insert({
+          clinic_id: clinicId,
+          type: "receita",
+          category: "atendimento",
+          description: `Procedimento adicional: ${proc.name}`,
+          amount: proc.price,
+          payment_method: form.payment_method,
+          status: form.status,
+          date: form.date,
+        });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["financial-daily"] });
       queryClient.invalidateQueries({ queryKey: ["financial-monthly"] });
-      toast.success("Transação criada com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ["stock"] });
+      toast.success("Faturamento realizado com sucesso!");
       onOpenChange(false);
     },
     onError: (e: any) => toast.error(e.message),
@@ -1327,7 +1452,7 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Receipt className="w-5 h-5 text-primary" />
@@ -1368,7 +1493,7 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Valor (R$) *</Label>
+              <Label>Valor Principal (R$) *</Label>
               <Input type="number" step="0.01" required value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
             </div>
             <div className="space-y-2">
@@ -1376,6 +1501,127 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
               <Input type="date" required value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
             </div>
           </div>
+
+          {/* Sale Items Section */}
+          <div className="space-y-2 border rounded-lg p-3 bg-muted/30">
+            <Label className="flex items-center gap-1 text-sm font-medium">
+              <ShoppingCart className="w-4 h-4" /> Venda de Itens (Estoque)
+            </Label>
+            {saleItems.map((item, idx) => (
+              <div key={idx} className="flex items-center gap-2 text-sm">
+                <span className="flex-1 truncate">{item.name}</span>
+                <Input
+                  type="number"
+                  min="1"
+                  step="1"
+                  className="w-16 h-7 text-xs"
+                  value={item.qty}
+                  onChange={(e) => {
+                    const updated = [...saleItems];
+                    updated[idx].qty = parseInt(e.target.value) || 1;
+                    setSaleItems(updated);
+                  }}
+                />
+                <span className="text-xs text-muted-foreground">×</span>
+                <Input
+                  type="number"
+                  step="0.01"
+                  className="w-20 h-7 text-xs"
+                  value={item.price}
+                  onChange={(e) => {
+                    const updated = [...saleItems];
+                    updated[idx].price = parseFloat(e.target.value) || 0;
+                    setSaleItems(updated);
+                  }}
+                />
+                <span className="text-xs font-medium w-20 text-right">R$ {(item.qty * item.price).toFixed(2)}</span>
+                <Button type="button" size="icon" variant="ghost" className="h-6 w-6" onClick={() => setSaleItems(saleItems.filter((_, i) => i !== idx))}>
+                  <X className="w-3 h-3" />
+                </Button>
+              </div>
+            ))}
+            <Popover open={showItemPicker} onOpenChange={setShowItemPicker}>
+              <PopoverTrigger asChild>
+                <Button type="button" variant="outline" size="sm" className="gap-1 text-xs">
+                  <Plus className="w-3 h-3" /> Adicionar Item
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[280px] p-0" align="start">
+                <Command shouldFilter={false}>
+                  <CommandInput placeholder="Buscar item..." value={itemSearch} onValueChange={setItemSearch} />
+                  <CommandList>
+                    <CommandEmpty>Nenhum item encontrado</CommandEmpty>
+                    <CommandGroup>
+                      {filteredStock.map((s: any) => (
+                        <CommandItem key={s.id} onSelect={() => addSaleItem(s)} className="flex justify-between">
+                          <span>{s.name}</span>
+                          <span className="text-xs text-muted-foreground">R$ {Number(s.sale_price || s.cost_price || 0).toFixed(2)}</span>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Extra Procedures Section */}
+          <div className="space-y-2 border rounded-lg p-3 bg-muted/30">
+            <Label className="flex items-center gap-1 text-sm font-medium">
+              <Stethoscope className="w-4 h-4" /> Procedimentos Adicionais
+            </Label>
+            {extraProcedures.map((proc, idx) => (
+              <div key={idx} className="flex items-center gap-2 text-sm">
+                <span className="flex-1 truncate">{proc.name}</span>
+                <Input
+                  type="number"
+                  step="0.01"
+                  className="w-24 h-7 text-xs"
+                  value={proc.price}
+                  onChange={(e) => {
+                    const updated = [...extraProcedures];
+                    updated[idx].price = parseFloat(e.target.value) || 0;
+                    setExtraProcedures(updated);
+                  }}
+                />
+                <Button type="button" size="icon" variant="ghost" className="h-6 w-6" onClick={() => setExtraProcedures(extraProcedures.filter((_, i) => i !== idx))}>
+                  <X className="w-3 h-3" />
+                </Button>
+              </div>
+            ))}
+            <Popover open={showProcPicker} onOpenChange={setShowProcPicker}>
+              <PopoverTrigger asChild>
+                <Button type="button" variant="outline" size="sm" className="gap-1 text-xs">
+                  <Plus className="w-3 h-3" /> Adicionar Procedimento
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[280px] p-0" align="start">
+                <Command shouldFilter={false}>
+                  <CommandInput placeholder="Buscar procedimento..." value={procSearch} onValueChange={setProcSearch} />
+                  <CommandList>
+                    <CommandEmpty>Nenhum procedimento encontrado</CommandEmpty>
+                    <CommandGroup>
+                      {filteredProcs.map((p: any) => (
+                        <CommandItem key={p.id} onSelect={() => addExtraProcedure(p)} className="flex justify-between">
+                          <span>{p.name}</span>
+                          <span className="text-xs text-muted-foreground">R$ {Number(p.price).toFixed(2)}</span>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Grand Total */}
+          {(saleItems.length > 0 || extraProcedures.length > 0) && (
+            <div className="flex justify-between items-center p-3 bg-primary/5 rounded-lg border border-primary/20">
+              <span className="text-sm font-medium">Total Geral</span>
+              <span className="text-lg font-bold text-primary">R$ {grandTotal.toFixed(2)}</span>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Forma de Pagamento</Label>
