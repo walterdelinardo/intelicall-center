@@ -406,6 +406,38 @@ const EstoqueModule = () => {
         </CardContent>
       </Card>
 
+      {/* Entry Dialog */}
+      <Dialog open={entryOpen} onOpenChange={(o) => { if (!o) { setEntryOpen(false); setEntryItem(null); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Entrada de Estoque</DialogTitle></DialogHeader>
+          {entryItem && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Item: <span className="font-medium text-foreground">{entryItem.name}</span>
+                <br />Estoque atual: <span className="font-medium">{entryItem.quantity} {entryItem.unit}</span>
+              </p>
+              <div className="space-y-2">
+                <Label>Quantidade de Entrada</Label>
+                <Input type="number" step="0.01" value={entryQty} onChange={(e) => setEntryQty(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Custo Unitário (R$)</Label>
+                <Input type="number" min="0" step="0.01" value={entryCost} onChange={(e) => setEntryCost(e.target.value)} />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Total da despesa: R$ {((parseFloat(entryQty) || 0) * (parseFloat(entryCost) || 0)).toFixed(2)}
+              </p>
+              <div className="flex justify-end gap-3">
+                <Button variant="outline" onClick={() => setEntryOpen(false)}>Cancelar</Button>
+                <Button onClick={() => entryMutation.mutate()} disabled={entryMutation.isPending} className="bg-gradient-primary">
+                  {entryMutation.isPending ? "Processando..." : "Confirmar Entrada"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Exit Dialog */}
       <Dialog open={exitOpen} onOpenChange={(o) => { if (!o) { setExitOpen(false); setExitItem(null); } }}>
         <DialogContent className="max-w-sm">
