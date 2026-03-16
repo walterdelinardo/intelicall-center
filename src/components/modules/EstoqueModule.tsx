@@ -204,7 +204,15 @@ const EstoqueModule = () => {
     setExitItem(item);
     setExitQty("1");
     setExitType("uso_interno");
+    setExitSalePrice(String(item.sale_price || 0));
     setExitOpen(true);
+  };
+
+  const openEntry = (item: any) => {
+    setEntryItem(item);
+    setEntryQty("1");
+    setEntryCost(String(item.cost_price || 0));
+    setEntryOpen(true);
   };
 
   const closeDialog = () => {
