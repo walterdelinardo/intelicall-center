@@ -12,6 +12,7 @@ import EstoqueModule from "@/components/modules/EstoqueModule";
 import LeadsModule from "@/components/modules/LeadsModule";
 import UsuariosModule from "@/components/modules/UsuariosModule";
 import ConfiguracoesModule from "@/components/modules/ConfiguracoesModule";
+import ListaEsperaModule from "@/components/modules/ListaEsperaModule";
 
 const modules: Record<string, React.ComponentType> = {
   dashboard: DashboardHome,
@@ -25,6 +26,7 @@ const modules: Record<string, React.ComponentType> = {
   leads: LeadsModule,
   usuarios: UsuariosModule,
   configuracoes: ConfiguracoesModule,
+  "lista-espera": ListaEsperaModule,
 };
 
 const Dashboard = () => {

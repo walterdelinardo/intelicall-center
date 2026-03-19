@@ -22,6 +22,7 @@ const mainMenuItems = [
   { id: "conversas", label: "Conversas", icon: MessageSquare, roles: [] },
   { id: "prontuarios", label: "Prontuários", icon: FileText, roles: ["admin", "podologo"] },
   { id: "procedimentos", label: "Procedimentos", icon: ClipboardList, roles: [] },
+  { id: "lista-espera", label: "Lista de Espera", icon: Clock, roles: [] },
 ];
 
 const financeMenuItems = [
