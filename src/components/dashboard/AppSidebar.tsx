@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Calendar, Users, MessageSquare, FileText,
   DollarSign, Package, TrendingUp, Settings, LogOut, Footprints,
-  ClipboardList, UserCog
+  ClipboardList, UserCog, Clock
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent,
