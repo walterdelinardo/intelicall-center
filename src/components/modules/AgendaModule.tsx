@@ -101,6 +101,8 @@ const AgendaModule = () => {
   const [cancelReason, setCancelReason] = useState("");
   const [eventToDelete, setEventToDelete] = useState<MergedEvent | null>(null);
   const [editEnabled, setEditEnabled] = useState(false);
+  const [waitingSuggestions, setWaitingSuggestions] = useState<any[]>([]);
+  const [showWaitingSuggestions, setShowWaitingSuggestions] = useState(false);
   const [editForm, setEditForm] = useState({
     title: "", description: "", date: "", startTime: "", endTime: "",
     clientName: "", clientWhatsapp: "", clientEmail: "", clientOrigin: "",
