@@ -17,7 +17,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar, Plus, ChevronLeft, ChevronRight, Clock, Globe, Pencil, Trash2, Search, UserPlus, User, Phone, DollarSign, RefreshCw, Mail, Eye, XCircle, Lock, Unlock, CalendarDays, Receipt, X, ShoppingCart, Stethoscope } from "lucide-react";
+import { Calendar, Plus, ChevronLeft, ChevronRight, Clock, Globe, Pencil, Trash2, Search, UserPlus, User, Phone, DollarSign, RefreshCw, Mail, Eye, XCircle, Lock, Unlock, CalendarDays, Receipt, X, ShoppingCart, Stethoscope, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import { format, addDays, addMonths, subMonths, startOfWeek, endOfWeek, eachDayOfInterval, isToday, isSameDay, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -101,6 +101,8 @@ const AgendaModule = () => {
   const [cancelReason, setCancelReason] = useState("");
   const [eventToDelete, setEventToDelete] = useState<MergedEvent | null>(null);
   const [editEnabled, setEditEnabled] = useState(false);
+  const [waitingSuggestions, setWaitingSuggestions] = useState<any[]>([]);
+  const [showWaitingSuggestions, setShowWaitingSuggestions] = useState(false);
   const [editForm, setEditForm] = useState({
     title: "", description: "", date: "", startTime: "", endTime: "",
     clientName: "", clientWhatsapp: "", clientEmail: "", clientOrigin: "",
@@ -464,6 +466,41 @@ const AgendaModule = () => {
       }
       queryClient.invalidateQueries({ queryKey: ["financial-daily"] });
       queryClient.invalidateQueries({ queryKey: ["financial-monthly"] });
+
+      // Check waiting list for compatible patients
+      try {
+        const { data: waitingItems } = await supabase
+          .from("waiting_list")
+          .select("*, clients(name, whatsapp, phone), procedures(name), profiles(full_name)")
+          .eq("clinic_id", profile.clinic_id)
+          .in("status", ["aguardando", "notificado"])
+          .order("created_at", { ascending: true });
+
+        if (waitingItems && waitingItems.length > 0) {
+          const cancelDate = eventToDelete.date;
+          const compatible = waitingItems.filter((w: any) => {
+            if (w.desired_date && w.desired_date !== cancelDate) {
+              if (w.flexibility === "mesmo_dia") return false;
+            }
+            return true;
+          });
+
+          const priorityOrder: Record<string, number> = { urgencia: 0, alta: 1, normal: 2, baixa: 3 };
+          compatible.sort((a: any, b: any) => {
+            const pa = priorityOrder[a.priority] ?? 2;
+            const pb = priorityOrder[b.priority] ?? 2;
+            if (pa !== pb) return pa - pb;
+            return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          });
+
+          if (compatible.length > 0) {
+            setWaitingSuggestions(compatible.slice(0, 10));
+            setShowWaitingSuggestions(true);
+          }
+        }
+      } catch (err) {
+        console.error("Error checking waiting list:", err);
+      }
     }
     setEditLoading(false);
     if (success) {
@@ -1235,6 +1272,72 @@ const AgendaModule = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Waiting List Suggestions Dialog */}
+      <Dialog open={showWaitingSuggestions} onOpenChange={setShowWaitingSuggestions}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-primary" />
+              Pacientes na Lista de Espera
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">Uma vaga foi liberada. Os seguintes pacientes da lista de espera podem ser compatíveis:</p>
+          <div className="space-y-2 mt-2">
+            {waitingSuggestions.map((w: any) => (
+              <div key={w.id} className="flex items-center justify-between border border-border rounded-lg p-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">{w.client_name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {w.procedures?.name || "Procedimento não especificado"}
+                    {w.desired_date ? ` • ${w.desired_date}` : ""}
+                    {w.time_range_start ? ` • ${w.time_range_start.slice(0,5)}–${w.time_range_end?.slice(0,5)}` : ""}
+                  </p>
+                  <Badge variant="outline" className={
+                    w.priority === "urgencia" ? "bg-red-100 text-red-700 border-red-300" :
+                    w.priority === "alta" ? "bg-orange-100 text-orange-700 border-orange-300" :
+                    w.priority === "normal" ? "bg-blue-100 text-blue-700 border-blue-300" :
+                    "bg-muted text-muted-foreground border-border"
+                  }>
+                    {w.priority === "urgencia" ? "Urgência" : w.priority === "alta" ? "Alta" : w.priority === "normal" ? "Normal" : "Baixa"}
+                  </Badge>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1 shrink-0 ml-2"
+                  onClick={async () => {
+                    const phone = w.client_phone || w.clients?.whatsapp || w.clients?.phone;
+                    if (!phone) { toast.error("Paciente sem telefone"); return; }
+                    const procName = w.procedures?.name || "consulta";
+                    const msg = `Olá ${w.client_name}! Surgiu uma vaga para ${procName}. Deseja agendar? Responda SIM para confirmar.`;
+                    try {
+                      await supabase.functions.invoke("send-whatsapp", { body: { phoneNumber: phone, message: msg } });
+                      await supabase.from("waiting_list").update({ status: "notificado", notified_at: new Date().toISOString() }).eq("id", w.id);
+                      if (profile?.clinic_id) {
+                        await supabase.from("waiting_list_history").insert({
+                          waiting_list_id: w.id, clinic_id: profile.clinic_id,
+                          action: "notificado", details: `Notificado via WhatsApp após cancelamento`, performed_by: profile?.id,
+                        });
+                      }
+                      toast.success(`Notificação enviada para ${w.client_name}`);
+                      setWaitingSuggestions(prev => prev.map(p => p.id === w.id ? { ...p, status: "notificado" } : p));
+                    } catch (err: any) {
+                      toast.error("Erro ao enviar: " + err.message);
+                    }
+                  }}
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  Notificar
+                </Button>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-end pt-2">
+            <Button variant="outline" onClick={() => setShowWaitingSuggestions(false)}>Fechar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation (legacy) */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

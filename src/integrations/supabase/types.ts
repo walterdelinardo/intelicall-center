@@ -1033,6 +1033,150 @@ export type Database = {
           },
         ]
       }
+      waiting_list: {
+        Row: {
+          client_id: string | null
+          client_name: string
+          client_phone: string | null
+          clinic_id: string
+          created_at: string
+          desired_date: string | null
+          flexibility: string | null
+          id: string
+          notes: string | null
+          notified_at: string | null
+          origin: string | null
+          priority: string
+          procedure_id: string | null
+          professional_id: string | null
+          status: string
+          time_range_end: string | null
+          time_range_start: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id?: string | null
+          client_name: string
+          client_phone?: string | null
+          clinic_id: string
+          created_at?: string
+          desired_date?: string | null
+          flexibility?: string | null
+          id?: string
+          notes?: string | null
+          notified_at?: string | null
+          origin?: string | null
+          priority?: string
+          procedure_id?: string | null
+          professional_id?: string | null
+          status?: string
+          time_range_end?: string | null
+          time_range_start?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string | null
+          client_name?: string
+          client_phone?: string | null
+          clinic_id?: string
+          created_at?: string
+          desired_date?: string | null
+          flexibility?: string | null
+          id?: string
+          notes?: string | null
+          notified_at?: string | null
+          origin?: string | null
+          priority?: string
+          procedure_id?: string | null
+          professional_id?: string | null
+          status?: string
+          time_range_end?: string | null
+          time_range_start?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "waiting_list_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "waiting_list_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "waiting_list_procedure_id_fkey"
+            columns: ["procedure_id"]
+            isOneToOne: false
+            referencedRelation: "procedures"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "waiting_list_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      waiting_list_history: {
+        Row: {
+          action: string
+          clinic_id: string
+          created_at: string
+          details: string | null
+          id: string
+          performed_by: string | null
+          waiting_list_id: string
+        }
+        Insert: {
+          action: string
+          clinic_id: string
+          created_at?: string
+          details?: string | null
+          id?: string
+          performed_by?: string | null
+          waiting_list_id: string
+        }
+        Update: {
+          action?: string
+          clinic_id?: string
+          created_at?: string
+          details?: string | null
+          id?: string
+          performed_by?: string | null
+          waiting_list_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "waiting_list_history_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "waiting_list_history_performed_by_fkey"
+            columns: ["performed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "waiting_list_history_waiting_list_id_fkey"
+            columns: ["waiting_list_id"]
+            isOneToOne: false
+            referencedRelation: "waiting_list"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       webhook_logs: {
         Row: {
           base64_length: number | null

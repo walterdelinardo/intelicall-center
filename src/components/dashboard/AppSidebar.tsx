@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Calendar, Users, MessageSquare, FileText,
   DollarSign, Package, TrendingUp, Settings, LogOut, Footprints,
-  ClipboardList, UserCog
+  ClipboardList, UserCog, Clock
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent,
@@ -22,6 +22,7 @@ const mainMenuItems = [
   { id: "conversas", label: "Conversas", icon: MessageSquare, roles: [] },
   { id: "prontuarios", label: "Prontuários", icon: FileText, roles: ["admin", "podologo"] },
   { id: "procedimentos", label: "Procedimentos", icon: ClipboardList, roles: [] },
+  { id: "lista-espera", label: "Lista de Espera", icon: Clock, roles: [] },
 ];
 
 const financeMenuItems = [
