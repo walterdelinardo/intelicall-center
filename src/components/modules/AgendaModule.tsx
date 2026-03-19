@@ -1273,6 +1273,72 @@ const AgendaModule = () => {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Waiting List Suggestions Dialog */}
+      <Dialog open={showWaitingSuggestions} onOpenChange={setShowWaitingSuggestions}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-primary" />
+              Pacientes na Lista de Espera
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">Uma vaga foi liberada. Os seguintes pacientes da lista de espera podem ser compatíveis:</p>
+          <div className="space-y-2 mt-2">
+            {waitingSuggestions.map((w: any) => (
+              <div key={w.id} className="flex items-center justify-between border border-border rounded-lg p-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">{w.client_name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {w.procedures?.name || "Procedimento não especificado"}
+                    {w.desired_date ? ` • ${w.desired_date}` : ""}
+                    {w.time_range_start ? ` • ${w.time_range_start.slice(0,5)}–${w.time_range_end?.slice(0,5)}` : ""}
+                  </p>
+                  <Badge variant="outline" className={
+                    w.priority === "urgencia" ? "bg-red-100 text-red-700 border-red-300" :
+                    w.priority === "alta" ? "bg-orange-100 text-orange-700 border-orange-300" :
+                    w.priority === "normal" ? "bg-blue-100 text-blue-700 border-blue-300" :
+                    "bg-muted text-muted-foreground border-border"
+                  }>
+                    {w.priority === "urgencia" ? "Urgência" : w.priority === "alta" ? "Alta" : w.priority === "normal" ? "Normal" : "Baixa"}
+                  </Badge>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1 shrink-0 ml-2"
+                  onClick={async () => {
+                    const phone = w.client_phone || w.clients?.whatsapp || w.clients?.phone;
+                    if (!phone) { toast.error("Paciente sem telefone"); return; }
+                    const procName = w.procedures?.name || "consulta";
+                    const msg = `Olá ${w.client_name}! Surgiu uma vaga para ${procName}. Deseja agendar? Responda SIM para confirmar.`;
+                    try {
+                      await supabase.functions.invoke("send-whatsapp", { body: { phoneNumber: phone, message: msg } });
+                      await supabase.from("waiting_list").update({ status: "notificado", notified_at: new Date().toISOString() }).eq("id", w.id);
+                      if (profile?.clinic_id) {
+                        await supabase.from("waiting_list_history").insert({
+                          waiting_list_id: w.id, clinic_id: profile.clinic_id,
+                          action: "notificado", details: `Notificado via WhatsApp após cancelamento`, performed_by: profile?.id,
+                        });
+                      }
+                      toast.success(`Notificação enviada para ${w.client_name}`);
+                      setWaitingSuggestions(prev => prev.map(p => p.id === w.id ? { ...p, status: "notificado" } : p));
+                    } catch (err: any) {
+                      toast.error("Erro ao enviar: " + err.message);
+                    }
+                  }}
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  Notificar
+                </Button>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-end pt-2">
+            <Button variant="outline" onClick={() => setShowWaitingSuggestions(false)}>Fechar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Delete Confirmation (legacy) */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
