@@ -466,6 +466,41 @@ const AgendaModule = () => {
       }
       queryClient.invalidateQueries({ queryKey: ["financial-daily"] });
       queryClient.invalidateQueries({ queryKey: ["financial-monthly"] });
+
+      // Check waiting list for compatible patients
+      try {
+        const { data: waitingItems } = await supabase
+          .from("waiting_list")
+          .select("*, clients(name, whatsapp, phone), procedures(name), profiles(full_name)")
+          .eq("clinic_id", profile.clinic_id)
+          .in("status", ["aguardando", "notificado"])
+          .order("created_at", { ascending: true });
+
+        if (waitingItems && waitingItems.length > 0) {
+          const cancelDate = eventToDelete.date;
+          const compatible = waitingItems.filter((w: any) => {
+            if (w.desired_date && w.desired_date !== cancelDate) {
+              if (w.flexibility === "mesmo_dia") return false;
+            }
+            return true;
+          });
+
+          const priorityOrder: Record<string, number> = { urgencia: 0, alta: 1, normal: 2, baixa: 3 };
+          compatible.sort((a: any, b: any) => {
+            const pa = priorityOrder[a.priority] ?? 2;
+            const pb = priorityOrder[b.priority] ?? 2;
+            if (pa !== pb) return pa - pb;
+            return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          });
+
+          if (compatible.length > 0) {
+            setWaitingSuggestions(compatible.slice(0, 10));
+            setShowWaitingSuggestions(true);
+          }
+        }
+      } catch (err) {
+        console.error("Error checking waiting list:", err);
+      }
     }
     setEditLoading(false);
     if (success) {
