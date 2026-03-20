@@ -1787,7 +1787,7 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
             start_time: event?.time ? event.time + ":00" : "00:00:00",
             duration_minutes: 30,
             estimated_price: proc.price,
-            status: "compareceu",
+            status: "confirmado",
             notes: `Procedimento adicional faturado: ${proc.name}`,
           });
         }
