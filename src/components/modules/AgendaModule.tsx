@@ -1800,7 +1800,7 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
         type: form.type,
         category: form.category,
         description: form.description,
-        amount: grandTotal,
+        amount: baseAmount,
         payment_method: form.payment_method,
         status: form.status,
         date: form.date,
