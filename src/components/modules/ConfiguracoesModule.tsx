@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { useWhatsAppInboxes } from "@/hooks/useWhatsApp";
 import { useGoogleOAuth } from "@/hooks/useGoogleOAuth";
 import { GoogleOAuthConfigDialog } from "@/components/modules/GoogleOAuthConfigDialog";
+import { GoogleMapsConfigDialog } from "@/components/modules/GoogleMapsConfigDialog";
 
 const DAYS = [
   { key: "mon", label: "Segunda-feira" },
