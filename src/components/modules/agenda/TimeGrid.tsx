@@ -144,6 +144,20 @@ export const TimeGrid = ({ events, selectedDate, onSlotClick, onEventClick, onSt
         })}
 
         {/* Events overlay */}
+        {/* Current time indicator */}
+        {showNowLine && nowTop > 0 && nowTop < (totalMinutes / 30) * SLOT_HEIGHT && (
+          <div
+            className="absolute left-0 right-0 z-20 pointer-events-none flex items-center"
+            style={{ top: `${nowTop}px` }}
+          >
+            <div className="w-16 flex items-center justify-end pr-1">
+              <span className="text-[10px] font-semibold text-destructive">{nowTime}</span>
+            </div>
+            <div className="h-0.5 bg-destructive flex-1 relative">
+              <div className="absolute -left-1 -top-[3px] w-2 h-2 rounded-full bg-destructive" />
+            </div>
+          </div>
+        )}
         {events.map((evt) => {
           const evtMinutes = timeToMinutes(evt.time);
           const durationMin = parseDuration(evt.duration);
