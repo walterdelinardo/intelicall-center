@@ -38,7 +38,6 @@ const ChatTab = () => {
     clearPendingChat();
   }, [pendingChatPhone, conversations, convsLoading, clearPendingChat]);
 
-  const selectedConv = conversations.find(c => c.id === selectedConvId) || null;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-120px)]">
