@@ -52,6 +52,7 @@ export interface WhatsAppMessage {
   status: string;
   timestamp: string;
   created_at: string;
+  is_internal_note: boolean;
 }
 
 export const useWhatsAppInboxes = (activeOnly = false) => {
