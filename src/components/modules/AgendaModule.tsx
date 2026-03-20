@@ -1571,6 +1571,8 @@ const AgendaModule = () => {
         clinicId={profile?.clinic_id || ""}
       />
     </div>
+      </TabsContent>
+    </Tabs>
   );
 };
 
