@@ -1749,7 +1749,7 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
             start_time: event.time + ":00",
             duration_minutes: durationMin,
             estimated_price: parseFloat(form.amount) || null,
-            status: "compareceu",
+            status: "confirmado",
             notes: `Faturado via Google Calendar: ${event.title}`,
           })
           .select("id")
