@@ -57,6 +57,7 @@ const emptyForm = {
 };
 
 const ListaEsperaModule = () => {
+  const { profile } = useAuth();
   const { openChatWithPhone } = useDashboard();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
