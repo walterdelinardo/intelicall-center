@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,20 +15,22 @@ import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   FileText, Plus, Search, Eye, Calendar, User, Footprints,
-  Package, Camera, Trash2, Upload, X, Clock, Edit
+  Trash2, Upload, X, Edit, ArrowLeft, ClipboardList, FileUp,
+  Brain, Loader2, Sparkles, ScrollText
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+
+type ViewMode = "list" | "create" | "edit" | "view";
 
 const ProntuariosModule = () => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [viewRecordId, setViewRecordId] = useState<string | null>(null);
-  const [editRecordId, setEditRecordId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [activeRecordId, setActiveRecordId] = useState<string | null>(null);
   const [deleteRecordId, setDeleteRecordId] = useState<string | null>(null);
 
   const { data: clients = [] } = useQuery({
@@ -80,6 +81,35 @@ const ProntuariosModule = () => {
     (r.chief_complaint || "").toLowerCase().includes(search.toLowerCase())
   );
 
+  const goToCreate = () => { setActiveRecordId(null); setViewMode("create"); };
+  const goToEdit = (id: string) => { setActiveRecordId(id); setViewMode("edit"); };
+  const goToView = (id: string) => { setActiveRecordId(id); setViewMode("view"); };
+  const goToList = () => { setActiveRecordId(null); setViewMode("list"); };
+
+  // Inline form/view
+  if (viewMode === "create" || viewMode === "edit") {
+    return (
+      <RecordFormInline
+        clinicId={profile?.clinic_id || ""}
+        userId={profile?.id || ""}
+        clients={clients}
+        editRecordId={viewMode === "edit" ? activeRecordId : null}
+        onBack={goToList}
+      />
+    );
+  }
+
+  if (viewMode === "view" && activeRecordId) {
+    return (
+      <ViewRecordInline
+        recordId={activeRecordId}
+        clinicId={profile?.clinic_id || ""}
+        onBack={goToList}
+        onEdit={() => goToEdit(activeRecordId)}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header stats */}
@@ -105,7 +135,7 @@ const ProntuariosModule = () => {
         <Card className="shadow-card">
           <CardContent className="pt-4 pb-4">
             <p className="text-sm text-muted-foreground">Pacientes Atendidos</p>
-            <p className="text-2xl font-bold text-success">
+            <p className="text-2xl font-bold text-emerald-600">
               {new Set(records.map(r => r.client_id)).size}
             </p>
           </CardContent>
@@ -131,7 +161,7 @@ const ProntuariosModule = () => {
             </SelectContent>
           </Select>
         </div>
-        <Button className="bg-gradient-primary gap-2 shadow-card" onClick={() => setIsCreateOpen(true)}>
+        <Button className="bg-gradient-primary gap-2 shadow-card" onClick={goToCreate}>
           <Plus className="w-4 h-4" /> Novo Prontuário
         </Button>
       </div>
@@ -158,7 +188,7 @@ const ProntuariosModule = () => {
               </TableHeader>
               <TableBody>
                 {filtered.map((rec) => (
-                  <TableRow key={rec.id}>
+                  <TableRow key={rec.id} className="cursor-pointer" onClick={() => goToView(rec.id)}>
                     <TableCell className="whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4 text-muted-foreground" />
@@ -171,11 +201,11 @@ const ProntuariosModule = () => {
                     </TableCell>
                     <TableCell className="hidden lg:table-cell">{rec.profiles?.full_name || "—"}</TableCell>
                     <TableCell>
-                      <div className="flex gap-1">
-                        <Button size="icon" variant="ghost" onClick={() => setViewRecordId(rec.id)}>
+                      <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                        <Button size="icon" variant="ghost" onClick={() => goToView(rec.id)}>
                           <Eye className="w-4 h-4" />
                         </Button>
-                        <Button size="icon" variant="ghost" onClick={() => setEditRecordId(rec.id)}>
+                        <Button size="icon" variant="ghost" onClick={() => goToEdit(rec.id)}>
                           <Edit className="w-4 h-4 text-primary" />
                         </Button>
                         <Button size="icon" variant="ghost" onClick={() => setDeleteRecordId(rec.id)}>
@@ -191,43 +221,13 @@ const ProntuariosModule = () => {
         </CardContent>
       </Card>
 
-      {/* Create dialog */}
-      <RecordFormDialog
-        open={isCreateOpen}
-        onOpenChange={setIsCreateOpen}
-        clients={clients}
-        clinicId={profile?.clinic_id || ""}
-        userId={profile?.id || ""}
-      />
-
-      {/* Edit dialog */}
-      {editRecordId && (
-        <RecordFormDialog
-          open={!!editRecordId}
-          onOpenChange={(o) => !o && setEditRecordId(null)}
-          clients={clients}
-          clinicId={profile?.clinic_id || ""}
-          userId={profile?.id || ""}
-          editRecordId={editRecordId}
-        />
-      )}
-
-      {/* View dialog */}
-      {viewRecordId && (
-        <ViewRecordDialog
-          recordId={viewRecordId}
-          open={!!viewRecordId}
-          onOpenChange={(o) => !o && setViewRecordId(null)}
-        />
-      )}
-
       {/* Delete confirmation */}
       <AlertDialog open={!!deleteRecordId} onOpenChange={(o) => !o && setDeleteRecordId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir Prontuário</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir este prontuário? Esta ação não pode ser desfeita. Todos os dados relacionados (avaliações, produtos e fotos) serão removidos.
+              Tem certeza que deseja excluir este prontuário? Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -245,10 +245,10 @@ const ProntuariosModule = () => {
   );
 };
 
-// ===================== RECORD FORM DIALOG (CREATE + EDIT) =====================
-function RecordFormDialog({ open, onOpenChange, clients, clinicId, userId, editRecordId }: {
-  open: boolean; onOpenChange: (o: boolean) => void;
-  clients: any[]; clinicId: string; userId: string; editRecordId?: string;
+// ===================== RECORD FORM INLINE (CREATE + EDIT) =====================
+function RecordFormInline({ clinicId, userId, clients, editRecordId, onBack }: {
+  clinicId: string; userId: string; clients: any[];
+  editRecordId: string | null; onBack: () => void;
 }) {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState("clinical");
@@ -260,27 +260,23 @@ function RecordFormDialog({ open, onOpenChange, clients, clinicId, userId, editR
   const emptyFoot = { nail_condition: "", skin_condition: "", deformities: "", sensitivity: "", circulation: "", pain_level: "", observations: "" };
   const [leftFoot, setLeftFoot] = useState({ ...emptyFoot });
   const [rightFoot, setRightFoot] = useState({ ...emptyFoot });
-  const [products, setProducts] = useState<{ product_name: string; quantity: string; notes: string }[]>([]);
-  const [photos, setPhotos] = useState<{ file: File; description: string; photo_type: string }[]>([]);
+  const [documents, setDocuments] = useState<{ file: File; title: string }[]>([]);
   const [loaded, setLoaded] = useState(false);
 
-  // Load existing record for editing
   const { data: existingRecord } = useQuery({
     queryKey: ["medical-record-edit", editRecordId],
     queryFn: async () => {
       if (!editRecordId) return null;
-      const [recRes, footRes, prodRes] = await Promise.all([
+      const [recRes, footRes] = await Promise.all([
         supabase.from("medical_records").select("*").eq("id", editRecordId).single(),
         supabase.from("foot_assessments").select("*").eq("record_id", editRecordId),
-        supabase.from("record_products").select("*").eq("record_id", editRecordId),
       ]);
       if (recRes.error) throw recRes.error;
-      return { record: recRes.data, feet: footRes.data || [], products: prodRes.data || [] };
+      return { record: recRes.data, feet: footRes.data || [] };
     },
     enabled: !!editRecordId,
   });
 
-  // Populate form when editing
   if (existingRecord && !loaded) {
     const r = existingRecord.record;
     setForm({
@@ -293,46 +289,26 @@ function RecordFormDialog({ open, onOpenChange, clients, clinicId, userId, editR
     const right = existingRecord.feet.find((f: any) => f.foot === "right");
     if (left) setLeftFoot({ nail_condition: left.nail_condition || "", skin_condition: left.skin_condition || "", deformities: left.deformities || "", sensitivity: left.sensitivity || "", circulation: left.circulation || "", pain_level: left.pain_level != null ? String(left.pain_level) : "", observations: left.observations || "" });
     if (right) setRightFoot({ nail_condition: right.nail_condition || "", skin_condition: right.skin_condition || "", deformities: right.deformities || "", sensitivity: right.sensitivity || "", circulation: right.circulation || "", pain_level: right.pain_level != null ? String(right.pain_level) : "", observations: right.observations || "" });
-    setProducts(existingRecord.products.map((p: any) => ({ product_name: p.product_name, quantity: p.quantity || "", notes: p.notes || "" })));
     setLoaded(true);
   }
-
-  const resetAll = () => {
-    setForm({ client_id: "", date: format(new Date(), "yyyy-MM-dd"), chief_complaint: "", clinical_notes: "", diagnosis: "", treatment_performed: "", recommendations: "" });
-    setLeftFoot({ ...emptyFoot });
-    setRightFoot({ ...emptyFoot });
-    setProducts([]);
-    setPhotos([]);
-    setTab("clinical");
-    setLoaded(false);
-  };
 
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!clinicId || !form.client_id) throw new Error("Selecione um paciente");
 
       const recordData = {
-        clinic_id: clinicId,
-        client_id: form.client_id,
-        professional_id: userId,
-        date: form.date,
-        chief_complaint: form.chief_complaint || null,
-        clinical_notes: form.clinical_notes || null,
-        diagnosis: form.diagnosis || null,
-        treatment_performed: form.treatment_performed || null,
-        recommendations: form.recommendations || null,
+        clinic_id: clinicId, client_id: form.client_id, professional_id: userId,
+        date: form.date, chief_complaint: form.chief_complaint || null,
+        clinical_notes: form.clinical_notes || null, diagnosis: form.diagnosis || null,
+        treatment_performed: form.treatment_performed || null, recommendations: form.recommendations || null,
       };
 
       let recordId: string;
-
       if (editRecordId) {
         const { error } = await supabase.from("medical_records").update(recordData).eq("id", editRecordId);
         if (error) throw error;
         recordId = editRecordId;
-
-        // Replace foot assessments and products
         await supabase.from("foot_assessments").delete().eq("record_id", recordId);
-        await supabase.from("record_products").delete().eq("record_id", recordId);
       } else {
         const { data: record, error } = await supabase.from("medical_records").insert(recordData).select("id").single();
         if (error) throw error;
@@ -357,51 +333,34 @@ function RecordFormDialog({ open, onOpenChange, clients, clinicId, userId, editR
         if (footErr) throw footErr;
       }
 
-      // Products
-      if (products.length > 0) {
-        const { error: prodErr } = await supabase.from("record_products").insert(
-          products.map(p => ({ record_id: recordId, product_name: p.product_name, quantity: p.quantity || null, notes: p.notes || null }))
-        );
-        if (prodErr) throw prodErr;
-      }
-
-      // Photos (only new uploads)
-      for (const photo of photos) {
-        const filePath = `${clinicId}/${recordId}/${Date.now()}_${photo.file.name}`;
-        const { error: upErr } = await supabase.storage.from("record-photos").upload(filePath, photo.file);
+      // Upload new documents
+      for (const doc of documents) {
+        const filePath = `${clinicId}/${recordId}/${Date.now()}_${doc.file.name}`;
+        const { error: upErr } = await supabase.storage.from("record-photos").upload(filePath, doc.file);
         if (upErr) throw upErr;
         const { data: urlData } = supabase.storage.from("record-photos").getPublicUrl(filePath);
-        await supabase.from("record_photos").insert({
-          record_id: recordId, photo_url: urlData.publicUrl,
-          description: photo.description || null, photo_type: photo.photo_type,
+        const fileType = doc.file.type.startsWith("image/") ? "image" : "document";
+        await supabase.from("record_documents").insert({
+          record_id: recordId, clinic_id: clinicId,
+          file_url: urlData.publicUrl, title: doc.title || doc.file.name,
+          file_type: fileType,
         });
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["medical-records"] });
-      queryClient.invalidateQueries({ queryKey: ["medical-record"] });
-      toast.success(editRecordId ? "Prontuário atualizado!" : "Prontuário salvo com sucesso!");
-      onOpenChange(false);
-      resetAll();
+      toast.success(editRecordId ? "Prontuário atualizado!" : "Prontuário salvo!");
+      onBack();
     },
     onError: (e: any) => toast.error(e.message),
   });
 
-  const addProduct = () => setProducts([...products, { product_name: "", quantity: "", notes: "" }]);
-  const removeProduct = (i: number) => setProducts(products.filter((_, idx) => idx !== i));
-  const updateProduct = (i: number, field: string, value: string) => {
-    const updated = [...products];
-    (updated[i] as any)[field] = value;
-    setProducts(updated);
-  };
-
-  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDocSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      const newPhotos = Array.from(e.target.files).map(file => ({ file, description: "", photo_type: "during" }));
-      setPhotos([...photos, ...newPhotos]);
+      const newDocs = Array.from(e.target.files).map(file => ({ file, title: file.name.replace(/\.[^/.]+$/, "") }));
+      setDocuments([...documents, ...newDocs]);
     }
   };
-  const removePhoto = (i: number) => setPhotos(photos.filter((_, idx) => idx !== i));
 
   const FootForm = ({ data, setData, label }: { data: typeof leftFoot; setData: (d: typeof leftFoot) => void; label: string }) => (
     <div className="space-y-3">
@@ -442,143 +401,127 @@ function RecordFormDialog({ open, onOpenChange, clients, clinicId, userId, editR
   );
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) resetAll(); onOpenChange(o); }}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileText className="w-5 h-5 text-primary" /> {editRecordId ? "Editar Prontuário" : "Novo Prontuário"}
-          </DialogTitle>
-        </DialogHeader>
+    <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="icon" onClick={onBack}>
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
+        <h2 className="text-xl font-semibold flex items-center gap-2">
+          <FileText className="w-5 h-5 text-primary" />
+          {editRecordId ? "Editar Prontuário" : "Novo Prontuário"}
+        </h2>
+      </div>
 
-        <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="w-full grid grid-cols-4">
-            <TabsTrigger value="clinical">Ficha Clínica</TabsTrigger>
-            <TabsTrigger value="feet">Avaliação Pés</TabsTrigger>
-            <TabsTrigger value="products">Produtos</TabsTrigger>
-            <TabsTrigger value="photos">Fotos</TabsTrigger>
-          </TabsList>
+      <Card className="shadow-card">
+        <CardContent className="pt-6">
+          <Tabs value={tab} onValueChange={setTab}>
+            <TabsList className="w-full grid grid-cols-3">
+              <TabsTrigger value="clinical">Ficha Clínica</TabsTrigger>
+              <TabsTrigger value="feet">Avaliação Pés</TabsTrigger>
+              <TabsTrigger value="documents">Documentos</TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="clinical" className="space-y-4 mt-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Paciente *</Label>
-                <Select value={form.client_id} onValueChange={(v) => setForm({ ...form, client_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent>
-                    {clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Data *</Label>
-                <Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Queixa Principal</Label>
-              <Textarea value={form.chief_complaint} onChange={(e) => setForm({ ...form, chief_complaint: e.target.value })} rows={2} placeholder="O que o paciente relata..." />
-            </div>
-            <div className="space-y-2">
-              <Label>Anotações Clínicas</Label>
-              <Textarea value={form.clinical_notes} onChange={(e) => setForm({ ...form, clinical_notes: e.target.value })} rows={3} placeholder="Observações do profissional..." />
-            </div>
-            <div className="space-y-2">
-              <Label>Diagnóstico</Label>
-              <Textarea value={form.diagnosis} onChange={(e) => setForm({ ...form, diagnosis: e.target.value })} rows={2} />
-            </div>
-            <div className="space-y-2">
-              <Label>Tratamento Realizado</Label>
-              <Textarea value={form.treatment_performed} onChange={(e) => setForm({ ...form, treatment_performed: e.target.value })} rows={3} placeholder="Procedimentos executados..." />
-            </div>
-            <div className="space-y-2">
-              <Label>Recomendações</Label>
-              <Textarea value={form.recommendations} onChange={(e) => setForm({ ...form, recommendations: e.target.value })} rows={2} placeholder="Orientações ao paciente..." />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="feet" className="space-y-6 mt-4">
-            <FootForm data={leftFoot} setData={setLeftFoot} label="Pé Esquerdo" />
-            <Separator />
-            <FootForm data={rightFoot} setData={setRightFoot} label="Pé Direito" />
-          </TabsContent>
-
-          <TabsContent value="products" className="space-y-4 mt-4">
-            {products.map((p, i) => (
-              <Card key={i} className="border">
-                <CardContent className="p-3 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">Produto {i + 1}</span>
-                    <Button size="icon" variant="ghost" onClick={() => removeProduct(i)}>
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    <Input placeholder="Nome do produto *" value={p.product_name} onChange={(e) => updateProduct(i, "product_name", e.target.value)} />
-                    <Input placeholder="Quantidade" value={p.quantity} onChange={(e) => updateProduct(i, "quantity", e.target.value)} />
-                    <Input placeholder="Observação" value={p.notes} onChange={(e) => updateProduct(i, "notes", e.target.value)} />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-            <Button variant="outline" className="gap-2" onClick={addProduct}>
-              <Package className="w-4 h-4" /> Adicionar Produto
-            </Button>
-          </TabsContent>
-
-          <TabsContent value="photos" className="space-y-4 mt-4">
-            <div>
-              <Label htmlFor="photo-upload" className="cursor-pointer">
-                <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary transition-colors">
-                  <Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-                  <p className="text-sm text-muted-foreground">Clique para selecionar fotos</p>
-                  <p className="text-xs text-muted-foreground">JPG, PNG — Antes, durante e depois</p>
+            <TabsContent value="clinical" className="space-y-4 mt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Paciente *</Label>
+                  <Select value={form.client_id} onValueChange={(v) => setForm({ ...form, client_id: v })}>
+                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                    <SelectContent>
+                      {clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
-              </Label>
-              <input id="photo-upload" type="file" accept="image/*" multiple className="hidden" onChange={handlePhotoSelect} />
-            </div>
-            {photos.length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {photos.map((p, i) => (
-                  <Card key={i} className="border overflow-hidden">
-                    <div className="relative">
-                      <img src={URL.createObjectURL(p.file)} alt="" className="w-full h-32 object-cover" />
-                      <Button size="icon" variant="destructive" className="absolute top-1 right-1 w-6 h-6" onClick={() => removePhoto(i)}>
-                        <X className="w-3 h-3" />
-                      </Button>
-                    </div>
-                    <CardContent className="p-2 space-y-1">
-                      <Select value={p.photo_type} onValueChange={(v) => { const u = [...photos]; u[i].photo_type = v; setPhotos(u); }}>
-                        <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="before">Antes</SelectItem>
-                          <SelectItem value="during">Durante</SelectItem>
-                          <SelectItem value="after">Depois</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Input className="h-7 text-xs" placeholder="Descrição" value={p.description} onChange={(e) => { const u = [...photos]; u[i].description = e.target.value; setPhotos(u); }} />
-                    </CardContent>
-                  </Card>
-                ))}
+                <div className="space-y-2">
+                  <Label>Data *</Label>
+                  <Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+                </div>
               </div>
-            )}
-          </TabsContent>
-        </Tabs>
+              <div className="space-y-2">
+                <Label>Queixa Principal</Label>
+                <Textarea value={form.chief_complaint} onChange={(e) => setForm({ ...form, chief_complaint: e.target.value })} rows={2} placeholder="O que o paciente relata..." />
+              </div>
+              <div className="space-y-2">
+                <Label>Anotações Clínicas</Label>
+                <Textarea value={form.clinical_notes} onChange={(e) => setForm({ ...form, clinical_notes: e.target.value })} rows={3} placeholder="Observações do profissional..." />
+              </div>
+              <div className="space-y-2">
+                <Label>Diagnóstico</Label>
+                <Textarea value={form.diagnosis} onChange={(e) => setForm({ ...form, diagnosis: e.target.value })} rows={2} />
+              </div>
+              <div className="space-y-2">
+                <Label>Tratamento Realizado</Label>
+                <Textarea value={form.treatment_performed} onChange={(e) => setForm({ ...form, treatment_performed: e.target.value })} rows={3} placeholder="Procedimentos executados..." />
+              </div>
+              <div className="space-y-2">
+                <Label>Recomendações</Label>
+                <Textarea value={form.recommendations} onChange={(e) => setForm({ ...form, recommendations: e.target.value })} rows={2} placeholder="Orientações ao paciente..." />
+              </div>
+            </TabsContent>
 
-        <div className="flex justify-end gap-3 pt-4">
-          <Button variant="outline" onClick={() => { resetAll(); onOpenChange(false); }}>Cancelar</Button>
-          <Button className="bg-gradient-primary" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || !form.client_id}>
-            {saveMutation.isPending ? "Salvando..." : editRecordId ? "Atualizar Prontuário" : "Salvar Prontuário"}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+            <TabsContent value="feet" className="space-y-6 mt-4">
+              <FootForm data={leftFoot} setData={setLeftFoot} label="Pé Esquerdo" />
+              <Separator />
+              <FootForm data={rightFoot} setData={setRightFoot} label="Pé Direito" />
+            </TabsContent>
+
+            <TabsContent value="documents" className="space-y-4 mt-4">
+              <div>
+                <Label htmlFor="doc-upload" className="cursor-pointer">
+                  <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary transition-colors">
+                    <FileUp className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+                    <p className="text-sm text-muted-foreground">Clique para anexar documentos ou imagens</p>
+                    <p className="text-xs text-muted-foreground">JPG, PNG, PDF</p>
+                  </div>
+                </Label>
+                <input id="doc-upload" type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={handleDocSelect} />
+              </div>
+              {documents.length > 0 && (
+                <div className="space-y-3">
+                  {documents.map((d, i) => (
+                    <Card key={i} className="border">
+                      <CardContent className="p-3 flex items-center gap-3">
+                        <FileText className="w-8 h-8 text-primary shrink-0" />
+                        <div className="flex-1">
+                          <Input
+                            value={d.title}
+                            onChange={(e) => {
+                              const u = [...documents]; u[i].title = e.target.value; setDocuments(u);
+                            }}
+                            className="h-8 text-sm"
+                            placeholder="Título do documento"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">{d.file.name} — {(d.file.size / 1024).toFixed(0)} KB</p>
+                        </div>
+                        <Button size="icon" variant="ghost" onClick={() => setDocuments(documents.filter((_, idx) => idx !== i))}>
+                          <X className="w-4 h-4 text-destructive" />
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+
+          <div className="flex justify-end gap-3 pt-6">
+            <Button variant="outline" onClick={onBack}>Cancelar</Button>
+            <Button className="bg-gradient-primary" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || !form.client_id}>
+              {saveMutation.isPending ? "Salvando..." : editRecordId ? "Atualizar Prontuário" : "Salvar Prontuário"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
-// ===================== VIEW RECORD DIALOG =====================
-function ViewRecordDialog({ recordId, open, onOpenChange }: {
-  recordId: string; open: boolean; onOpenChange: (o: boolean) => void;
+// ===================== VIEW RECORD INLINE =====================
+function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
+  recordId: string; clinicId: string; onBack: () => void; onEdit: () => void;
 }) {
+  const queryClient = useQueryClient();
+
   const { data: record } = useQuery({
     queryKey: ["medical-record", recordId],
     queryFn: async () => {
@@ -602,18 +545,41 @@ function ViewRecordDialog({ recordId, open, onOpenChange }: {
     enabled: !!recordId,
   });
 
-  const { data: products = [] } = useQuery({
-    queryKey: ["record-products", recordId],
+  // Patient procedures (from appointments)
+  const { data: procedures = [] } = useQuery({
+    queryKey: ["patient-procedures", record?.client_id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("record_products").select("*").eq("record_id", recordId);
+      if (!record?.client_id || !clinicId) return [];
+      const { data, error } = await supabase
+        .from("appointments")
+        .select("*, procedures(name, price, duration_minutes), profiles(full_name)")
+        .eq("client_id", record.client_id)
+        .eq("clinic_id", clinicId)
+        .order("date", { ascending: false });
       if (error) throw error;
-      return data;
+      return data as any[];
+    },
+    enabled: !!record?.client_id && !!clinicId,
+  });
+
+  // Documents from record_documents
+  const { data: docs = [] } = useQuery({
+    queryKey: ["record-documents", recordId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("record_documents")
+        .select("*")
+        .eq("record_id", recordId)
+        .order("created_at");
+      if (error) throw error;
+      return data as any[];
     },
     enabled: !!recordId,
   });
 
-  const { data: photos = [] } = useQuery({
-    queryKey: ["record-photos", recordId],
+  // Also load legacy photos
+  const { data: legacyPhotos = [] } = useQuery({
+    queryKey: ["record-photos-legacy", recordId],
     queryFn: async () => {
       const { data, error } = await supabase.from("record_photos").select("*").eq("record_id", recordId).order("created_at");
       if (error) throw error;
@@ -622,9 +588,116 @@ function ViewRecordDialog({ recordId, open, onOpenChange }: {
     enabled: !!recordId,
   });
 
-  if (!record) return null;
+  const [analyzingId, setAnalyzingId] = useState<string | null>(null);
+  const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const photoTypeLabel: Record<string, string> = { before: "Antes", during: "Durante", after: "Depois" };
+  const uploadDocMutation = useMutation({
+    mutationFn: async (files: FileList) => {
+      for (const file of Array.from(files)) {
+        const filePath = `${clinicId}/${recordId}/${Date.now()}_${file.name}`;
+        const { error: upErr } = await supabase.storage.from("record-photos").upload(filePath, file);
+        if (upErr) throw upErr;
+        const { data: urlData } = supabase.storage.from("record-photos").getPublicUrl(filePath);
+        const fileType = file.type.startsWith("image/") ? "image" : "document";
+        await supabase.from("record_documents").insert({
+          record_id: recordId, clinic_id: clinicId,
+          file_url: urlData.publicUrl, title: file.name.replace(/\.[^/.]+$/, ""),
+          file_type: fileType,
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["record-documents", recordId] });
+      toast.success("Documento(s) anexado(s)!");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const updateTitleMutation = useMutation({
+    mutationFn: async ({ id, title }: { id: string; title: string }) => {
+      const { error } = await supabase.from("record_documents").update({ title }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["record-documents", recordId] });
+      setEditingTitleId(null);
+      toast.success("Título atualizado!");
+    },
+  });
+
+  const analyzeDocMutation = useMutation({
+    mutationFn: async (doc: any) => {
+      setAnalyzingId(doc.id);
+      const { data, error } = await supabase.functions.invoke("analyze-document", {
+        body: { document_id: doc.id, file_url: doc.file_url, file_type: doc.file_type, title: doc.title },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["record-documents", recordId] });
+      toast.success("Análise concluída!");
+      setAnalyzingId(null);
+    },
+    onError: (e: any) => {
+      toast.error(e.message || "Erro na análise");
+      setAnalyzingId(null);
+    },
+  });
+
+  const deleteDocMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("record_documents").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["record-documents", recordId] });
+      toast.success("Documento removido!");
+    },
+  });
+
+  const generatePrescription = () => {
+    if (!record) return;
+    const lines = [
+      `RECEITUÁRIO`,
+      ``,
+      `Paciente: ${record.clients?.name || "—"}`,
+      `Data: ${format(new Date(record.date), "dd/MM/yyyy", { locale: ptBR })}`,
+      `Profissional: ${record.profiles?.full_name || "—"}`,
+      ``,
+      `Diagnóstico: ${record.diagnosis || "—"}`,
+      ``,
+      `Tratamento Realizado: ${record.treatment_performed || "—"}`,
+      ``,
+      `Recomendações:`,
+      record.recommendations || "—",
+      ``,
+      `_________________________________`,
+      `Assinatura do Profissional`,
+    ];
+    const blob = new Blob([lines.join("\n")], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Receita_${record.clients?.name || "paciente"}_${record.date}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Receita gerada!");
+  };
+
+  if (!record) return <div className="p-8 text-center text-muted-foreground">Carregando...</div>;
+
+  const statusMap: Record<string, { label: string; color: string }> = {
+    agendado: { label: "Agendado", color: "bg-blue-100 text-blue-800" },
+    confirmado: { label: "Confirmado", color: "bg-emerald-100 text-emerald-800" },
+    compareceu: { label: "Compareceu", color: "bg-green-100 text-green-800" },
+    faltou: { label: "Faltou", color: "bg-red-100 text-red-800" },
+    cancelado: { label: "Cancelado", color: "bg-gray-100 text-gray-800" },
+    remarcado: { label: "Remarcado", color: "bg-amber-100 text-amber-800" },
+  };
 
   const FootSection = ({ assessment, label }: { assessment: any; label: string }) => (
     <div className="space-y-2">
@@ -648,86 +721,214 @@ function ViewRecordDialog({ recordId, open, onOpenChange }: {
   );
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileText className="w-5 h-5 text-primary" />
-            Prontuário — {record.clients?.name}
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-          <span className="flex items-center gap-1"><Calendar className="w-4 h-4" />{format(new Date(record.date), "dd/MM/yyyy", { locale: ptBR })}</span>
-          {record.profiles?.full_name && <span className="flex items-center gap-1"><User className="w-4 h-4" />{record.profiles.full_name}</span>}
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={onBack}>
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div>
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              <FileText className="w-5 h-5 text-primary" />
+              Prontuário — {record.clients?.name}
+            </h2>
+            <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+              <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />{format(new Date(record.date), "dd/MM/yyyy", { locale: ptBR })}</span>
+              {record.profiles?.full_name && <span className="flex items-center gap-1"><User className="w-3.5 h-3.5" />{record.profiles.full_name}</span>}
+            </div>
+          </div>
         </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="gap-2" onClick={generatePrescription}>
+            <ScrollText className="w-4 h-4" /> Gerar Receita
+          </Button>
+          <Button size="sm" className="gap-2" onClick={onEdit}>
+            <Edit className="w-4 h-4" /> Editar
+          </Button>
+        </div>
+      </div>
 
-        <Tabs defaultValue="clinical">
-          <TabsList className="w-full grid grid-cols-4">
-            <TabsTrigger value="clinical">Ficha Clínica</TabsTrigger>
-            <TabsTrigger value="feet">Avaliação Pés</TabsTrigger>
-            <TabsTrigger value="products">Produtos ({products.length})</TabsTrigger>
-            <TabsTrigger value="photos">Fotos ({photos.length})</TabsTrigger>
-          </TabsList>
+      <Card className="shadow-card">
+        <CardContent className="pt-6">
+          <Tabs defaultValue="clinical">
+            <TabsList className="w-full grid grid-cols-4">
+              <TabsTrigger value="clinical">Ficha Clínica</TabsTrigger>
+              <TabsTrigger value="feet">Avaliação Pés</TabsTrigger>
+              <TabsTrigger value="procedures">Procedimentos</TabsTrigger>
+              <TabsTrigger value="documents">Documentos ({docs.length + legacyPhotos.length})</TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="clinical" className="space-y-4 mt-4">
-            {record.chief_complaint && <div><p className="text-xs font-medium text-muted-foreground mb-1">Queixa Principal</p><p className="text-sm">{record.chief_complaint}</p></div>}
-            {record.clinical_notes && <div><p className="text-xs font-medium text-muted-foreground mb-1">Anotações Clínicas</p><p className="text-sm whitespace-pre-wrap">{record.clinical_notes}</p></div>}
-            {record.diagnosis && <div><p className="text-xs font-medium text-muted-foreground mb-1">Diagnóstico</p><p className="text-sm">{record.diagnosis}</p></div>}
-            {record.treatment_performed && <div><p className="text-xs font-medium text-muted-foreground mb-1">Tratamento Realizado</p><p className="text-sm whitespace-pre-wrap">{record.treatment_performed}</p></div>}
-            {record.recommendations && <div><p className="text-xs font-medium text-muted-foreground mb-1">Recomendações</p><p className="text-sm whitespace-pre-wrap">{record.recommendations}</p></div>}
-            {!record.chief_complaint && !record.clinical_notes && !record.diagnosis && !record.treatment_performed && !record.recommendations && (
-              <p className="text-muted-foreground text-sm">Nenhuma informação clínica registrada.</p>
-            )}
-          </TabsContent>
+            <TabsContent value="clinical" className="space-y-4 mt-4">
+              {record.chief_complaint && <div><p className="text-xs font-medium text-muted-foreground mb-1">Queixa Principal</p><p className="text-sm">{record.chief_complaint}</p></div>}
+              {record.clinical_notes && <div><p className="text-xs font-medium text-muted-foreground mb-1">Anotações Clínicas</p><p className="text-sm whitespace-pre-wrap">{record.clinical_notes}</p></div>}
+              {record.diagnosis && <div><p className="text-xs font-medium text-muted-foreground mb-1">Diagnóstico</p><p className="text-sm">{record.diagnosis}</p></div>}
+              {record.treatment_performed && <div><p className="text-xs font-medium text-muted-foreground mb-1">Tratamento Realizado</p><p className="text-sm whitespace-pre-wrap">{record.treatment_performed}</p></div>}
+              {record.recommendations && <div><p className="text-xs font-medium text-muted-foreground mb-1">Recomendações</p><p className="text-sm whitespace-pre-wrap">{record.recommendations}</p></div>}
+              {!record.chief_complaint && !record.clinical_notes && !record.diagnosis && !record.treatment_performed && !record.recommendations && (
+                <p className="text-muted-foreground text-sm">Nenhuma informação clínica registrada.</p>
+              )}
+            </TabsContent>
 
-          <TabsContent value="feet" className="space-y-4 mt-4">
-            {assessments.length === 0 ? (
-              <p className="text-muted-foreground text-sm">Nenhuma avaliação podológica registrada.</p>
-            ) : assessments.map((a: any) => (
-              <div key={a.id}><FootSection assessment={a} label={a.foot === "left" ? "Pé Esquerdo" : "Pé Direito"} /><Separator className="mt-4" /></div>
-            ))}
-          </TabsContent>
+            <TabsContent value="feet" className="space-y-4 mt-4">
+              {assessments.length === 0 ? (
+                <p className="text-muted-foreground text-sm">Nenhuma avaliação podológica registrada.</p>
+              ) : assessments.map((a: any) => (
+                <div key={a.id}><FootSection assessment={a} label={a.foot === "left" ? "Pé Esquerdo" : "Pé Direito"} /><Separator className="mt-4" /></div>
+              ))}
+            </TabsContent>
 
-          <TabsContent value="products" className="mt-4">
-            {products.length === 0 ? (
-              <p className="text-muted-foreground text-sm">Nenhum produto registrado.</p>
-            ) : (
-              <Table>
-                <TableHeader><TableRow><TableHead>Produto</TableHead><TableHead>Quantidade</TableHead><TableHead>Observação</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {products.map((p: any) => (
-                    <TableRow key={p.id}><TableCell className="font-medium">{p.product_name}</TableCell><TableCell>{p.quantity || "—"}</TableCell><TableCell>{p.notes || "—"}</TableCell></TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </TabsContent>
-
-          <TabsContent value="photos" className="mt-4">
-            {photos.length === 0 ? (
-              <p className="text-muted-foreground text-sm">Nenhuma foto registrada.</p>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {photos.map((p: any) => (
-                  <div key={p.id} className="space-y-1">
-                    <img src={p.photo_url} alt={p.description || ""} className="w-full h-40 object-cover rounded-lg border" />
-                    <div className="flex items-center gap-1">
-                      <Badge variant="secondary" className="text-xs">{photoTypeLabel[p.photo_type] || p.photo_type}</Badge>
-                      {p.description && <span className="text-xs text-muted-foreground truncate">{p.description}</span>}
-                    </div>
-                  </div>
-                ))}
+            <TabsContent value="procedures" className="space-y-4 mt-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm text-muted-foreground">Histórico de procedimentos do paciente</p>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="gap-2" onClick={() => fileInputRef.current?.click()}>
+                    <FileUp className="w-4 h-4" /> Anexar Documento
+                  </Button>
+                  <input ref={fileInputRef} type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={(e) => e.target.files && uploadDocMutation.mutate(e.target.files)} />
+                </div>
               </div>
-            )}
-          </TabsContent>
-        </Tabs>
+              {procedures.length === 0 ? (
+                <p className="text-muted-foreground text-sm">Nenhum procedimento registrado para este paciente.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Data</TableHead>
+                      <TableHead>Procedimento</TableHead>
+                      <TableHead className="hidden md:table-cell">Profissional</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="hidden md:table-cell text-right">Valor</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {procedures.map((p: any) => {
+                      const st = statusMap[p.status] || { label: p.status, color: "bg-gray-100 text-gray-800" };
+                      return (
+                        <TableRow key={p.id}>
+                          <TableCell className="whitespace-nowrap">{format(new Date(p.date), "dd/MM/yyyy")}</TableCell>
+                          <TableCell className="font-medium">{p.procedures?.name || "—"}</TableCell>
+                          <TableCell className="hidden md:table-cell">{p.profiles?.full_name || "—"}</TableCell>
+                          <TableCell><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${st.color}`}>{st.label}</span></TableCell>
+                          <TableCell className="hidden md:table-cell text-right">
+                            {p.procedures?.price ? `R$ ${Number(p.procedures.price).toFixed(2)}` : "—"}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </TabsContent>
 
-        <p className="text-xs text-muted-foreground pt-2">
-          Criado em {format(new Date(record.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-        </p>
-      </DialogContent>
-    </Dialog>
+            <TabsContent value="documents" className="space-y-4 mt-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm text-muted-foreground">Documentos e imagens anexados</p>
+                <Button variant="outline" size="sm" className="gap-2" onClick={() => fileInputRef.current?.click()}>
+                  <Upload className="w-4 h-4" /> Adicionar
+                </Button>
+              </div>
+
+              {docs.length === 0 && legacyPhotos.length === 0 ? (
+                <div className="border-2 border-dashed rounded-lg p-8 text-center">
+                  <FileText className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
+                  <p className="text-sm text-muted-foreground">Nenhum documento anexado.</p>
+                  <Button variant="link" className="mt-2" onClick={() => fileInputRef.current?.click()}>Anexar primeiro documento</Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {/* New documents */}
+                  {docs.map((doc: any) => (
+                    <Card key={doc.id} className="border">
+                      <CardContent className="p-4">
+                        <div className="flex items-start gap-3">
+                          {doc.file_type === "image" ? (
+                            <img src={doc.file_url} alt={doc.title} className="w-20 h-20 object-cover rounded-lg border shrink-0" />
+                          ) : (
+                            <div className="w-20 h-20 bg-muted rounded-lg flex items-center justify-center shrink-0">
+                              <FileText className="w-8 h-8 text-muted-foreground" />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            {editingTitleId === doc.id ? (
+                              <div className="flex gap-2">
+                                <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="h-8 text-sm" autoFocus />
+                                <Button size="sm" variant="outline" onClick={() => updateTitleMutation.mutate({ id: doc.id, title: editTitle })}>
+                                  Salvar
+                                </Button>
+                                <Button size="sm" variant="ghost" onClick={() => setEditingTitleId(null)}>
+                                  <X className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <p className="font-medium text-sm cursor-pointer hover:text-primary" onClick={() => { setEditingTitleId(doc.id); setEditTitle(doc.title); }}>
+                                {doc.title}
+                                <Edit className="w-3 h-3 inline ml-1 text-muted-foreground" />
+                              </p>
+                            )}
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {format(new Date(doc.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                              {doc.file_type === "image" ? " · Imagem" : " · Documento"}
+                            </p>
+
+                            {/* AI Analysis */}
+                            {doc.ai_analysis && (
+                              <div className="mt-3 p-3 bg-muted/50 rounded-lg border">
+                                <div className="flex items-center gap-1.5 mb-2">
+                                  <Sparkles className="w-3.5 h-3.5 text-primary" />
+                                  <span className="text-xs font-medium text-primary">Análise por IA</span>
+                                  {doc.ai_analyzed_at && (
+                                    <span className="text-xs text-muted-foreground ml-auto">
+                                      {format(new Date(doc.ai_analyzed_at), "dd/MM HH:mm")}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-sm whitespace-pre-wrap">{doc.ai_analysis}</p>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex flex-col gap-1 shrink-0">
+                            <Button
+                              size="sm" variant="outline" className="gap-1.5 text-xs"
+                              disabled={analyzingId === doc.id}
+                              onClick={() => analyzeDocMutation.mutate(doc)}
+                            >
+                              {analyzingId === doc.id ? (
+                                <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Analisando...</>
+                              ) : (
+                                <><Brain className="w-3.5 h-3.5" /> Analisar com IA</>
+                              )}
+                            </Button>
+                            <Button size="sm" variant="ghost" className="text-xs text-destructive" onClick={() => deleteDocMutation.mutate(doc.id)}>
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+
+                  {/* Legacy photos */}
+                  {legacyPhotos.length > 0 && (
+                    <>
+                      {docs.length > 0 && <Separator />}
+                      <p className="text-xs text-muted-foreground">Fotos anteriores</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {legacyPhotos.map((p: any) => (
+                          <div key={p.id} className="space-y-1">
+                            <img src={p.photo_url} alt={p.description || ""} className="w-full h-40 object-cover rounded-lg border" />
+                            {p.description && <p className="text-xs text-muted-foreground">{p.description}</p>}
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
