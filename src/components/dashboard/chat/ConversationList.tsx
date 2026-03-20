@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, Bot, User, Clock, XCircle } from "lucide-react";
 import { format } from "date-fns";
 import { WhatsAppConversation } from "@/hooks/useWhatsApp";
+import { type InboxMeta } from "@/components/dashboard/ChatTab";
 import { useState } from "react";
 
 const StatusIndicator = ({ status }: { status: string }) => {
@@ -32,12 +33,16 @@ interface ConversationListProps {
   onStatusFilterChange: (value: string | null) => void;
   assignedFilter: 'mine' | 'all';
   onAssignedFilterChange: (value: 'mine' | 'all') => void;
+  inboxMetaMap?: Record<string, InboxMeta>;
+  showInboxLabel?: boolean;
 }
 
 const ConversationList = ({
   conversations, loading, selectedConvId, onSelect,
   statusFilter, onStatusFilterChange,
   assignedFilter, onAssignedFilterChange,
+  inboxMetaMap = {},
+  showInboxLabel = false,
 }: ConversationListProps) => {
   const [search, setSearch] = useState("");
 
@@ -95,44 +100,60 @@ const ConversationList = ({
           </div>
         ) : (
           <div className="divide-y">
-            {filtered.map(conv => (
-              <button
-                key={conv.id}
-                onClick={() => onSelect(conv.id)}
-                className={`w-full p-3 text-left transition-colors hover:bg-accent/50 ${
-                  selectedConvId === conv.id ? "bg-accent" : ""
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <Avatar className="w-10 h-10 shrink-0">
-                    <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                      {(conv.contact_name || conv.contact_phone || '?')[0].toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-0.5">
-                      <span className="font-medium text-sm truncate">
-                        {conv.contact_name || conv.contact_phone || 'Desconhecido'}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground shrink-0 ml-2">
-                        {conv.last_message_at ? format(new Date(conv.last_message_at), 'HH:mm') : ''}
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {conv.last_message || 'Sem mensagens'}
-                    </p>
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <StatusIndicator status={conv.conversation_status} />
-                      {conv.unread_count > 0 && (
-                        <Badge className="bg-primary text-primary-foreground text-[10px] px-1.5 py-0 min-w-[18px] h-[18px] flex items-center justify-center rounded-full">
-                          {conv.unread_count}
-                        </Badge>
-                      )}
+            {filtered.map(conv => {
+              const meta = conv.inbox_id ? inboxMetaMap[conv.inbox_id] : null;
+              const inboxColor = meta?.color || null;
+
+              return (
+                <button
+                  key={conv.id}
+                  onClick={() => onSelect(conv.id)}
+                  className={`w-full p-3 text-left transition-colors hover:bg-accent/50 ${
+                    selectedConvId === conv.id ? "bg-accent" : ""
+                  }`}
+                  style={inboxColor ? { borderLeft: `3px solid ${inboxColor}` } : undefined}
+                >
+                  <div className="flex items-start gap-3">
+                    <Avatar className="w-10 h-10 shrink-0">
+                      <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                        {(conv.contact_name || conv.contact_phone || '?')[0].toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="font-medium text-sm truncate">
+                          {conv.contact_name || conv.contact_phone || 'Desconhecido'}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground shrink-0 ml-2">
+                          {conv.last_message_at ? format(new Date(conv.last_message_at), 'HH:mm') : ''}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {conv.last_message || 'Sem mensagens'}
+                      </p>
+                      <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                        <StatusIndicator status={conv.conversation_status} />
+                        {showInboxLabel && meta && (
+                          <span
+                            className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground"
+                          >
+                            {inboxColor && (
+                              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: inboxColor }} />
+                            )}
+                            {meta.label}
+                          </span>
+                        )}
+                        {conv.unread_count > 0 && (
+                          <Badge className="bg-primary text-primary-foreground text-[10px] px-1.5 py-0 min-w-[18px] h-[18px] flex items-center justify-center rounded-full">
+                            {conv.unread_count}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
         )}
       </ScrollArea>
