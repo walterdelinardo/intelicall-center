@@ -108,7 +108,11 @@ const ConfiguracoesModule = () => {
         state: clinic.state || "",
         zip_code: clinic.zip_code || "",
         theme_color: clinic.theme_color || "#3B82F6",
+        cnpj: (clinic as any).cnpj || "",
       });
+      if ((clinic as any).google_maps_api_key) {
+        setGoogleMapsKey("••••••••••••••••");
+      }
       if (clinic.working_hours) {
         setWorkingHours(clinic.working_hours as unknown as WorkingHours);
       }
