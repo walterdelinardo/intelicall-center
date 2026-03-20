@@ -562,7 +562,7 @@ function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
       if (!record?.client_id || !clinicId) return [];
       const { data, error } = await supabase
         .from("appointments")
-        .select("*, procedures(name, price, duration_minutes), profiles(full_name)")
+        .select("*, procedures(name, price, duration_minutes)")
         .eq("client_id", record.client_id)
         .eq("clinic_id", clinicId)
         .order("date", { ascending: false });
@@ -817,7 +817,7 @@ function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
                         <TableRow key={p.id}>
                           <TableCell className="whitespace-nowrap">{format(new Date(p.date), "dd/MM/yyyy")}</TableCell>
                           <TableCell className="font-medium">{p.procedures?.name || "—"}</TableCell>
-                          <TableCell className="hidden md:table-cell">{p.profiles?.full_name || "—"}</TableCell>
+                          <TableCell className="hidden md:table-cell">—</TableCell>
                           <TableCell><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${st.color}`}>{st.label}</span></TableCell>
                           <TableCell className="hidden md:table-cell text-right">
                             {p.procedures?.price ? `R$ ${Number(p.procedures.price).toFixed(2)}` : "—"}
