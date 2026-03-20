@@ -1370,6 +1370,7 @@ export type Database = {
         Row: {
           clinic_id: string
           created_at: string
+          google_calendar_account_id: string | null
           id: string
           instance_name: string
           is_active: boolean
@@ -1380,6 +1381,7 @@ export type Database = {
         Insert: {
           clinic_id: string
           created_at?: string
+          google_calendar_account_id?: string | null
           id?: string
           instance_name: string
           is_active?: boolean
@@ -1390,6 +1392,7 @@ export type Database = {
         Update: {
           clinic_id?: string
           created_at?: string
+          google_calendar_account_id?: string | null
           id?: string
           instance_name?: string
           is_active?: boolean
@@ -1403,6 +1406,13 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_inboxes_google_calendar_account_id_fkey"
+            columns: ["google_calendar_account_id"]
+            isOneToOne: false
+            referencedRelation: "google_calendar_accounts"
             referencedColumns: ["id"]
           },
         ]

@@ -1,0 +1,1 @@
+ALTER TABLE public.whatsapp_inboxes ADD COLUMN google_calendar_account_id uuid REFERENCES public.google_calendar_accounts(id) ON DELETE SET NULL;
