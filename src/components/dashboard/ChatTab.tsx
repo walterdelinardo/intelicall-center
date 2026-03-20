@@ -32,7 +32,44 @@ const ChatTab = () => {
 
   const selectedConv = conversations.find(c => c.id === selectedConvId) || null;
 
-  // Auto-select or create conversation when navigating from another module
+  // Build inbox -> { label, color } map from inboxes + google_calendar_accounts
+  const { data: inboxCalendarData } = useQuery({
+    queryKey: ['inbox-calendar-colors', profile?.clinic_id],
+    queryFn: async () => {
+      const { data: inboxRows } = await supabase
+        .from('whatsapp_inboxes')
+        .select('id, label, google_calendar_account_id')
+        .order('label');
+      if (!inboxRows) return {};
+
+      const calendarIds = inboxRows
+        .map((r: any) => r.google_calendar_account_id)
+        .filter(Boolean) as string[];
+
+      let colorMap: Record<string, string> = {};
+      if (calendarIds.length > 0) {
+        const { data: cals } = await supabase
+          .from('google_calendar_accounts')
+          .select('id, color')
+          .in('id', calendarIds);
+        if (cals) {
+          cals.forEach((c: any) => { colorMap[c.id] = c.color; });
+        }
+      }
+
+      const result: Record<string, InboxMeta> = {};
+      inboxRows.forEach((r: any) => {
+        result[r.id] = {
+          label: r.label,
+          color: r.google_calendar_account_id ? (colorMap[r.google_calendar_account_id] || null) : null,
+        };
+      });
+      return result;
+    },
+    enabled: !!profile?.clinic_id,
+  });
+
+  const inboxMetaMap = inboxCalendarData || {};
   useEffect(() => {
     if (!pendingChatPhone || !pendingChatInboxId || convsLoading) return;
 
