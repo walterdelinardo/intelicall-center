@@ -344,16 +344,26 @@ const ConfiguracoesModule = () => {
                 </div>
 
                 {/* Theme Color */}
-                <div className="space-y-2">
-                  <Label>Cor do Tema</Label>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="color"
-                      value={form.theme_color}
-                      onChange={(e) => setForm({ ...form, theme_color: e.target.value })}
-                      className="w-10 h-10 rounded cursor-pointer border border-border"
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>CNPJ</Label>
+                    <Input
+                      value={form.cnpj}
+                      onChange={(e) => setForm({ ...form, cnpj: e.target.value })}
+                      placeholder="00.000.000/0000-00"
                     />
-                    <span className="text-sm text-muted-foreground">{form.theme_color}</span>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Cor do Tema</Label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="color"
+                        value={form.theme_color}
+                        onChange={(e) => setForm({ ...form, theme_color: e.target.value })}
+                        className="w-10 h-10 rounded cursor-pointer border border-border"
+                      />
+                      <span className="text-sm text-muted-foreground">{form.theme_color}</span>
+                    </div>
                   </div>
                 </div>
 
