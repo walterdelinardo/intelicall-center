@@ -785,14 +785,9 @@ function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
             </div>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="gap-2" onClick={generatePrescription}>
-            <ScrollText className="w-4 h-4" /> Gerar Receita
-          </Button>
-          <Button size="sm" className="gap-2" onClick={onEdit}>
-            <Edit className="w-4 h-4" /> Editar
-          </Button>
-        </div>
+        <Button size="sm" className="gap-2" onClick={onEdit}>
+          <Edit className="w-4 h-4" /> Editar
+        </Button>
       </div>
 
       <Card className="shadow-card">
