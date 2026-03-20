@@ -914,38 +914,23 @@ const ConfiguracoesModule = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Configure a chave da API do Google Maps para calcular distâncias e tempos de transporte na Lista de Espera.
+                Configure as credenciais do Google Maps para calcular distâncias e tempos de transporte na Lista de Espera.
               </p>
-              <div className="flex gap-2">
-                <div className="flex-1 space-y-1">
-                  <Label>Chave da API</Label>
-                  <Input
-                    type={googleMapsKey.startsWith("••") ? "password" : "text"}
-                    value={googleMapsKey}
-                    onChange={(e) => setGoogleMapsKey(e.target.value)}
-                    placeholder="AIza..."
-                    onFocus={() => { if (googleMapsKey.startsWith("••")) setGoogleMapsKey(""); }}
-                  />
-                </div>
-                <div className="flex items-end">
-                  <Button
-                    onClick={saveGoogleMapsKey}
-                    disabled={savingMapsKey || !googleMapsKey || googleMapsKey.startsWith("••")}
-                    size="sm"
-                    className="gap-1"
-                  >
-                    {savingMapsKey ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                    Salvar
-                  </Button>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 text-xs">
+              <div className="flex items-center gap-3">
                 {(clinic as any)?.google_maps_api_key ? (
-                  <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">✓ Configurada</Badge>
+                  <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800">✓ Configurada</Badge>
                 ) : (
                   <Badge variant="outline" className="bg-muted text-muted-foreground border-border">Não configurada</Badge>
                 )}
               </div>
+              <Button variant="outline" size="sm" onClick={() => setShowMapsConfig(true)}>
+                <Plus className="w-4 h-4 mr-1" /> {(clinic as any)?.google_maps_api_key ? "Atualizar Credenciais" : "Configurar Credenciais"}
+              </Button>
+              <GoogleMapsConfigDialog
+                open={showMapsConfig}
+                onOpenChange={setShowMapsConfig}
+                onSaved={() => queryClient.invalidateQueries({ queryKey: ["clinic"] })}
+              />
             </CardContent>
           </Card>
         </TabsContent>
