@@ -775,15 +775,26 @@ const AgendaModule = () => {
                 />
                 <CommandList>
                   <CommandEmpty>Nenhum cliente encontrado</CommandEmpty>
-                  <CommandGroup>
-                    {filteredExternalClients.map((c, i) => (
+                  <CommandGroup heading="Clientes">
+                    {filteredSearchClients.map((c, i) => (
                       <CommandItem
-                        key={`${c.whatsapp}-${i}`}
-                        onSelect={() => handleSelectExternalClient(c)}
+                        key={`${c.type}-${c.id || c.whatsapp}-${i}`}
+                        onSelect={() => {
+                          if (c.type === 'local') {
+                            const localClient = clients.find(cl => cl.id === c.id);
+                            if (localClient) handleSelectLocalClient(localClient);
+                          } else {
+                            const extClient = externalClients.find(ec => ec.whatsapp === c.whatsapp);
+                            if (extClient) handleSelectExternalClient(extClient);
+                          }
+                        }}
                         className="flex flex-col items-start"
                       >
-                        <span className="font-medium">{c.nome || c.nome_wpp || c.whatsapp}</span>
-                        <span className="text-xs text-muted-foreground">{c.whatsapp}</span>
+                        <span className="font-medium">{c.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {c.whatsapp}{c.email ? ` • ${c.email}` : ''}
+                          {c.type === 'local' ? ' (cadastrado)' : ''}
+                        </span>
                       </CommandItem>
                     ))}
                   </CommandGroup>
