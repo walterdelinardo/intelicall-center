@@ -360,6 +360,7 @@ const AgendaModule = () => {
       if (success) {
         setIsCreateOpen(false);
         resetForm();
+        logNotification("created", title, accountId, `Novo evento criado: ${title}`);
 
         // Auto-create prontuário and redirect
         if (profile?.clinic_id && form.clientName) {
