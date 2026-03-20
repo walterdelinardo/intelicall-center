@@ -58,7 +58,7 @@ const emptyForm = {
 };
 
 const ClientesModule = () => {
-  const { profile } = useAuth();
+  const { openChatWithPhone } = useDashboard();
   const queryClient = useQueryClient();
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
