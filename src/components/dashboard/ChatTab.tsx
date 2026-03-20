@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MessageSquare, Inbox } from "lucide-react";
@@ -6,8 +6,14 @@ import { useWhatsAppInboxes, useWhatsAppConversations, useWhatsAppMessages } fro
 import { useDashboard } from "@/contexts/DashboardContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 import ConversationList from "./chat/ConversationList";
 import ChatArea from "./chat/ChatArea";
+
+export interface InboxMeta {
+  label: string;
+  color: string | null;
+}
 
 const ChatTab = () => {
   const { inboxes, loading: inboxesLoading } = useWhatsAppInboxes();
