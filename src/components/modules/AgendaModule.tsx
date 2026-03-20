@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useGoogleCalendar, CalendarEventExtendedProps } from "@/hooks/useGoogleCalendar";
 import { useGoogleOAuth } from "@/hooks/useGoogleOAuth";
 import { useClients } from "@/hooks/useClients";
+import { useDashboard } from "@/contexts/DashboardContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
