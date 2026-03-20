@@ -562,7 +562,7 @@ function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
       if (!record?.client_id || !clinicId) return [];
       const { data, error } = await supabase
         .from("appointments")
-        .select("*, procedures(name, price, duration_minutes), profiles(full_name)")
+        .select("*, procedures(name, price, duration_minutes)")
         .eq("client_id", record.client_id)
         .eq("clinic_id", clinicId)
         .order("date", { ascending: false });
