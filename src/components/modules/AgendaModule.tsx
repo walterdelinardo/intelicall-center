@@ -1008,6 +1008,7 @@ const AgendaModule = () => {
       ) : view === "day" ? (
         <TimeGrid
           events={dayEvents(selectedDate)}
+          selectedDate={selectedDate}
           onSlotClick={handleDaySlotClick}
           onEventClick={(evt) => evt.type === 'google' ? handleEditEvent(evt) : undefined}
           onStatusChange={!useGoogleAsPrimary ? (id, status) => updateStatusMutation.mutate({ id, status }) : undefined}
