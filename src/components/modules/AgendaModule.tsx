@@ -580,14 +580,23 @@ const AgendaModule = () => {
     mergedEvents.filter((e) => isSameDay(parseISO(e.date), day));
 
   // Filtered external clients for search
-  const filteredExternalClients = useMemo(() => {
-    if (!clientSearch) return externalClients.slice(0, 20);
-    const q = clientSearch.toLowerCase();
-    return externalClients.filter(c => {
-      const name = c.nome || c.nome_wpp || '';
-      return name.toLowerCase().includes(q) || c.whatsapp?.includes(q);
-    }).slice(0, 20);
-  }, [externalClients, clientSearch]);
+  const filteredSearchClients = useMemo(() => {
+    const q = (clientSearch || '').toLowerCase();
+    // Local clients first
+    const localResults = clients
+      .filter(c => !q || c.name.toLowerCase().includes(q) || c.whatsapp?.includes(q) || c.email?.toLowerCase().includes(q))
+      .map(c => ({ type: 'local' as const, id: c.id, name: c.name, whatsapp: c.whatsapp || c.phone || '', email: c.email || '' }));
+    // External clients (exclude duplicates by whatsapp)
+    const localWhatsapps = new Set(localResults.map(c => c.whatsapp).filter(Boolean));
+    const extResults = externalClients
+      .filter(c => {
+        const name = c.nome || c.nome_wpp || '';
+        return (!q || name.toLowerCase().includes(q) || c.whatsapp?.includes(q)) && !localWhatsapps.has(c.whatsapp || '');
+      })
+      .slice(0, 15)
+      .map(c => ({ type: 'external' as const, id: '', name: c.nome || c.nome_wpp || c.whatsapp || '', whatsapp: c.whatsapp || '', email: c.email || '' }));
+    return [...localResults.slice(0, 15), ...extResults];
+  }, [clients, externalClients, clientSearch]);
 
   const renderEventCard = (evt: MergedEvent) => {
     if (evt.type === 'google') {
