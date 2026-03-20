@@ -254,12 +254,28 @@ const ListaEsperaModule = () => {
     setClientPickerOpen(false);
   };
 
+  const activeStatuses = new Set(["aguardando", "notificado", "confirmado"]);
   const priorityOrder = { urgencia: 0, alta: 1, normal: 2, baixa: 3 };
+  const getDaysInQueue = (createdAt: string) => Math.floor((Date.now() - new Date(createdAt).getTime()) / 86400000);
+
   const sortedItems = [...items].sort((a: any, b: any) => {
+    // Active statuses first
+    const aActive = activeStatuses.has(a.status) ? 0 : 1;
+    const bActive = activeStatuses.has(b.status) ? 0 : 1;
+    if (aActive !== bActive) return aActive - bActive;
+    // Priority
     const pa = priorityOrder[a.priority as keyof typeof priorityOrder] ?? 2;
     const pb = priorityOrder[b.priority as keyof typeof priorityOrder] ?? 2;
     if (pa !== pb) return pa - pb;
-    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    // Days in queue (most days first)
+    const daysA = getDaysInQueue(a.created_at);
+    const daysB = getDaysInQueue(b.created_at);
+    if (daysA !== daysB) return daysB - daysA;
+    // Distance (closest first)
+    const distA = a.distance_km ?? 9999;
+    const distB = b.distance_km ?? 9999;
+    if (distA !== distB) return distA - distB;
+    return 0;
   });
 
   const filtered = sortedItems.filter((item: any) => {
