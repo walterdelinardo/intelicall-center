@@ -165,9 +165,16 @@ const ChatArea = ({ conversation, messages, messagesLoading }: ChatAreaProps) =>
           <div className="flex items-center justify-center h-full text-muted-foreground text-sm">Nenhuma mensagem ainda</div>
         ) : (
           <div className="space-y-2">
-            {messages.map(msg => (
-              <MessageBubble key={msg.id} msg={msg} />
-            ))}
+            {messages.map((msg, idx) => {
+              const prevMsg = idx > 0 ? messages[idx - 1] : null;
+              const showDate = !prevMsg || !isSameDay(new Date(msg.timestamp), new Date(prevMsg.timestamp));
+              return (
+                <div key={msg.id}>
+                  {showDate && <DateSeparator label={formatDateLabel(msg.timestamp)} />}
+                  <MessageBubble msg={msg} />
+                </div>
+              );
+            })}
             <div ref={messagesEndRef} />
           </div>
         )}
