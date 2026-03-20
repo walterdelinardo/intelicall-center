@@ -86,6 +86,7 @@ function getEventStyles(evt: MergedEvent) {
 
 interface TimeGridProps {
   events: MergedEvent[];
+  selectedDate?: Date;
   onSlotClick: (time: string) => void;
   onEventClick: (event: MergedEvent) => void;
   onStatusChange?: (id: string, status: string) => void;
