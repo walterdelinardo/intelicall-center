@@ -82,6 +82,7 @@ interface MergedEvent {
 }
 
 const AgendaModule = () => {
+  const { openProntuario } = useDashboard();
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const { events: googleEvents, loading: googleLoading, fetchEvents: fetchGoogleEvents, createEvent: createGoogleEvent, updateEvent: updateGoogleEvent, deleteEvent: deleteGoogleEvent } = useGoogleCalendar();
