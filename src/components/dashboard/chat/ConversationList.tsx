@@ -118,18 +118,16 @@ const ConversationList = ({
                         {conv.last_message_at ? format(new Date(conv.last_message_at), 'HH:mm') : ''}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between gap-1">
-                      <p className="text-xs text-muted-foreground truncate flex-1">
-                        {conv.last_message || 'Sem mensagens'}
-                      </p>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <StatusIndicator status={conv.conversation_status} />
-                        {conv.unread_count > 0 && (
-                          <Badge className="bg-primary text-primary-foreground text-[10px] px-1.5 py-0 min-w-[18px] h-[18px] flex items-center justify-center rounded-full">
-                            {conv.unread_count}
-                          </Badge>
-                        )}
-                      </div>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {conv.last_message || 'Sem mensagens'}
+                    </p>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <StatusIndicator status={conv.conversation_status} />
+                      {conv.unread_count > 0 && (
+                        <Badge className="bg-primary text-primary-foreground text-[10px] px-1.5 py-0 min-w-[18px] h-[18px] flex items-center justify-center rounded-full">
+                          {conv.unread_count}
+                        </Badge>
+                      )}
                     </div>
                   </div>
                 </div>
