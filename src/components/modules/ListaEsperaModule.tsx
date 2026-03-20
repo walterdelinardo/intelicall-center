@@ -115,7 +115,7 @@ const ListaEsperaModule = () => {
     queryKey: ["procedures-list", profile?.clinic_id],
     queryFn: async () => {
       if (!profile?.clinic_id) return [];
-      const { data } = await supabase.from("procedures").select("id, name").eq("clinic_id", profile.clinic_id).eq("is_active", true).order("name");
+      const { data } = await supabase.from("procedures").select("id, name, duration_minutes, price").eq("clinic_id", profile.clinic_id).eq("is_active", true).order("name");
       return data || [];
     },
     enabled: !!profile?.clinic_id,
