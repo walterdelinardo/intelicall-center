@@ -437,6 +437,7 @@ const ConfiguracoesModule = () => {
                           <TableHead>Label</TableHead>
                           <TableHead>Instância</TableHead>
                           <TableHead>Telefone</TableHead>
+                          <TableHead>Agenda</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead className="w-[80px]">Ações</TableHead>
                         </TableRow>
