@@ -61,6 +61,7 @@ const ListaEsperaModule = () => {
   const { profile } = useAuth();
   const { openChatWithPhone } = useDashboard();
   const queryClient = useQueryClient();
+  const { createEvent: createGoogleEvent } = useGoogleCalendar();
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterPriority, setFilterPriority] = useState("all");
@@ -72,6 +73,17 @@ const ListaEsperaModule = () => {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyId, setHistoryId] = useState<string | null>(null);
   const [clientPickerOpen, setClientPickerOpen] = useState(false);
+
+  // Calendar accounts query
+  const { data: calendarAccounts = [] } = useQuery({
+    queryKey: ["calendar-accounts", profile?.clinic_id],
+    queryFn: async () => {
+      if (!profile?.clinic_id) return [];
+      const { data } = await supabase.from("google_calendar_accounts").select("id, label, is_active").eq("clinic_id", profile.clinic_id).eq("is_active", true).order("label");
+      return data || [];
+    },
+    enabled: !!profile?.clinic_id,
+  });
 
   // Queries
   const { data: items = [], isLoading } = useQuery({
