@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.google-update-calendar-color]
 verify_jwt = false
+
+[functions.analyze-document]
+verify_jwt = false

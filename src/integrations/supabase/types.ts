@@ -872,6 +872,57 @@ export type Database = {
           },
         ]
       }
+      record_documents: {
+        Row: {
+          ai_analysis: string | null
+          ai_analyzed_at: string | null
+          clinic_id: string
+          created_at: string
+          file_type: string | null
+          file_url: string
+          id: string
+          record_id: string
+          title: string
+        }
+        Insert: {
+          ai_analysis?: string | null
+          ai_analyzed_at?: string | null
+          clinic_id: string
+          created_at?: string
+          file_type?: string | null
+          file_url: string
+          id?: string
+          record_id: string
+          title?: string
+        }
+        Update: {
+          ai_analysis?: string | null
+          ai_analyzed_at?: string | null
+          clinic_id?: string
+          created_at?: string
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          record_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "record_documents_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "record_documents_record_id_fkey"
+            columns: ["record_id"]
+            isOneToOne: false
+            referencedRelation: "medical_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       record_photos: {
         Row: {
           created_at: string
