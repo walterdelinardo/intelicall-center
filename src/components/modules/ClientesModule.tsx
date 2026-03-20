@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import ClientDetailsDialog from "./clients/ClientDetailsDialog";
+import { useDashboard } from "@/contexts/DashboardContext";
 
 interface Client {
   id: string;

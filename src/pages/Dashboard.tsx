@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import AppSidebar from "@/components/dashboard/AppSidebar";
 import DashboardHome from "@/components/modules/DashboardHome";
@@ -13,6 +12,7 @@ import LeadsModule from "@/components/modules/LeadsModule";
 import UsuariosModule from "@/components/modules/UsuariosModule";
 import ConfiguracoesModule from "@/components/modules/ConfiguracoesModule";
 import ListaEsperaModule from "@/components/modules/ListaEsperaModule";
+import { DashboardProvider, useDashboard } from "@/contexts/DashboardContext";
 
 const modules: Record<string, React.ComponentType> = {
   dashboard: DashboardHome,
@@ -29,8 +29,8 @@ const modules: Record<string, React.ComponentType> = {
   "lista-espera": ListaEsperaModule,
 };
 
-const Dashboard = () => {
-  const [activeModule, setActiveModule] = useState("dashboard");
+const DashboardContent = () => {
+  const { activeModule, setActiveModule } = useDashboard();
   const ActiveComponent = modules[activeModule] || DashboardHome;
 
   return (
@@ -50,5 +50,11 @@ const Dashboard = () => {
     </SidebarProvider>
   );
 };
+
+const Dashboard = () => (
+  <DashboardProvider>
+    <DashboardContent />
+  </DashboardProvider>
+);
 
 export default Dashboard;
