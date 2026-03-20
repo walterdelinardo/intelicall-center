@@ -11,6 +11,9 @@ interface DashboardContextType {
   showInboxPicker: boolean;
   confirmChatWithInbox: (inboxId: string) => void;
   cancelInboxPicker: () => void;
+  pendingProntuarioClientId: string | null;
+  openProntuario: (clientId: string) => void;
+  clearPendingProntuario: () => void;
 }
 
 const DashboardContext = createContext<DashboardContextType | null>(null);
@@ -29,6 +32,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   const [showInboxPicker, setShowInboxPicker] = useState(false);
   const [pickerPhone, setPickerPhone] = useState<string | null>(null);
   const [pickerContactName, setPickerContactName] = useState<string | null>(null);
+  const [pendingProntuarioClientId, setPendingProntuarioClientId] = useState<string | null>(null);
 
   const openChatWithPhone = useCallback((phone: string, contactName?: string) => {
     setPickerPhone(phone.replace(/\D/g, ""));
@@ -58,12 +62,22 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     setPendingChatContactName(null);
   }, []);
 
+  const openProntuario = useCallback((clientId: string) => {
+    setPendingProntuarioClientId(clientId);
+    setActiveModule("prontuarios");
+  }, []);
+
+  const clearPendingProntuario = useCallback(() => {
+    setPendingProntuarioClientId(null);
+  }, []);
+
   return (
     <DashboardContext.Provider value={{
       activeModule, setActiveModule,
       pendingChatPhone, pendingChatInboxId, pendingChatContactName,
       clearPendingChat, openChatWithPhone,
       showInboxPicker, confirmChatWithInbox, cancelInboxPicker,
+      pendingProntuarioClientId, openProntuario, clearPendingProntuario,
     }}>
       {children}
     </DashboardContext.Provider>

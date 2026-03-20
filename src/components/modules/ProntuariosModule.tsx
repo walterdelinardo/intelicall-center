@@ -1,7 +1,8 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDashboard } from "@/contexts/DashboardContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,12 +27,21 @@ type ViewMode = "list" | "create" | "edit" | "view";
 
 const ProntuariosModule = () => {
   const { profile } = useAuth();
+  const { pendingProntuarioClientId, clearPendingProntuario } = useDashboard();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [activeRecordId, setActiveRecordId] = useState<string | null>(null);
   const [deleteRecordId, setDeleteRecordId] = useState<string | null>(null);
+
+  // Handle external navigation with pre-selected client
+  useEffect(() => {
+    if (pendingProntuarioClientId) {
+      setSelectedClientId(pendingProntuarioClientId);
+      clearPendingProntuario();
+    }
+  }, [pendingProntuarioClientId, clearPendingProntuario]);
 
   const { data: clients = [] } = useQuery({
     queryKey: ["clients-list", profile?.clinic_id],

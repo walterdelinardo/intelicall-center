@@ -254,12 +254,28 @@ const ListaEsperaModule = () => {
     setClientPickerOpen(false);
   };
 
+  const activeStatuses = new Set(["aguardando", "notificado", "confirmado"]);
   const priorityOrder = { urgencia: 0, alta: 1, normal: 2, baixa: 3 };
+  const getDaysInQueue = (createdAt: string) => Math.floor((Date.now() - new Date(createdAt).getTime()) / 86400000);
+
   const sortedItems = [...items].sort((a: any, b: any) => {
+    // Active statuses first
+    const aActive = activeStatuses.has(a.status) ? 0 : 1;
+    const bActive = activeStatuses.has(b.status) ? 0 : 1;
+    if (aActive !== bActive) return aActive - bActive;
+    // Priority
     const pa = priorityOrder[a.priority as keyof typeof priorityOrder] ?? 2;
     const pb = priorityOrder[b.priority as keyof typeof priorityOrder] ?? 2;
     if (pa !== pb) return pa - pb;
-    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    // Days in queue (most days first)
+    const daysA = getDaysInQueue(a.created_at);
+    const daysB = getDaysInQueue(b.created_at);
+    if (daysA !== daysB) return daysB - daysA;
+    // Distance (closest first)
+    const distA = a.distance_km ?? 9999;
+    const distB = b.distance_km ?? 9999;
+    if (distA !== distB) return distA - distB;
+    return 0;
   });
 
   const filtered = sortedItems.filter((item: any) => {
@@ -359,18 +375,21 @@ const ListaEsperaModule = () => {
                   <TableHead>Profissional</TableHead>
                   <TableHead>Data Desejada</TableHead>
                   <TableHead>Horário</TableHead>
+                  <TableHead>Dias na Fila</TableHead>
+                  <TableHead>Distância</TableHead>
                   <TableHead>Prioridade</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Entrada</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
                 ) : filtered.length === 0 ? (
-                  <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">Nenhum registro na lista de espera</TableCell></TableRow>
-                ) : filtered.map((item: any) => (
+                  <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Nenhum registro na lista de espera</TableCell></TableRow>
+                ) : filtered.map((item: any) => {
+                  const daysInQueue = getDaysInQueue(item.created_at);
+                  return (
                   <TableRow key={item.id}>
                     <TableCell className="font-medium">{item.client_name}</TableCell>
                     <TableCell className="text-sm">{item.client_phone || item.clients?.whatsapp || "—"}</TableCell>
@@ -380,9 +399,30 @@ const ListaEsperaModule = () => {
                     <TableCell className="text-sm">
                       {item.time_range_start && item.time_range_end ? `${item.time_range_start.slice(0, 5)}–${item.time_range_end.slice(0, 5)}` : "—"}
                     </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={
+                        daysInQueue > 14 ? "bg-red-100 text-red-700 border-red-300" :
+                        daysInQueue > 7 ? "bg-orange-100 text-orange-700 border-orange-300" :
+                        "bg-muted text-muted-foreground border-border"
+                      }>
+                        {daysInQueue}d
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {item.distance_km != null ? (
+                        <div className="space-y-0.5">
+                          <span className="font-medium">{Number(item.distance_km).toFixed(1)} km</span>
+                          {item.driving_time_min != null && (
+                            <p className="text-muted-foreground">🚗 {item.driving_time_min} min</p>
+                          )}
+                          {item.transit_time_min != null && (
+                            <p className="text-muted-foreground">🚌 {item.transit_time_min} min</p>
+                          )}
+                        </div>
+                      ) : "—"}
+                    </TableCell>
                     <TableCell>{getPriorityBadge(item.priority)}</TableCell>
                     <TableCell>{getStatusBadge(item.status)}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{format(new Date(item.created_at), "dd/MM HH:mm")}</TableCell>
                     <TableCell>
                       <div className="flex gap-1 justify-end">
                         {(item.status === "aguardando" || item.status === "notificado") && (
@@ -412,7 +452,8 @@ const ListaEsperaModule = () => {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </div>

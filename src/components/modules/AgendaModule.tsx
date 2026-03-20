@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useGoogleCalendar, CalendarEventExtendedProps } from "@/hooks/useGoogleCalendar";
 import { useGoogleOAuth } from "@/hooks/useGoogleOAuth";
 import { useClients } from "@/hooks/useClients";
+import { useDashboard } from "@/contexts/DashboardContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -81,6 +82,7 @@ interface MergedEvent {
 }
 
 const AgendaModule = () => {
+  const { openProntuario } = useDashboard();
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const { events: googleEvents, loading: googleLoading, fetchEvents: fetchGoogleEvents, createEvent: createGoogleEvent, updateEvent: updateGoogleEvent, deleteEvent: deleteGoogleEvent } = useGoogleCalendar();
@@ -169,7 +171,7 @@ const AgendaModule = () => {
     queryFn: async () => {
       if (!profile?.clinic_id) return [];
       const { data, error } = await supabase
-        .from("clients").select("id, name")
+        .from("clients").select("id, name, email, whatsapp, phone, birth_date")
         .eq("clinic_id", profile.clinic_id)
         .eq("is_active", true)
         .order("name");
@@ -250,6 +252,18 @@ const AgendaModule = () => {
     return editForm.title;
   }, [editForm.procedureName, editForm.clientName, editForm.title]);
 
+  const handleSelectLocalClient = (client: typeof clients[0]) => {
+    setForm({
+      ...form,
+      clientName: client.name,
+      clientWhatsapp: client.whatsapp || client.phone || '',
+      clientEmail: client.email || '',
+      clientOrigin: 'cadastro',
+    });
+    setIsNewClient(false);
+    setClientSearchOpen(false);
+  };
+
   const handleSelectExternalClient = (client: typeof externalClients[0]) => {
     const displayName = client.nome || client.nome_wpp || client.whatsapp || '';
     setForm({
@@ -311,6 +325,70 @@ const AgendaModule = () => {
       if (success) {
         setIsCreateOpen(false);
         resetForm();
+
+        // Auto-create prontuário and redirect
+        if (profile?.clinic_id && form.clientName) {
+          try {
+            // Resolve or create local client
+            let clientId: string | null = null;
+            if (form.clientWhatsapp) {
+              const { data: existing } = await supabase
+                .from("clients").select("id")
+                .eq("clinic_id", profile.clinic_id)
+                .eq("whatsapp", form.clientWhatsapp)
+                .maybeSingle();
+              if (existing) clientId = existing.id;
+            }
+            if (!clientId) {
+              const { data: byName } = await supabase
+                .from("clients").select("id")
+                .eq("clinic_id", profile.clinic_id)
+                .eq("name", form.clientName)
+                .maybeSingle();
+              if (byName) clientId = byName.id;
+            }
+            if (!clientId) {
+              const { data: newClient } = await supabase
+                .from("clients")
+                .insert({
+                  clinic_id: profile.clinic_id,
+                  name: form.clientName,
+                  whatsapp: form.clientWhatsapp || null,
+                  email: form.clientEmail || null,
+                  birth_date: form.clientBirthdate || null,
+                  lead_source: form.clientOrigin || null,
+                })
+                .select("id")
+                .single();
+              if (newClient) clientId = newClient.id;
+            }
+
+            if (clientId) {
+              // Create medical_record if not exists for client+date
+              const { data: existingRecord } = await supabase
+                .from("medical_records")
+                .select("id")
+                .eq("clinic_id", profile.clinic_id)
+                .eq("client_id", clientId)
+                .eq("date", form.date)
+                .maybeSingle();
+
+              if (!existingRecord) {
+                await supabase.from("medical_records").insert({
+                  clinic_id: profile.clinic_id,
+                  client_id: clientId,
+                  date: form.date,
+                  chief_complaint: proc?.name || '',
+                });
+              }
+
+              // Redirect to prontuário
+              openProntuario(clientId);
+            }
+          } catch (err) {
+            console.error("Error auto-creating prontuário:", err);
+          }
+        }
       }
     } else {
       if (!profile?.clinic_id || !form.client_id) return;
@@ -566,14 +644,23 @@ const AgendaModule = () => {
     mergedEvents.filter((e) => isSameDay(parseISO(e.date), day));
 
   // Filtered external clients for search
-  const filteredExternalClients = useMemo(() => {
-    if (!clientSearch) return externalClients.slice(0, 20);
-    const q = clientSearch.toLowerCase();
-    return externalClients.filter(c => {
-      const name = c.nome || c.nome_wpp || '';
-      return name.toLowerCase().includes(q) || c.whatsapp?.includes(q);
-    }).slice(0, 20);
-  }, [externalClients, clientSearch]);
+  const filteredSearchClients = useMemo(() => {
+    const q = (clientSearch || '').toLowerCase();
+    // Local clients first
+    const localResults = clients
+      .filter(c => !q || c.name.toLowerCase().includes(q) || c.whatsapp?.includes(q) || c.email?.toLowerCase().includes(q))
+      .map(c => ({ type: 'local' as const, id: c.id, name: c.name, whatsapp: c.whatsapp || c.phone || '', email: c.email || '' }));
+    // External clients (exclude duplicates by whatsapp)
+    const localWhatsapps = new Set(localResults.map(c => c.whatsapp).filter(Boolean));
+    const extResults = externalClients
+      .filter(c => {
+        const name = c.nome || c.nome_wpp || '';
+        return (!q || name.toLowerCase().includes(q) || c.whatsapp?.includes(q)) && !localWhatsapps.has(c.whatsapp || '');
+      })
+      .slice(0, 15)
+      .map(c => ({ type: 'external' as const, id: '', name: c.nome || c.nome_wpp || c.whatsapp || '', whatsapp: c.whatsapp || '', email: c.email || '' }));
+    return [...localResults.slice(0, 15), ...extResults];
+  }, [clients, externalClients, clientSearch]);
 
   const renderEventCard = (evt: MergedEvent) => {
     if (evt.type === 'google') {
@@ -752,15 +839,26 @@ const AgendaModule = () => {
                 />
                 <CommandList>
                   <CommandEmpty>Nenhum cliente encontrado</CommandEmpty>
-                  <CommandGroup>
-                    {filteredExternalClients.map((c, i) => (
+                  <CommandGroup heading="Clientes">
+                    {filteredSearchClients.map((c, i) => (
                       <CommandItem
-                        key={`${c.whatsapp}-${i}`}
-                        onSelect={() => handleSelectExternalClient(c)}
+                        key={`${c.type}-${c.id || c.whatsapp}-${i}`}
+                        onSelect={() => {
+                          if (c.type === 'local') {
+                            const localClient = clients.find(cl => cl.id === c.id);
+                            if (localClient) handleSelectLocalClient(localClient);
+                          } else {
+                            const extClient = externalClients.find(ec => ec.whatsapp === c.whatsapp);
+                            if (extClient) handleSelectExternalClient(extClient);
+                          }
+                        }}
                         className="flex flex-col items-start"
                       >
-                        <span className="font-medium">{c.nome || c.nome_wpp || c.whatsapp}</span>
-                        <span className="text-xs text-muted-foreground">{c.whatsapp}</span>
+                        <span className="font-medium">{c.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {c.whatsapp}{c.email ? ` • ${c.email}` : ''}
+                          {c.type === 'local' ? ' (cadastrado)' : ''}
+                        </span>
                       </CommandItem>
                     ))}
                   </CommandGroup>
