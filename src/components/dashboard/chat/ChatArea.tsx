@@ -33,10 +33,11 @@ interface ChatAreaProps {
 }
 
 const ChatArea = ({ conversation, messages, messagesLoading }: ChatAreaProps) => {
-  const { sendMessage, sending } = useSendWhatsAppMessage();
+  const { sendMessage, sendInternalNote, sending } = useSendWhatsAppMessage();
   const { assumeConversation, returnToBot, closeConversation, markAsRead } = useConversationActions();
   const [message, setMessage] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [isNoteMode, setIsNoteMode] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
