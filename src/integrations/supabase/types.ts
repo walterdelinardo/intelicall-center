@@ -787,6 +787,48 @@ export type Database = {
           },
         ]
       }
+      procedure_materials: {
+        Row: {
+          clinic_id: string
+          created_at: string
+          id: string
+          procedure_id: string
+          quantity: number
+          stock_item_id: string
+        }
+        Insert: {
+          clinic_id: string
+          created_at?: string
+          id?: string
+          procedure_id: string
+          quantity?: number
+          stock_item_id: string
+        }
+        Update: {
+          clinic_id?: string
+          created_at?: string
+          id?: string
+          procedure_id?: string
+          quantity?: number
+          stock_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "procedure_materials_procedure_id_fkey"
+            columns: ["procedure_id"]
+            isOneToOne: false
+            referencedRelation: "procedures"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "procedure_materials_stock_item_id_fkey"
+            columns: ["stock_item_id"]
+            isOneToOne: false
+            referencedRelation: "stock_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       procedures: {
         Row: {
           clinic_id: string
@@ -1092,6 +1134,8 @@ export type Database = {
           clinic_id: string
           created_at: string
           desired_date: string | null
+          distance_km: number | null
+          driving_time_min: number | null
           flexibility: string | null
           id: string
           notes: string | null
@@ -1103,6 +1147,7 @@ export type Database = {
           status: string
           time_range_end: string | null
           time_range_start: string | null
+          transit_time_min: number | null
           updated_at: string
         }
         Insert: {
@@ -1112,6 +1157,8 @@ export type Database = {
           clinic_id: string
           created_at?: string
           desired_date?: string | null
+          distance_km?: number | null
+          driving_time_min?: number | null
           flexibility?: string | null
           id?: string
           notes?: string | null
@@ -1123,6 +1170,7 @@ export type Database = {
           status?: string
           time_range_end?: string | null
           time_range_start?: string | null
+          transit_time_min?: number | null
           updated_at?: string
         }
         Update: {
@@ -1132,6 +1180,8 @@ export type Database = {
           clinic_id?: string
           created_at?: string
           desired_date?: string | null
+          distance_km?: number | null
+          driving_time_min?: number | null
           flexibility?: string | null
           id?: string
           notes?: string | null
@@ -1143,6 +1193,7 @@ export type Database = {
           status?: string
           time_range_end?: string | null
           time_range_start?: string | null
+          transit_time_min?: number | null
           updated_at?: string
         }
         Relationships: [
