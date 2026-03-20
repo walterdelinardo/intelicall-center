@@ -1055,7 +1055,70 @@ const AgendaModule = () => {
     </>
   );
 
+  const notificationActionIcons: Record<string, string> = {
+    created: "🆕",
+    updated: "✏️",
+    rescheduled: "📅",
+    cancelled: "❌",
+  };
+
+  const notificationActionLabels: Record<string, string> = {
+    created: "Novo Agendamento",
+    updated: "Atualizado",
+    rescheduled: "Reagendado",
+    cancelled: "Cancelado",
+  };
+
   return (
+    <Tabs value={agendaTab} onValueChange={(v) => setAgendaTab(v as any)} className="space-y-4">
+      <TabsList>
+        <TabsTrigger value="calendario" className="gap-2">
+          <Calendar className="w-4 h-4" /> Calendário
+        </TabsTrigger>
+        <TabsTrigger value="notificacoes" className="gap-2">
+          <Bell className="w-4 h-4" /> Notificações
+          {notifications.length > 0 && (
+            <Badge variant="secondary" className="ml-1 h-5 min-w-5 px-1 text-[10px]">{notifications.length}</Badge>
+          )}
+        </TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="notificacoes" className="space-y-4">
+        <Card className="shadow-card">
+          <CardContent className="p-4">
+            <h3 className="font-semibold text-sm mb-4 flex items-center gap-2">
+              <Bell className="w-4 h-4 text-primary" />
+              Histórico de Ações na Agenda
+            </h3>
+            {notifications.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">Nenhuma notificação registrada</p>
+            ) : (
+              <div className="space-y-2">
+                {notifications.map((n: any) => (
+                  <div key={n.id} className="flex items-start gap-3 border-b border-border pb-3 last:border-0">
+                    <span className="text-lg mt-0.5">{notificationActionIcons[n.action] || "📋"}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-[10px]">
+                          {notificationActionLabels[n.action] || n.action}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {format(new Date(n.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                        </span>
+                      </div>
+                      <p className="text-sm font-medium mt-0.5">{n.event_title}</p>
+                      {n.details && <p className="text-xs text-muted-foreground">{n.details}</p>}
+                      <p className="text-xs text-muted-foreground mt-0.5">por {n.actor_name || "Sistema"}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      <TabsContent value="calendario" className="space-y-6">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
