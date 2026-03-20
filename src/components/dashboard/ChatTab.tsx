@@ -1,13 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MessageSquare, Inbox } from "lucide-react";
 import { useWhatsAppInboxes, useWhatsAppConversations, useWhatsAppMessages } from "@/hooks/useWhatsApp";
+import { useDashboard } from "@/contexts/DashboardContext";
 import ConversationList from "./chat/ConversationList";
 import ChatArea from "./chat/ChatArea";
 
 const ChatTab = () => {
   const { inboxes, loading: inboxesLoading } = useWhatsAppInboxes();
+  const { pendingChatPhone, clearPendingChat } = useDashboard();
   const [selectedInboxId, setSelectedInboxId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [assignedFilter, setAssignedFilter] = useState<'mine' | 'all'>('all');
@@ -18,6 +20,23 @@ const ChatTab = () => {
   });
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
   const { messages, loading: msgsLoading } = useWhatsAppMessages(selectedConvId);
+
+  const selectedConv = conversations.find(c => c.id === selectedConvId) || null;
+
+  // Auto-select conversation when navigating from another module
+  useEffect(() => {
+    if (!pendingChatPhone || convsLoading || conversations.length === 0) return;
+    const normalizedPhone = pendingChatPhone.replace(/\D/g, "");
+    const match = conversations.find(c => {
+      const jid = c.remote_jid?.replace(/\D/g, "") || "";
+      const phone = c.contact_phone?.replace(/\D/g, "") || "";
+      return jid.includes(normalizedPhone) || phone.includes(normalizedPhone) || normalizedPhone.includes(phone);
+    });
+    if (match) {
+      setSelectedConvId(match.id);
+    }
+    clearPendingChat();
+  }, [pendingChatPhone, conversations, convsLoading, clearPendingChat]);
 
   const selectedConv = conversations.find(c => c.id === selectedConvId) || null;
 
