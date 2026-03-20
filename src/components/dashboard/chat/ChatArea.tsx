@@ -8,7 +8,24 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { WhatsAppConversation, WhatsAppMessage, useSendWhatsAppMessage, useConversationActions } from "@/hooks/useWhatsApp";
 import MessageBubble from "./MessageBubble";
+import { isToday, isYesterday, isSameDay, format } from "date-fns";
 
+const formatDateLabel = (dateStr: string) => {
+  const date = new Date(dateStr);
+  if (isToday(date)) return "Hoje";
+  if (isYesterday(date)) return "Ontem";
+  return format(date, "dd/MM/yyyy");
+};
+
+const DateSeparator = ({ label }: { label: string }) => (
+  <div className="flex items-center gap-3 my-3">
+    <div className="flex-1 h-px bg-border" />
+    <span className="text-[11px] text-muted-foreground bg-muted/60 px-3 py-0.5 rounded-full whitespace-nowrap">
+      {label}
+    </span>
+    <div className="flex-1 h-px bg-border" />
+  </div>
+);
 interface ChatAreaProps {
   conversation: WhatsAppConversation | null;
   messages: WhatsAppMessage[];
@@ -148,9 +165,16 @@ const ChatArea = ({ conversation, messages, messagesLoading }: ChatAreaProps) =>
           <div className="flex items-center justify-center h-full text-muted-foreground text-sm">Nenhuma mensagem ainda</div>
         ) : (
           <div className="space-y-2">
-            {messages.map(msg => (
-              <MessageBubble key={msg.id} msg={msg} />
-            ))}
+            {messages.map((msg, idx) => {
+              const prevMsg = idx > 0 ? messages[idx - 1] : null;
+              const showDate = !prevMsg || !isSameDay(new Date(msg.timestamp), new Date(prevMsg.timestamp));
+              return (
+                <div key={msg.id}>
+                  {showDate && <DateSeparator label={formatDateLabel(msg.timestamp)} />}
+                  <MessageBubble msg={msg} />
+                </div>
+              );
+            })}
             <div ref={messagesEndRef} />
           </div>
         )}
