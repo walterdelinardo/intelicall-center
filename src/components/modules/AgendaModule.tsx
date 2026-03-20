@@ -325,6 +325,70 @@ const AgendaModule = () => {
       if (success) {
         setIsCreateOpen(false);
         resetForm();
+
+        // Auto-create prontuário and redirect
+        if (profile?.clinic_id && form.clientName) {
+          try {
+            // Resolve or create local client
+            let clientId: string | null = null;
+            if (form.clientWhatsapp) {
+              const { data: existing } = await supabase
+                .from("clients").select("id")
+                .eq("clinic_id", profile.clinic_id)
+                .eq("whatsapp", form.clientWhatsapp)
+                .maybeSingle();
+              if (existing) clientId = existing.id;
+            }
+            if (!clientId) {
+              const { data: byName } = await supabase
+                .from("clients").select("id")
+                .eq("clinic_id", profile.clinic_id)
+                .eq("name", form.clientName)
+                .maybeSingle();
+              if (byName) clientId = byName.id;
+            }
+            if (!clientId) {
+              const { data: newClient } = await supabase
+                .from("clients")
+                .insert({
+                  clinic_id: profile.clinic_id,
+                  name: form.clientName,
+                  whatsapp: form.clientWhatsapp || null,
+                  email: form.clientEmail || null,
+                  birth_date: form.clientBirthdate || null,
+                  lead_source: form.clientOrigin || null,
+                })
+                .select("id")
+                .single();
+              if (newClient) clientId = newClient.id;
+            }
+
+            if (clientId) {
+              // Create medical_record if not exists for client+date
+              const { data: existingRecord } = await supabase
+                .from("medical_records")
+                .select("id")
+                .eq("clinic_id", profile.clinic_id)
+                .eq("client_id", clientId)
+                .eq("date", form.date)
+                .maybeSingle();
+
+              if (!existingRecord) {
+                await supabase.from("medical_records").insert({
+                  clinic_id: profile.clinic_id,
+                  client_id: clientId,
+                  date: form.date,
+                  chief_complaint: proc?.name || '',
+                });
+              }
+
+              // Redirect to prontuário
+              openProntuario(clientId);
+            }
+          } catch (err) {
+            console.error("Error auto-creating prontuário:", err);
+          }
+        }
       }
     } else {
       if (!profile?.clinic_id || !form.client_id) return;
