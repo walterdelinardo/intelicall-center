@@ -52,7 +52,7 @@ const ORIGINS = [
 ];
 
 const emptyForm = {
-  client_name: "", client_phone: "", client_id: "", procedure_id: "", professional_id: "",
+  client_name: "", client_phone: "", client_id: "", procedure_id: "", google_calendar_account_id: "",
   desired_date: "", time_range_start: "", time_range_end: "",
   flexibility: "mesmo_dia", priority: "normal", origin: "manual", notes: "",
 };
