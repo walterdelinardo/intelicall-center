@@ -669,33 +669,70 @@ function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
     },
   });
 
-  const generatePrescription = () => {
+  const generatePrescription = (procedure?: any) => {
     if (!record) return;
+    const procedureName = procedure?.procedures?.name || "—";
+    const procedureDate = procedure ? format(new Date(procedure.date), "dd/MM/yyyy", { locale: ptBR }) : format(new Date(record.date), "dd/MM/yyyy", { locale: ptBR });
     const lines = [
       `RECEITUÁRIO`,
       ``,
       `Paciente: ${record.clients?.name || "—"}`,
-      `Data: ${format(new Date(record.date), "dd/MM/yyyy", { locale: ptBR })}`,
+      `Data: ${procedureDate}`,
       `Profissional: ${record.profiles?.full_name || "—"}`,
       ``,
-      `Diagnóstico: ${record.diagnosis || "—"}`,
+      `Procedimento Realizado: ${procedureName}`,
       ``,
-      `Tratamento Realizado: ${record.treatment_performed || "—"}`,
+      `─────────────────────────────────────────`,
+      `PRESCRIÇÃO:`,
       ``,
-      `Recomendações:`,
-      record.recommendations || "—",
+      `1. `,
+      ``,
+      `2. `,
+      ``,
+      `3. `,
+      ``,
+      `─────────────────────────────────────────`,
+      `ORIENTAÇÕES AO PACIENTE:`,
+      ``,
+      `• `,
+      ``,
+      `• `,
+      ``,
+      `─────────────────────────────────────────`,
+      `OBSERVAÇÕES:`,
+      ``,
+      ``,
+      ``,
       ``,
       `_________________________________`,
       `Assinatura do Profissional`,
+      `${record.profiles?.full_name || ""}`,
     ];
     const blob = new Blob([lines.join("\n")], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `Receita_${record.clients?.name || "paciente"}_${record.date}.txt`;
+    a.download = `Receita_${record.clients?.name || "paciente"}_${procedureDate.replace(/\//g, "-")}.txt`;
     a.click();
     URL.revokeObjectURL(url);
     toast.success("Receita gerada!");
+  };
+
+  const handleUploadForProcedure = async (files: FileList, appointmentId: string) => {
+    for (const file of Array.from(files)) {
+      const filePath = `${clinicId}/${recordId}/${Date.now()}_${file.name}`;
+      const { error: upErr } = await supabase.storage.from("record-photos").upload(filePath, file);
+      if (upErr) throw upErr;
+      const { data: urlData } = supabase.storage.from("record-photos").getPublicUrl(filePath);
+      const fileType = file.type.startsWith("image/") ? "image" : "document";
+      await supabase.from("record_documents").insert({
+        record_id: recordId, clinic_id: clinicId,
+        file_url: urlData.publicUrl, title: file.name.replace(/\.[^/.]+$/, ""),
+        file_type: fileType,
+      });
+    }
+    queryClient.invalidateQueries({ queryKey: ["record-documents", recordId] });
+    toast.success("Documento anexado ao procedimento!");
   };
 
   if (!record) return <div className="p-8 text-center text-muted-foreground">Carregando...</div>;
@@ -748,14 +785,9 @@ function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
             </div>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="gap-2" onClick={generatePrescription}>
-            <ScrollText className="w-4 h-4" /> Gerar Receita
-          </Button>
-          <Button size="sm" className="gap-2" onClick={onEdit}>
-            <Edit className="w-4 h-4" /> Editar
-          </Button>
-        </div>
+        <Button size="sm" className="gap-2" onClick={onEdit}>
+          <Edit className="w-4 h-4" /> Editar
+        </Button>
       </div>
 
       <Card className="shadow-card">
@@ -788,15 +820,7 @@ function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
             </TabsContent>
 
             <TabsContent value="procedures" className="space-y-4 mt-4">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm text-muted-foreground">Histórico de procedimentos do paciente</p>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="gap-2" onClick={() => fileInputRef.current?.click()}>
-                    <FileUp className="w-4 h-4" /> Anexar Documento
-                  </Button>
-                  <input ref={fileInputRef} type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={(e) => e.target.files && uploadDocMutation.mutate(e.target.files)} />
-                </div>
-              </div>
+              <p className="text-sm text-muted-foreground mb-2">Histórico de procedimentos do paciente</p>
               {procedures.length === 0 ? (
                 <p className="text-muted-foreground text-sm">Nenhum procedimento registrado para este paciente.</p>
               ) : (
@@ -808,6 +832,7 @@ function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
                       <TableHead className="hidden md:table-cell">Profissional</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="hidden md:table-cell text-right">Valor</TableHead>
+                      <TableHead>Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -821,6 +846,46 @@ function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
                           <TableCell><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${st.color}`}>{st.label}</span></TableCell>
                           <TableCell className="hidden md:table-cell text-right">
                             {p.procedures?.price ? `R$ ${Number(p.procedures.price).toFixed(2)}` : "—"}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Anexar Documento"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const input = document.createElement('input');
+                                  input.type = 'file';
+                                  input.accept = 'image/*,application/pdf';
+                                  input.multiple = true;
+                                  input.onchange = async (ev) => {
+                                    const files = (ev.target as HTMLInputElement).files;
+                                    if (files) {
+                                      try {
+                                        await handleUploadForProcedure(files, p.id);
+                                      } catch {
+                                        toast.error("Erro ao anexar documento");
+                                      }
+                                    }
+                                  };
+                                  input.click();
+                                }}
+                              >
+                                <FileUp className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Gerar Receita"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  generatePrescription(p);
+                                }}
+                              >
+                                <ScrollText className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
