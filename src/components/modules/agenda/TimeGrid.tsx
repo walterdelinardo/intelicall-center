@@ -226,6 +226,11 @@ interface WeekTimeGridProps {
 export const WeekTimeGrid = ({ days, getEventsForDay, onSlotClick, onEventClick, isToday }: WeekTimeGridProps) => {
   const slots = generateTimeSlots();
   const gridStartMin = START_HOUR * 60;
+  const nowMinutes = useCurrentMinutes();
+  const hasTodayColumn = days.some(d => isTodayFn(d));
+  const nowTop = ((nowMinutes - gridStartMin) / 30) * SLOT_HEIGHT;
+  const totalHeight = slots.length * SLOT_HEIGHT;
+  const nowTime = `${String(Math.floor(nowMinutes / 60)).padStart(2, '0')}:${String(nowMinutes % 60).padStart(2, '0')}`;
 
   return (
     <div className="border rounded-lg bg-card overflow-auto">
@@ -247,6 +252,33 @@ export const WeekTimeGrid = ({ days, getEventsForDay, onSlotClick, onEventClick,
 
       {/* Time grid */}
       <div className="relative">
+        {/* Past time overlay for today's column */}
+        {hasTodayColumn && nowTop > 0 && (() => {
+          const todayIdx = days.findIndex(d => isTodayFn(d));
+          const colLeft = `calc(3.5rem + (${todayIdx} * (100% - 3.5rem) / ${days.length}))`;
+          const colWidth = `calc((100% - 3.5rem) / ${days.length})`;
+          return (
+            <div
+              className="absolute bg-foreground/[0.04] pointer-events-none z-[5]"
+              style={{ top: 0, height: `${nowTop}px`, left: colLeft, width: colWidth }}
+            />
+          );
+        })()}
+
+        {/* Current time line */}
+        {hasTodayColumn && nowTop > 0 && nowTop < totalHeight && (
+          <div
+            className="absolute left-0 right-0 z-20 pointer-events-none flex items-center"
+            style={{ top: `${nowTop}px` }}
+          >
+            <div className="w-14 flex items-center justify-end pr-0.5">
+              <span className="text-[9px] font-semibold text-destructive">{nowTime}</span>
+            </div>
+            <div className="h-0.5 bg-destructive flex-1 relative">
+              <div className="absolute -left-1 -top-[3px] w-2 h-2 rounded-full bg-destructive" />
+            </div>
+          </div>
+        )}
         {slots.map((time, i) => {
           const isHour = time.endsWith(':00');
           return (
