@@ -88,7 +88,11 @@ const ConfiguracoesModule = () => {
     state: "",
     zip_code: "",
     theme_color: "#3B82F6",
+    cnpj: "",
   });
+
+  const [googleMapsKey, setGoogleMapsKey] = useState("");
+  const [savingMapsKey, setSavingMapsKey] = useState(false);
 
   const [workingHours, setWorkingHours] = useState<WorkingHours>(defaultWorkingHours);
 
@@ -104,7 +108,11 @@ const ConfiguracoesModule = () => {
         state: clinic.state || "",
         zip_code: clinic.zip_code || "",
         theme_color: clinic.theme_color || "#3B82F6",
+        cnpj: (clinic as any).cnpj || "",
       });
+      if ((clinic as any).google_maps_api_key) {
+        setGoogleMapsKey("••••••••••••••••");
+      }
       if (clinic.working_hours) {
         setWorkingHours(clinic.working_hours as unknown as WorkingHours);
       }
@@ -126,7 +134,8 @@ const ConfiguracoesModule = () => {
           state: form.state || null,
           zip_code: form.zip_code || null,
           theme_color: form.theme_color || null,
-        })
+          cnpj: form.cnpj || null,
+        } as any)
         .eq("id", profile.clinic_id);
       if (error) throw error;
     },
@@ -136,6 +145,25 @@ const ConfiguracoesModule = () => {
     },
     onError: (e: any) => toast.error(e.message),
   });
+
+  const saveGoogleMapsKey = async () => {
+    if (!profile?.clinic_id || !googleMapsKey || googleMapsKey.startsWith("••")) return;
+    setSavingMapsKey(true);
+    try {
+      const { error } = await supabase
+        .from("clinics")
+        .update({ google_maps_api_key: googleMapsKey } as any)
+        .eq("id", profile.clinic_id);
+      if (error) throw error;
+      toast.success("Chave do Google Maps salva!");
+      setGoogleMapsKey("••••••••••••••••");
+      queryClient.invalidateQueries({ queryKey: ["clinic"] });
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setSavingMapsKey(false);
+    }
+  };
 
   const updateHoursMutation = useMutation({
     mutationFn: async () => {
@@ -316,16 +344,26 @@ const ConfiguracoesModule = () => {
                 </div>
 
                 {/* Theme Color */}
-                <div className="space-y-2">
-                  <Label>Cor do Tema</Label>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="color"
-                      value={form.theme_color}
-                      onChange={(e) => setForm({ ...form, theme_color: e.target.value })}
-                      className="w-10 h-10 rounded cursor-pointer border border-border"
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>CNPJ</Label>
+                    <Input
+                      value={form.cnpj}
+                      onChange={(e) => setForm({ ...form, cnpj: e.target.value })}
+                      placeholder="00.000.000/0000-00"
                     />
-                    <span className="text-sm text-muted-foreground">{form.theme_color}</span>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Cor do Tema</Label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="color"
+                        value={form.theme_color}
+                        onChange={(e) => setForm({ ...form, theme_color: e.target.value })}
+                        className="w-10 h-10 rounded cursor-pointer border border-border"
+                      />
+                      <span className="text-sm text-muted-foreground">{form.theme_color}</span>
+                    </div>
                   </div>
                 </div>
 
@@ -884,6 +922,51 @@ const ConfiguracoesModule = () => {
                   />
                 </>
               )}
+            </CardContent>
+          </Card>
+
+          {/* Google Maps API Section */}
+          <Card className="shadow-card mt-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-primary" />
+                Google Maps API
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Configure a chave da API do Google Maps para calcular distâncias e tempos de transporte na Lista de Espera.
+              </p>
+              <div className="flex gap-2">
+                <div className="flex-1 space-y-1">
+                  <Label>Chave da API</Label>
+                  <Input
+                    type={googleMapsKey.startsWith("••") ? "password" : "text"}
+                    value={googleMapsKey}
+                    onChange={(e) => setGoogleMapsKey(e.target.value)}
+                    placeholder="AIza..."
+                    onFocus={() => { if (googleMapsKey.startsWith("••")) setGoogleMapsKey(""); }}
+                  />
+                </div>
+                <div className="flex items-end">
+                  <Button
+                    onClick={saveGoogleMapsKey}
+                    disabled={savingMapsKey || !googleMapsKey || googleMapsKey.startsWith("••")}
+                    size="sm"
+                    className="gap-1"
+                  >
+                    {savingMapsKey ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                    Salvar
+                  </Button>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                {(clinic as any)?.google_maps_api_key ? (
+                  <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">✓ Configurada</Badge>
+                ) : (
+                  <Badge variant="outline" className="bg-muted text-muted-foreground border-border">Não configurada</Badge>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

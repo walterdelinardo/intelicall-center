@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useGoogleCalendar } from "@/hooks/useGoogleCalendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,7 +52,7 @@ const ORIGINS = [
 ];
 
 const emptyForm = {
-  client_name: "", client_phone: "", client_id: "", procedure_id: "", professional_id: "",
+  client_name: "", client_phone: "", client_id: "", procedure_id: "", google_calendar_account_id: "",
   desired_date: "", time_range_start: "", time_range_end: "",
   flexibility: "mesmo_dia", priority: "normal", origin: "manual", notes: "",
 };
@@ -60,6 +61,7 @@ const ListaEsperaModule = () => {
   const { profile } = useAuth();
   const { openChatWithPhone } = useDashboard();
   const queryClient = useQueryClient();
+  const { createEvent: createGoogleEvent } = useGoogleCalendar();
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterPriority, setFilterPriority] = useState("all");
@@ -71,6 +73,17 @@ const ListaEsperaModule = () => {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyId, setHistoryId] = useState<string | null>(null);
   const [clientPickerOpen, setClientPickerOpen] = useState(false);
+
+  // Calendar accounts query
+  const { data: calendarAccounts = [] } = useQuery({
+    queryKey: ["calendar-accounts", profile?.clinic_id],
+    queryFn: async () => {
+      if (!profile?.clinic_id) return [];
+      const { data } = await supabase.from("google_calendar_accounts").select("id, label, is_active").eq("clinic_id", profile.clinic_id).eq("is_active", true).order("label");
+      return data || [];
+    },
+    enabled: !!profile?.clinic_id,
+  });
 
   // Queries
   const { data: items = [], isLoading } = useQuery({
@@ -135,13 +148,17 @@ const ListaEsperaModule = () => {
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!profile?.clinic_id) throw new Error("Sem clínica");
+      if (!form.desired_date) throw new Error("Informe a data desejada");
+      if (!form.time_range_start) throw new Error("Informe o horário de início");
+      if (!form.google_calendar_account_id) throw new Error("Selecione uma agenda");
+
       const payload: any = {
         clinic_id: profile.clinic_id,
         client_name: form.client_name,
         client_phone: form.client_phone || null,
         client_id: form.client_id || null,
         procedure_id: form.procedure_id || null,
-        professional_id: form.professional_id || null,
+        google_calendar_account_id: form.google_calendar_account_id || null,
         desired_date: form.desired_date || null,
         time_range_start: form.time_range_start || null,
         time_range_end: form.time_range_end || null,
@@ -150,9 +167,12 @@ const ListaEsperaModule = () => {
         origin: form.origin,
         notes: form.notes || null,
       };
+
+      let recordId: string;
       if (editId) {
         const { error } = await supabase.from("waiting_list").update(payload).eq("id", editId);
         if (error) throw error;
+        recordId = editId;
         await supabase.from("waiting_list_history").insert({
           waiting_list_id: editId, clinic_id: profile.clinic_id,
           action: "editado", details: "Registro editado", performed_by: profile.id,
@@ -160,14 +180,44 @@ const ListaEsperaModule = () => {
       } else {
         const { data, error } = await supabase.from("waiting_list").insert(payload).select("id").single();
         if (error) throw error;
+        recordId = data.id;
         await supabase.from("waiting_list_history").insert({
           waiting_list_id: data.id, clinic_id: profile.clinic_id,
           action: "criado", details: "Adicionado à lista de espera", performed_by: profile.id,
         });
+
+        // Auto-create Google Calendar event
+        const proc = procedures.find((p: any) => p.id === form.procedure_id);
+        const title = `${proc?.name || "Agendamento"} - ${form.client_name}`;
+        const startDT = `${form.desired_date}T${form.time_range_start}:00`;
+        const durationMin = proc?.duration_minutes || 30;
+        const endDT = new Date(new Date(startDT).getTime() + durationMin * 60000).toISOString();
+
+        const success = await createGoogleEvent({
+          title,
+          description: form.notes || "",
+          startDateTime: startDT,
+          endDateTime: endDT,
+          account_id: form.google_calendar_account_id,
+          extendedProperties: {
+            clientName: form.client_name,
+            clientWhatsapp: form.client_phone || "",
+            procedureName: proc?.name || "",
+            procedureValue: proc?.price ? String(proc.price) : "",
+          },
+        });
+
+        if (success) {
+          await supabase.from("waiting_list").update({ status: "agendado" }).eq("id", recordId);
+          await supabase.from("waiting_list_history").insert({
+            waiting_list_id: recordId, clinic_id: profile.clinic_id,
+            action: "agendado", details: "Evento criado automaticamente no Google Calendar", performed_by: profile.id,
+          });
+        }
       }
     },
     onSuccess: () => {
-      toast.success(editId ? "Registro atualizado" : "Adicionado à lista de espera");
+      toast.success(editId ? "Registro atualizado" : "Adicionado e agendado com sucesso!");
       queryClient.invalidateQueries({ queryKey: ["waiting-list"] });
       setIsOpen(false);
       setEditId(null);
@@ -237,7 +287,7 @@ const ListaEsperaModule = () => {
       client_phone: item.client_phone || "",
       client_id: item.client_id || "",
       procedure_id: item.procedure_id || "",
-      professional_id: item.professional_id || "",
+      google_calendar_account_id: (item as any).google_calendar_account_id || "",
       desired_date: item.desired_date || "",
       time_range_start: item.time_range_start?.slice(0, 5) || "",
       time_range_end: item.time_range_end?.slice(0, 5) || "",
@@ -512,11 +562,11 @@ const ListaEsperaModule = () => {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Profissional</Label>
-                <Select value={form.professional_id} onValueChange={(v) => setForm({ ...form, professional_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="Qualquer" /></SelectTrigger>
+                <Label>Agenda *</Label>
+                <Select value={form.google_calendar_account_id} onValueChange={(v) => setForm({ ...form, google_calendar_account_id: v })}>
+                  <SelectTrigger><SelectValue placeholder="Selecionar agenda" /></SelectTrigger>
                   <SelectContent>
-                    {professionals.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}
+                    {calendarAccounts.map((a: any) => <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

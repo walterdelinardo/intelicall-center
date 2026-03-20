@@ -14,11 +14,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar, Plus, ChevronLeft, ChevronRight, Clock, Globe, Pencil, Trash2, Search, UserPlus, User, Phone, DollarSign, RefreshCw, Mail, Eye, XCircle, Lock, Unlock, CalendarDays, Receipt, X, ShoppingCart, Stethoscope, MessageSquare } from "lucide-react";
+import { Calendar, Plus, ChevronLeft, ChevronRight, Clock, Globe, Pencil, Trash2, Search, UserPlus, User, Phone, DollarSign, RefreshCw, Mail, Eye, XCircle, Lock, Unlock, CalendarDays, Receipt, X, ShoppingCart, Stethoscope, MessageSquare, Bell } from "lucide-react";
 import { toast } from "sonner";
 import { format, addDays, addMonths, subMonths, startOfWeek, endOfWeek, eachDayOfInterval, isToday, isSameDay, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -94,6 +94,7 @@ const AgendaModule = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
   const [filterAccount, setFilterAccount] = useState<string>("all");
+  const [agendaTab, setAgendaTab] = useState<"calendario" | "notificacoes">("calendario");
 
   // Edit/Delete state for Google events
   const [editingEvent, setEditingEvent] = useState<MergedEvent | null>(null);
@@ -195,6 +196,40 @@ const AgendaModule = () => {
     },
     enabled: !!profile?.clinic_id,
   });
+
+  // Calendar notifications query
+  const { data: notifications = [], refetch: refetchNotifications } = useQuery({
+    queryKey: ["calendar-notifications", profile?.clinic_id],
+    queryFn: async () => {
+      if (!profile?.clinic_id) return [];
+      const { data, error } = await supabase
+        .from("calendar_notifications" as any)
+        .select("*")
+        .eq("clinic_id", profile.clinic_id)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!profile?.clinic_id,
+  });
+
+  const logNotification = useCallback(async (action: string, eventTitle: string, accountId?: string, details?: string) => {
+    if (!profile?.clinic_id) return;
+    try {
+      await supabase.from("calendar_notifications" as any).insert({
+        clinic_id: profile.clinic_id,
+        account_id: accountId || null,
+        event_title: eventTitle,
+        action,
+        details: details || null,
+        actor_name: profile.full_name || "Sistema",
+      });
+      refetchNotifications();
+    } catch (err) {
+      console.error("Error logging notification:", err);
+    }
+  }, [profile?.clinic_id, profile?.full_name, refetchNotifications]);
 
   const mergedEvents = useMemo((): MergedEvent[] => {
     if (useGoogleAsPrimary) {
@@ -325,6 +360,7 @@ const AgendaModule = () => {
       if (success) {
         setIsCreateOpen(false);
         resetForm();
+        logNotification("created", title, accountId, `Novo evento criado: ${title}`);
 
         // Auto-create prontuário and redirect
         if (profile?.clinic_id && form.clientName) {
@@ -513,6 +549,8 @@ const AgendaModule = () => {
 
     setEditLoading(false);
     if (success) {
+      const wasRescheduled = editingEvent && (editForm.date !== editingEvent.date || editForm.startTime !== editingEvent.time);
+      logNotification(wasRescheduled ? "rescheduled" : "updated", title, editingEvent?.accountId, wasRescheduled ? `Reagendado para ${editForm.date} ${editForm.startTime}` : `Evento atualizado`);
       setIsEditOpen(false);
       setEditingEvent(null);
     }
@@ -582,6 +620,7 @@ const AgendaModule = () => {
     }
     setEditLoading(false);
     if (success) {
+      logNotification("cancelled", eventToDelete?.title || "", eventToDelete?.accountId, `Cancelado: ${cancelReason}`);
       setShowCancelDialog(false);
       setEventToDelete(null);
       setCancelReason("");
@@ -596,6 +635,7 @@ const AgendaModule = () => {
     const success = await deleteGoogleEvent(eventToDelete.id, eventToDelete.accountId);
     setEditLoading(false);
     if (success) {
+      logNotification("cancelled", eventToDelete?.title || "", eventToDelete?.accountId, "Evento excluído");
       setShowDeleteDialog(false);
       setEventToDelete(null);
     }
@@ -1015,7 +1055,70 @@ const AgendaModule = () => {
     </>
   );
 
+  const notificationActionIcons: Record<string, string> = {
+    created: "🆕",
+    updated: "✏️",
+    rescheduled: "📅",
+    cancelled: "❌",
+  };
+
+  const notificationActionLabels: Record<string, string> = {
+    created: "Novo Agendamento",
+    updated: "Atualizado",
+    rescheduled: "Reagendado",
+    cancelled: "Cancelado",
+  };
+
   return (
+    <Tabs value={agendaTab} onValueChange={(v) => setAgendaTab(v as any)} className="space-y-4">
+      <TabsList>
+        <TabsTrigger value="calendario" className="gap-2">
+          <Calendar className="w-4 h-4" /> Calendário
+        </TabsTrigger>
+        <TabsTrigger value="notificacoes" className="gap-2">
+          <Bell className="w-4 h-4" /> Notificações
+          {notifications.length > 0 && (
+            <Badge variant="secondary" className="ml-1 h-5 min-w-5 px-1 text-[10px]">{notifications.length}</Badge>
+          )}
+        </TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="notificacoes" className="space-y-4">
+        <Card className="shadow-card">
+          <CardContent className="p-4">
+            <h3 className="font-semibold text-sm mb-4 flex items-center gap-2">
+              <Bell className="w-4 h-4 text-primary" />
+              Histórico de Ações na Agenda
+            </h3>
+            {notifications.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">Nenhuma notificação registrada</p>
+            ) : (
+              <div className="space-y-2">
+                {notifications.map((n: any) => (
+                  <div key={n.id} className="flex items-start gap-3 border-b border-border pb-3 last:border-0">
+                    <span className="text-lg mt-0.5">{notificationActionIcons[n.action] || "📋"}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-[10px]">
+                          {notificationActionLabels[n.action] || n.action}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {format(new Date(n.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                        </span>
+                      </div>
+                      <p className="text-sm font-medium mt-0.5">{n.event_title}</p>
+                      {n.details && <p className="text-xs text-muted-foreground">{n.details}</p>}
+                      <p className="text-xs text-muted-foreground mt-0.5">por {n.actor_name || "Sistema"}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      <TabsContent value="calendario" className="space-y-6">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
@@ -1468,6 +1571,8 @@ const AgendaModule = () => {
         clinicId={profile?.clinic_id || ""}
       />
     </div>
+      </TabsContent>
+    </Tabs>
   );
 };
 
