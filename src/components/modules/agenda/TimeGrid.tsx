@@ -1,8 +1,24 @@
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Clock, Globe, Plus } from "lucide-react";
-import { format } from "date-fns";
+import { format, isToday as isTodayFn } from "date-fns";
 import { ptBR } from "date-fns/locale";
+
+function useCurrentMinutes() {
+  const [now, setNow] = useState(() => {
+    const d = new Date();
+    return d.getHours() * 60 + d.getMinutes();
+  });
+  useEffect(() => {
+    const id = setInterval(() => {
+      const d = new Date();
+      setNow(d.getHours() * 60 + d.getMinutes());
+    }, 60_000);
+    return () => clearInterval(id);
+  }, []);
+  return now;
+}
 
 interface MergedEvent {
   type: 'local' | 'google';
