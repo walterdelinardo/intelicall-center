@@ -134,7 +134,8 @@ const ConfiguracoesModule = () => {
           state: form.state || null,
           zip_code: form.zip_code || null,
           theme_color: form.theme_color || null,
-        })
+          cnpj: form.cnpj || null,
+        } as any)
         .eq("id", profile.clinic_id);
       if (error) throw error;
     },
@@ -144,6 +145,25 @@ const ConfiguracoesModule = () => {
     },
     onError: (e: any) => toast.error(e.message),
   });
+
+  const saveGoogleMapsKey = async () => {
+    if (!profile?.clinic_id || !googleMapsKey || googleMapsKey.startsWith("••")) return;
+    setSavingMapsKey(true);
+    try {
+      const { error } = await supabase
+        .from("clinics")
+        .update({ google_maps_api_key: googleMapsKey } as any)
+        .eq("id", profile.clinic_id);
+      if (error) throw error;
+      toast.success("Chave do Google Maps salva!");
+      setGoogleMapsKey("••••••••••••••••");
+      queryClient.invalidateQueries({ queryKey: ["clinic"] });
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setSavingMapsKey(false);
+    }
+  };
 
   const updateHoursMutation = useMutation({
     mutationFn: async () => {
