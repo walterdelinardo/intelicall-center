@@ -94,6 +94,7 @@ const AgendaModule = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
   const [filterAccount, setFilterAccount] = useState<string>("all");
+  const [agendaTab, setAgendaTab] = useState<"calendario" | "notificacoes">("calendario");
 
   // Edit/Delete state for Google events
   const [editingEvent, setEditingEvent] = useState<MergedEvent | null>(null);
