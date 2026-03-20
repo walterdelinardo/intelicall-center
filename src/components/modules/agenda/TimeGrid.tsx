@@ -1,8 +1,24 @@
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Clock, Globe, Plus } from "lucide-react";
-import { format } from "date-fns";
+import { format, isToday as isTodayFn } from "date-fns";
 import { ptBR } from "date-fns/locale";
+
+function useCurrentMinutes() {
+  const [now, setNow] = useState(() => {
+    const d = new Date();
+    return d.getHours() * 60 + d.getMinutes();
+  });
+  useEffect(() => {
+    const id = setInterval(() => {
+      const d = new Date();
+      setNow(d.getHours() * 60 + d.getMinutes());
+    }, 60_000);
+    return () => clearInterval(id);
+  }, []);
+  return now;
+}
 
 interface MergedEvent {
   type: 'local' | 'google';
@@ -70,6 +86,7 @@ function getEventStyles(evt: MergedEvent) {
 
 interface TimeGridProps {
   events: MergedEvent[];
+  selectedDate?: Date;
   onSlotClick: (time: string) => void;
   onEventClick: (event: MergedEvent) => void;
   onStatusChange?: (id: string, status: string) => void;
@@ -83,14 +100,25 @@ const statusLabels: Record<string, string> = {
   cancelado: "Cancelado",
 };
 
-export const TimeGrid = ({ events, onSlotClick, onEventClick, onStatusChange }: TimeGridProps) => {
+export const TimeGrid = ({ events, selectedDate, onSlotClick, onEventClick, onStatusChange }: TimeGridProps) => {
   const slots = generateTimeSlots();
   const gridStartMin = START_HOUR * 60;
   const totalMinutes = (END_HOUR - START_HOUR) * 60;
+  const nowMinutes = useCurrentMinutes();
+  const showNowLine = selectedDate ? isTodayFn(selectedDate) : true;
+  const nowTop = ((nowMinutes - gridStartMin) / 30) * SLOT_HEIGHT;
+  const nowTime = `${String(Math.floor(nowMinutes / 60)).padStart(2, '0')}:${String(nowMinutes % 60).padStart(2, '0')}`;
 
   return (
     <div className="border rounded-lg bg-card overflow-hidden">
       <div className="relative" style={{ height: `${(totalMinutes / 30) * SLOT_HEIGHT}px` }}>
+        {/* Past time overlay */}
+        {showNowLine && nowTop > 0 && (
+          <div
+            className="absolute left-0 right-0 top-0 bg-foreground/[0.04] pointer-events-none z-[5]"
+            style={{ height: `${nowTop}px` }}
+          />
+        )}
         {/* Time labels and grid lines */}
         {slots.map((time, i) => {
           const isHour = time.endsWith(':00');
@@ -116,6 +144,20 @@ export const TimeGrid = ({ events, onSlotClick, onEventClick, onStatusChange }: 
         })}
 
         {/* Events overlay */}
+        {/* Current time indicator */}
+        {showNowLine && nowTop > 0 && nowTop < (totalMinutes / 30) * SLOT_HEIGHT && (
+          <div
+            className="absolute left-0 right-0 z-20 pointer-events-none flex items-center"
+            style={{ top: `${nowTop}px` }}
+          >
+            <div className="w-16 flex items-center justify-end pr-1">
+              <span className="text-[10px] font-semibold text-destructive">{nowTime}</span>
+            </div>
+            <div className="h-0.5 bg-destructive flex-1 relative">
+              <div className="absolute -left-1 -top-[3px] w-2 h-2 rounded-full bg-destructive" />
+            </div>
+          </div>
+        )}
         {events.map((evt) => {
           const evtMinutes = timeToMinutes(evt.time);
           const durationMin = parseDuration(evt.duration);
@@ -184,6 +226,11 @@ interface WeekTimeGridProps {
 export const WeekTimeGrid = ({ days, getEventsForDay, onSlotClick, onEventClick, isToday }: WeekTimeGridProps) => {
   const slots = generateTimeSlots();
   const gridStartMin = START_HOUR * 60;
+  const nowMinutes = useCurrentMinutes();
+  const hasTodayColumn = days.some(d => isTodayFn(d));
+  const nowTop = ((nowMinutes - gridStartMin) / 30) * SLOT_HEIGHT;
+  const totalHeight = slots.length * SLOT_HEIGHT;
+  const nowTime = `${String(Math.floor(nowMinutes / 60)).padStart(2, '0')}:${String(nowMinutes % 60).padStart(2, '0')}`;
 
   return (
     <div className="border rounded-lg bg-card overflow-auto">
@@ -205,6 +252,33 @@ export const WeekTimeGrid = ({ days, getEventsForDay, onSlotClick, onEventClick,
 
       {/* Time grid */}
       <div className="relative">
+        {/* Past time overlay for today's column */}
+        {hasTodayColumn && nowTop > 0 && (() => {
+          const todayIdx = days.findIndex(d => isTodayFn(d));
+          const colLeft = `calc(3.5rem + (${todayIdx} * (100% - 3.5rem) / ${days.length}))`;
+          const colWidth = `calc((100% - 3.5rem) / ${days.length})`;
+          return (
+            <div
+              className="absolute bg-foreground/[0.04] pointer-events-none z-[5]"
+              style={{ top: 0, height: `${nowTop}px`, left: colLeft, width: colWidth }}
+            />
+          );
+        })()}
+
+        {/* Current time line */}
+        {hasTodayColumn && nowTop > 0 && nowTop < totalHeight && (
+          <div
+            className="absolute left-0 right-0 z-20 pointer-events-none flex items-center"
+            style={{ top: `${nowTop}px` }}
+          >
+            <div className="w-14 flex items-center justify-end pr-0.5">
+              <span className="text-[9px] font-semibold text-destructive">{nowTime}</span>
+            </div>
+            <div className="h-0.5 bg-destructive flex-1 relative">
+              <div className="absolute -left-1 -top-[3px] w-2 h-2 rounded-full bg-destructive" />
+            </div>
+          </div>
+        )}
         {slots.map((time, i) => {
           const isHour = time.endsWith(':00');
           return (
