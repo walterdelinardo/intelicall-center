@@ -165,6 +165,8 @@ const ChatTab = () => {
           onStatusFilterChange={setStatusFilter}
           assignedFilter={assignedFilter}
           onAssignedFilterChange={setAssignedFilter}
+          inboxMetaMap={inboxMetaMap}
+          showInboxLabel={!selectedInboxId}
         />
       </Card>
 
