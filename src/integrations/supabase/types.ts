@@ -84,6 +84,50 @@ export type Database = {
           },
         ]
       }
+      calendar_notifications: {
+        Row: {
+          account_id: string | null
+          action: string
+          actor_name: string | null
+          clinic_id: string
+          created_at: string
+          details: string | null
+          event_id: string | null
+          event_title: string | null
+          id: string
+        }
+        Insert: {
+          account_id?: string | null
+          action: string
+          actor_name?: string | null
+          clinic_id: string
+          created_at?: string
+          details?: string | null
+          event_id?: string | null
+          event_title?: string | null
+          id?: string
+        }
+        Update: {
+          account_id?: string | null
+          action?: string
+          actor_name?: string | null
+          clinic_id?: string
+          created_at?: string
+          details?: string | null
+          event_id?: string | null
+          event_title?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_notifications_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "google_calendar_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chatwoot_conversations: {
         Row: {
           account_id: string
@@ -262,8 +306,10 @@ export type Database = {
         Row: {
           address: string | null
           city: string | null
+          cnpj: string | null
           created_at: string
           email: string | null
+          google_maps_api_key: string | null
           id: string
           is_active: boolean
           location_url: string | null
@@ -279,8 +325,10 @@ export type Database = {
         Insert: {
           address?: string | null
           city?: string | null
+          cnpj?: string | null
           created_at?: string
           email?: string | null
+          google_maps_api_key?: string | null
           id?: string
           is_active?: boolean
           location_url?: string | null
@@ -296,8 +344,10 @@ export type Database = {
         Update: {
           address?: string | null
           city?: string | null
+          cnpj?: string | null
           created_at?: string
           email?: string | null
+          google_maps_api_key?: string | null
           id?: string
           is_active?: boolean
           location_url?: string | null
@@ -1137,6 +1187,7 @@ export type Database = {
           distance_km: number | null
           driving_time_min: number | null
           flexibility: string | null
+          google_calendar_account_id: string | null
           id: string
           notes: string | null
           notified_at: string | null
@@ -1160,6 +1211,7 @@ export type Database = {
           distance_km?: number | null
           driving_time_min?: number | null
           flexibility?: string | null
+          google_calendar_account_id?: string | null
           id?: string
           notes?: string | null
           notified_at?: string | null
@@ -1183,6 +1235,7 @@ export type Database = {
           distance_km?: number | null
           driving_time_min?: number | null
           flexibility?: string | null
+          google_calendar_account_id?: string | null
           id?: string
           notes?: string | null
           notified_at?: string | null
@@ -1209,6 +1262,13 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "waiting_list_google_calendar_account_id_fkey"
+            columns: ["google_calendar_account_id"]
+            isOneToOne: false
+            referencedRelation: "google_calendar_accounts"
             referencedColumns: ["id"]
           },
           {
