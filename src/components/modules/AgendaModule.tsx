@@ -1494,6 +1494,102 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
     mutationFn: async () => {
       if (!clinicId) throw new Error("Sem clínica");
 
+      const ep = event?.extendedProperties;
+
+      // === 1. Resolve client_id from extendedProperties ===
+      let clientId: string | null = null;
+      if (ep?.clientWhatsapp) {
+        const { data: clientByPhone } = await supabase
+          .from("clients")
+          .select("id")
+          .eq("clinic_id", clinicId)
+          .eq("whatsapp", ep.clientWhatsapp)
+          .maybeSingle();
+        if (clientByPhone) clientId = clientByPhone.id;
+      }
+      if (!clientId && ep?.clientName) {
+        const { data: clientByName } = await supabase
+          .from("clients")
+          .select("id")
+          .eq("clinic_id", clinicId)
+          .eq("name", ep.clientName)
+          .maybeSingle();
+        if (clientByName) clientId = clientByName.id;
+      }
+
+      // === 2. Resolve procedure_id from extendedProperties ===
+      let procedureId: string | null = null;
+      if (ep?.procedureName) {
+        const { data: procByName } = await supabase
+          .from("procedures")
+          .select("id")
+          .eq("clinic_id", clinicId)
+          .eq("name", ep.procedureName)
+          .maybeSingle();
+        if (procByName) procedureId = procByName.id;
+      }
+
+      // === 3. Create appointment record (links Google event to local data) ===
+      let appointmentId: string | null = null;
+      if (clientId && event) {
+        const durationMatch = event.duration?.match(/(\d+)/);
+        const durationMin = durationMatch ? parseInt(durationMatch[1]) : 30;
+
+        const { data: newAppt } = await supabase
+          .from("appointments")
+          .insert({
+            clinic_id: clinicId,
+            client_id: clientId,
+            procedure_id: procedureId,
+            date: event.date,
+            start_time: event.time + ":00",
+            duration_minutes: durationMin,
+            estimated_price: parseFloat(form.amount) || null,
+            status: "compareceu",
+            notes: `Faturado via Google Calendar: ${event.title}`,
+          })
+          .select("id")
+          .single();
+        if (newAppt) appointmentId = newAppt.id;
+      }
+
+      // === 4. Create or find existing medical_record ===
+      if (clientId) {
+        const { data: existingRecord } = await supabase
+          .from("medical_records")
+          .select("id")
+          .eq("clinic_id", clinicId)
+          .eq("client_id", clientId)
+          .maybeSingle();
+
+        if (!existingRecord) {
+          await supabase.from("medical_records").insert({
+            clinic_id: clinicId,
+            client_id: clientId,
+            appointment_id: appointmentId,
+            date: event?.date || format(new Date(), "yyyy-MM-dd"),
+          });
+        }
+      }
+
+      // === 5. Create extra procedure appointments ===
+      if (clientId) {
+        for (const proc of extraProcedures) {
+          await supabase.from("appointments").insert({
+            clinic_id: clinicId,
+            client_id: clientId,
+            procedure_id: proc.procedureId,
+            date: event?.date || form.date,
+            start_time: event?.time ? event.time + ":00" : "00:00:00",
+            duration_minutes: 30,
+            estimated_price: proc.price,
+            status: "compareceu",
+            notes: `Procedimento adicional faturado: ${proc.name}`,
+          });
+        }
+      }
+
+      // === 6. Financial transactions (existing logic) ===
       // Main transaction (atendimento)
       const { error } = await supabase.from("financial_transactions").insert({
         clinic_id: clinicId,
@@ -1505,6 +1601,8 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
         status: form.status,
         date: form.date,
         notes: form.notes || null,
+        client_id: clientId,
+        appointment_id: appointmentId,
       });
       if (error) throw error;
 
@@ -1519,6 +1617,7 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
           payment_method: form.payment_method,
           status: form.status,
           date: form.date,
+          client_id: clientId,
         });
         // Deduct stock
         const stockItem = stockItems.find((s: any) => s.id === item.stockId);
@@ -1540,6 +1639,7 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
           payment_method: form.payment_method,
           status: form.status,
           date: form.date,
+          client_id: clientId,
         });
       }
     },
@@ -1547,6 +1647,8 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
       queryClient.invalidateQueries({ queryKey: ["financial-daily"] });
       queryClient.invalidateQueries({ queryKey: ["financial-monthly"] });
       queryClient.invalidateQueries({ queryKey: ["stock"] });
+      queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["medical-records"] });
       toast.success("Faturamento realizado com sucesso!");
       onOpenChange(false);
     },
