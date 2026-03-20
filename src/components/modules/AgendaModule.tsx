@@ -635,6 +635,7 @@ const AgendaModule = () => {
     const success = await deleteGoogleEvent(eventToDelete.id, eventToDelete.accountId);
     setEditLoading(false);
     if (success) {
+      logNotification("cancelled", eventToDelete?.title || "", eventToDelete?.accountId, "Evento excluído");
       setShowDeleteDialog(false);
       setEventToDelete(null);
     }
