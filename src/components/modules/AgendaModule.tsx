@@ -169,7 +169,7 @@ const AgendaModule = () => {
     queryFn: async () => {
       if (!profile?.clinic_id) return [];
       const { data, error } = await supabase
-        .from("clients").select("id, name")
+        .from("clients").select("id, name, email, whatsapp, phone, birth_date")
         .eq("clinic_id", profile.clinic_id)
         .eq("is_active", true)
         .order("name");
