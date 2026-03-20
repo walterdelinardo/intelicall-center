@@ -55,6 +55,7 @@ const DashboardContent = () => {
 const Dashboard = () => (
   <DashboardProvider>
     <DashboardContent />
+    <InboxPickerDialog />
   </DashboardProvider>
 );
 
