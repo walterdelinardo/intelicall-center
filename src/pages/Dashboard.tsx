@@ -1,5 +1,6 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import AppSidebar from "@/components/dashboard/AppSidebar";
+import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import DashboardHome from "@/components/modules/DashboardHome";
 import AgendaModule from "@/components/modules/AgendaModule";
 import ClientesModule from "@/components/modules/ClientesModule";
@@ -38,15 +39,16 @@ const DashboardContent = () => {
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
         <AppSidebar activeModule={activeModule} onModuleChange={setActiveModule} />
-        <main className="flex-1 overflow-auto">
+        <div className="flex-1 flex flex-col overflow-auto">
+          <DashboardHeader />
           <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b border-border px-4 py-3 flex items-center gap-3">
             <SidebarTrigger />
             <h1 className="text-lg font-semibold text-foreground capitalize">{activeModule === "dashboard" ? "Painel" : activeModule}</h1>
           </div>
-          <div className="p-6 animate-fade-in">
+          <main className="flex-1 p-6 animate-fade-in">
             <ActiveComponent />
-          </div>
-        </main>
+          </main>
+        </div>
       </div>
     </SidebarProvider>
   );
