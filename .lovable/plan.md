@@ -1,54 +1,32 @@
 
 
-## Plano: Fluxo completo de "Abrir Chat" com seleção de instância
+## Plano: Tornar a lista de conversas responsiva
 
-### Problema atual
-O botão de chat nos módulos Clientes e Lista de Espera apenas navega para o módulo Conversas e tenta encontrar uma conversa existente. Falta:
-1. Dialog para selecionar a instância WhatsApp
-2. Criar conversa automaticamente se não existir
-3. Filtrar pelo inbox selecionado ao redirecionar
+### Problema
+O layout da linha de cada conversa tem nome, horário, última mensagem, status e badge de não lidos todos na mesma linha. Em telas menores o conteúdo é cortado, escondendo o horário e o status.
 
-### Alterações
+### Solução
+Reorganizar o layout de cada item de conversa para empilhar as informações em duas linhas claras, garantindo que nada seja cortado:
 
-#### 1. `DashboardContext.tsx` — Expandir estado
+**Arquivo: `src/components/dashboard/chat/ConversationList.tsx`**
 
-Adicionar `pendingChatInboxId` ao contexto. Mudar `openChatWithPhone` para abrir um dialog de seleção de instância em vez de navegar diretamente. Adicionar novo campo `showInboxPicker` (boolean) e `pendingChatPhoneForPicker` para controlar o fluxo.
+Alterar a estrutura de cada item de conversa (linhas 112-134):
 
-Nova função `confirmChatWithInbox(inboxId: string)` que:
-- Armazena phone + inboxId no contexto
-- Navega para "conversas"
+- **Linha 1**: Nome (truncate) + horário (shrink-0) — manter como está, funciona bem
+- **Linha 2**: Mudar de layout horizontal para wrap. Colocar a última mensagem em uma linha própria (`block` em vez de `flex-1 truncate` dentro de um flex row). Status e badge de unread ficam abaixo, em uma linha separada com `flex items-center gap-1 mt-0.5`
 
-#### 2. Novo componente `InboxPickerDialog.tsx`
+Layout proposto:
+```text
+[Avatar]  Nome do contato          14:32
+          Última mensagem receb...
+          [Status: Humano] [3]
+```
 
-Dialog modal que:
-- Recebe as inboxes ativas da clínica (via query)
-- Lista as instâncias disponíveis com nome e número
-- Ao selecionar, chama `confirmChatWithInbox(inboxId)`
-- Renderizado no `Dashboard.tsx` (nível global)
+Isso garante que status e horário nunca sejam cortados, independente da largura da coluna.
 
-#### 3. `ChatTab.tsx` — Lógica de auto-seleção/criação
-
-Quando recebe `pendingChatPhone` + `pendingChatInboxId`:
-1. Filtra o inbox selecionado no select de caixas
-2. Busca conversa existente com aquele phone + inbox
-3. Se não encontrar, cria nova conversa na tabela `whatsapp_conversations` com:
-   - `clinic_id` do usuário
-   - `inbox_id` selecionado
-   - `remote_jid` formatado como `55PHONE@s.whatsapp.net`
-   - `contact_name` (se disponível)
-   - `contact_phone` = phone
-4. Seleciona a conversa (nova ou existente)
-
-#### 4. `ClientesModule.tsx` e `ListaEsperaModule.tsx`
-
-Sem mudanças — já chamam `openChatWithPhone`. A mudança é no contexto que agora abre o picker antes de navegar.
-
-### Arquivos
+### Arquivo alterado
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/contexts/DashboardContext.tsx` | Adicionar estado de picker + inboxId |
-| `src/components/dashboard/InboxPickerDialog.tsx` | Novo — dialog de seleção de instância |
-| `src/pages/Dashboard.tsx` | Renderizar InboxPickerDialog |
-| `src/components/dashboard/ChatTab.tsx` | Auto-criar conversa + filtrar inbox |
+| `src/components/dashboard/chat/ConversationList.tsx` | Reorganizar layout do item para empilhar em 3 linhas |
 
