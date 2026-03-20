@@ -15,6 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ClipboardList, Plus, Search, Pencil, Trash2, MessageSquare, CalendarPlus, History, Phone, User, Clock } from "lucide-react";
+import { useDashboard } from "@/contexts/DashboardContext";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -57,6 +58,7 @@ const emptyForm = {
 
 const ListaEsperaModule = () => {
   const { profile } = useAuth();
+  const { openChatWithPhone } = useDashboard();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -385,7 +387,12 @@ const ListaEsperaModule = () => {
                       <div className="flex gap-1 justify-end">
                         {(item.status === "aguardando" || item.status === "notificado") && (
                           <Button size="icon" variant="ghost" title="Notificar via WhatsApp" onClick={() => handleNotifyWhatsApp(item)}>
-                            <MessageSquare className="w-4 h-4 text-green-600" />
+                            <Phone className="w-4 h-4 text-muted-foreground" />
+                          </Button>
+                        )}
+                        {(item.client_phone || item.clients?.whatsapp || item.clients?.phone) && (
+                          <Button size="icon" variant="ghost" title="Conversar no chat" onClick={() => openChatWithPhone(item.client_phone || item.clients?.whatsapp || item.clients?.phone)}>
+                            <MessageSquare className="w-4 h-4 text-success" />
                           </Button>
                         )}
                         {(item.status === "aguardando" || item.status === "confirmado") && (

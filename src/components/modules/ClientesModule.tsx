@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import ClientDetailsDialog from "./clients/ClientDetailsDialog";
+import { useDashboard } from "@/contexts/DashboardContext";
 
 interface Client {
   id: string;
@@ -58,6 +59,7 @@ const emptyForm = {
 
 const ClientesModule = () => {
   const { profile } = useAuth();
+  const { openChatWithPhone } = useDashboard();
   const queryClient = useQueryClient();
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
@@ -541,10 +543,8 @@ const ClientesModule = () => {
                           <Trash2 className="w-4 h-4 text-destructive" />
                         </Button>
                         {client.whatsapp && (
-                          <Button size="icon" variant="ghost" asChild>
-                            <a href={`https://wa.me/55${client.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer">
-                              <MessageSquare className="w-4 h-4 text-success" />
-                            </a>
+                          <Button size="icon" variant="ghost" onClick={() => openChatWithPhone(client.whatsapp!)}>
+                            <MessageSquare className="w-4 h-4 text-success" />
                           </Button>
                         )}
                       </div>
