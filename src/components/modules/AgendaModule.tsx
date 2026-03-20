@@ -252,6 +252,18 @@ const AgendaModule = () => {
     return editForm.title;
   }, [editForm.procedureName, editForm.clientName, editForm.title]);
 
+  const handleSelectLocalClient = (client: typeof clients[0]) => {
+    setForm({
+      ...form,
+      clientName: client.name,
+      clientWhatsapp: client.whatsapp || client.phone || '',
+      clientEmail: client.email || '',
+      clientOrigin: 'cadastro',
+    });
+    setIsNewClient(false);
+    setClientSearchOpen(false);
+  };
+
   const handleSelectExternalClient = (client: typeof externalClients[0]) => {
     const displayName = client.nome || client.nome_wpp || client.whatsapp || '';
     setForm({
