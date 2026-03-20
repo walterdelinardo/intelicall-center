@@ -820,15 +820,7 @@ function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
             </TabsContent>
 
             <TabsContent value="procedures" className="space-y-4 mt-4">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm text-muted-foreground">Histórico de procedimentos do paciente</p>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="gap-2" onClick={() => fileInputRef.current?.click()}>
-                    <FileUp className="w-4 h-4" /> Anexar Documento
-                  </Button>
-                  <input ref={fileInputRef} type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={(e) => e.target.files && uploadDocMutation.mutate(e.target.files)} />
-                </div>
-              </div>
+              <p className="text-sm text-muted-foreground mb-2">Histórico de procedimentos do paciente</p>
               {procedures.length === 0 ? (
                 <p className="text-muted-foreground text-sm">Nenhum procedimento registrado para este paciente.</p>
               ) : (
@@ -840,6 +832,7 @@ function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
                       <TableHead className="hidden md:table-cell">Profissional</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="hidden md:table-cell text-right">Valor</TableHead>
+                      <TableHead>Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -853,6 +846,46 @@ function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
                           <TableCell><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${st.color}`}>{st.label}</span></TableCell>
                           <TableCell className="hidden md:table-cell text-right">
                             {p.procedures?.price ? `R$ ${Number(p.procedures.price).toFixed(2)}` : "—"}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Anexar Documento"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const input = document.createElement('input');
+                                  input.type = 'file';
+                                  input.accept = 'image/*,application/pdf';
+                                  input.multiple = true;
+                                  input.onchange = async (ev) => {
+                                    const files = (ev.target as HTMLInputElement).files;
+                                    if (files) {
+                                      try {
+                                        await handleUploadForProcedure(files, p.id);
+                                      } catch {
+                                        toast.error("Erro ao anexar documento");
+                                      }
+                                    }
+                                  };
+                                  input.click();
+                                }}
+                              >
+                                <FileUp className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Gerar Receita"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  generatePrescription(p);
+                                }}
+                              >
+                                <ScrollText className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
