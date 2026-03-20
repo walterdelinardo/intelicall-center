@@ -1749,7 +1749,7 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
             start_time: event.time + ":00",
             duration_minutes: durationMin,
             estimated_price: parseFloat(form.amount) || null,
-            status: "compareceu",
+            status: "confirmado",
             notes: `Faturado via Google Calendar: ${event.title}`,
           })
           .select("id")
@@ -1787,7 +1787,7 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
             start_time: event?.time ? event.time + ":00" : "00:00:00",
             duration_minutes: 30,
             estimated_price: proc.price,
-            status: "compareceu",
+            status: "confirmado",
             notes: `Procedimento adicional faturado: ${proc.name}`,
           });
         }
@@ -1800,7 +1800,7 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
         type: form.type,
         category: form.category,
         description: form.description,
-        amount: grandTotal,
+        amount: baseAmount,
         payment_method: form.payment_method,
         status: form.status,
         date: form.date,
@@ -1845,6 +1845,27 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
           date: form.date,
           client_id: clientId,
         });
+      }
+
+      // === 7. Update all appointments to "compareceu" (trigger won't duplicate because transactions already exist) ===
+      const apptIdsToUpdate = [appointmentId].filter(Boolean);
+      if (clientId) {
+        const { data: extraAppts } = await supabase
+          .from("appointments")
+          .select("id")
+          .eq("clinic_id", clinicId)
+          .eq("client_id", clientId)
+          .eq("status", "confirmado")
+          .ilike("notes", "%faturado%");
+        if (extraAppts) {
+          apptIdsToUpdate.push(...extraAppts.map((a: any) => a.id));
+        }
+      }
+      if (apptIdsToUpdate.length > 0) {
+        await supabase
+          .from("appointments")
+          .update({ status: "compareceu" })
+          .in("id", apptIdsToUpdate);
       }
     },
     onSuccess: () => {
