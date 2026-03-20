@@ -1,4 +1,4 @@
-import { Check, CheckCheck, Clock, FileText, Download, X } from "lucide-react";
+import { Check, CheckCheck, Clock, FileText, Download, X, StickyNote } from "lucide-react";
 import { format } from "date-fns";
 import { useState } from "react";
 import { WhatsAppMessage } from "@/hooks/useWhatsApp";
