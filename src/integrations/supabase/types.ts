@@ -1417,6 +1417,7 @@ export type Database = {
           file_name: string | null
           id: string
           is_from_me: boolean | null
+          is_internal_note: boolean
           media_height: number | null
           media_seconds: number | null
           media_type: string | null
@@ -1439,6 +1440,7 @@ export type Database = {
           file_name?: string | null
           id?: string
           is_from_me?: boolean | null
+          is_internal_note?: boolean
           media_height?: number | null
           media_seconds?: number | null
           media_type?: string | null
@@ -1461,6 +1463,7 @@ export type Database = {
           file_name?: string | null
           id?: string
           is_from_me?: boolean | null
+          is_internal_note?: boolean
           media_height?: number | null
           media_seconds?: number | null
           media_type?: string | null
