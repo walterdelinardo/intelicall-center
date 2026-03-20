@@ -197,6 +197,40 @@ const AgendaModule = () => {
     enabled: !!profile?.clinic_id,
   });
 
+  // Calendar notifications query
+  const { data: notifications = [], refetch: refetchNotifications } = useQuery({
+    queryKey: ["calendar-notifications", profile?.clinic_id],
+    queryFn: async () => {
+      if (!profile?.clinic_id) return [];
+      const { data, error } = await supabase
+        .from("calendar_notifications" as any)
+        .select("*")
+        .eq("clinic_id", profile.clinic_id)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!profile?.clinic_id,
+  });
+
+  const logNotification = useCallback(async (action: string, eventTitle: string, accountId?: string, details?: string) => {
+    if (!profile?.clinic_id) return;
+    try {
+      await supabase.from("calendar_notifications" as any).insert({
+        clinic_id: profile.clinic_id,
+        account_id: accountId || null,
+        event_title: eventTitle,
+        action,
+        details: details || null,
+        actor_name: profile.full_name || "Sistema",
+      });
+      refetchNotifications();
+    } catch (err) {
+      console.error("Error logging notification:", err);
+    }
+  }, [profile?.clinic_id, profile?.full_name, refetchNotifications]);
+
   const mergedEvents = useMemo((): MergedEvent[] => {
     if (useGoogleAsPrimary) {
       return googleEvents
