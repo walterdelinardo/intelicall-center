@@ -386,7 +386,12 @@ const ListaEsperaModule = () => {
                       <div className="flex gap-1 justify-end">
                         {(item.status === "aguardando" || item.status === "notificado") && (
                           <Button size="icon" variant="ghost" title="Notificar via WhatsApp" onClick={() => handleNotifyWhatsApp(item)}>
-                            <MessageSquare className="w-4 h-4 text-green-600" />
+                            <Phone className="w-4 h-4 text-muted-foreground" />
+                          </Button>
+                        )}
+                        {(item.client_phone || item.clients?.whatsapp || item.clients?.phone) && (
+                          <Button size="icon" variant="ghost" title="Conversar no chat" onClick={() => openChatWithPhone(item.client_phone || item.clients?.whatsapp || item.clients?.phone)}>
+                            <MessageSquare className="w-4 h-4 text-success" />
                           </Button>
                         )}
                         {(item.status === "aguardando" || item.status === "confirmado") && (

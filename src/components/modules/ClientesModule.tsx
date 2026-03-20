@@ -542,10 +542,8 @@ const ClientesModule = () => {
                           <Trash2 className="w-4 h-4 text-destructive" />
                         </Button>
                         {client.whatsapp && (
-                          <Button size="icon" variant="ghost" asChild>
-                            <a href={`https://wa.me/55${client.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer">
-                              <MessageSquare className="w-4 h-4 text-success" />
-                            </a>
+                          <Button size="icon" variant="ghost" onClick={() => openChatWithPhone(client.whatsapp!)}>
+                            <MessageSquare className="w-4 h-4 text-success" />
                           </Button>
                         )}
                       </div>
