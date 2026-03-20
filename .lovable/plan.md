@@ -1,51 +1,45 @@
+## Plano: Redirecionar botões "Conversar" para o chat interno
+
+### Problema
+
+Os botões de conversa no módulo Clientes abrem `wa.me` (link externo) e no módulo Lista de Espera enviam notificação via edge function. O usuário quer que redirecionem para o módulo de Conversas interno e antes de iniciar a conversa o sistema mostra a lisa com as instancias disponíveis para o usuário selecionar uma e abrir a conversa usando a instancia selecionada
+
+### Abordagem
+
+O Dashboard.tsx gerencia a navegação entre módulos via `setActiveModule` (estado local). Os módulos não têm acesso a essa função. A solução é criar um contexto de navegação compartilhado.
+
+### Alterações
+
+#### 1. Criar `DashboardContext` com navegação + conversa selecionada
+
+Novo contexto (`src/contexts/DashboardContext.tsx`) que expõe:
+
+- `navigateToModule(module: string)` — troca o módulo ativo
+- `openChatWithPhone(phone: string)` — navega para "conversas" e armazena o telefone para pré-selecionar a conversa
+
+#### 2. `Dashboard.tsx` — Prover o contexto
+
+Envolver os módulos com `DashboardProvider`, passando `setActiveModule` e um estado `pendingChatPhone`.
+
+#### 3. `ClientesModule.tsx` — Alterar botão WhatsApp
+
+Trocar o link `wa.me` por um `onClick` que chama `openChatWithPhone(client.whatsapp)`.
+
+#### 4. `ListaEsperaModule.tsx` — Adicionar botão de chat interno
+
+alterar o botão existente que chama `openChatWithPhone(phone)` para abrir a conversa no chat interno. O botão de notificação pode permanecer para enviar a mensagem automática.
+
+#### 5. `ChatTab.tsx` — Auto-selecionar conversa pelo telefone
+
+Ao montar, verificar se existe um `pendingChatPhone` no contexto. Se sim, buscar a conversa correspondente na lista e selecioná-la automaticamente, depois limpar o pending.
+
+### Arquivos
 
 
-## Plano: Anotações Internas no Chat (estilo Chatwoot)
-
-### Resumo
-
-Adicionar um toggle no input do chat para alternar entre "Mensagem" e "Nota interna". Notas internas são salvas no banco mas nunca enviadas ao cliente. No corpo do chat, aparecem com visual diferenciado (fundo amarelo, ícone de nota).
-
----
-
-### 1. Migração de banco
-
-Adicionar coluna `is_internal_note` na tabela `whatsapp_messages`:
-
-```sql
-ALTER TABLE public.whatsapp_messages 
-ADD COLUMN is_internal_note boolean NOT NULL DEFAULT false;
-```
-
-### 2. `useWhatsApp.ts` — Tipo e hook
-
-- Adicionar `is_internal_note` ao tipo `WhatsAppMessage`
-- Criar função `sendInternalNote` no hook que insere direto no banco (sem chamar a edge function `send-evolution-message`), com `is_from_me = true`, `message_type = 'text'`, `is_internal_note = true`
-
-### 3. `ChatArea.tsx` — Toggle no input
-
-- Adicionar estado `isNoteMode` (boolean)
-- Botão toggle ao lado do input: ícone `StickyNote` quando ativo (amarelo), `MessageSquare` quando desativado
-- Quando `isNoteMode = true`:
-  - Barra de input muda de cor (borda amarela / fundo amarelo suave)
-  - Placeholder muda para "Escreva uma nota interna..."
-  - Ao enviar, chama `sendInternalNote` em vez de `sendMessage`
-  - Botão de anexo fica desabilitado em modo nota
-
-### 4. `MessageBubble.tsx` — Visual de nota
-
-- Se `msg.is_internal_note === true`, renderizar com estilo diferente:
-  - Fundo amarelo (`bg-yellow-100 border border-yellow-300`)
-  - Ícone de nota (`StickyNote`) no canto
-  - Label "Nota interna" em texto pequeno
-  - Alinhado à direita (como mensagens enviadas)
-
-### Arquivos alterados
-
-| Arquivo | Mudança |
-|---------|---------|
-| Migração SQL | Adicionar `is_internal_note` |
-| `src/hooks/useWhatsApp.ts` | Tipo + `sendInternalNote` |
-| `src/components/dashboard/chat/ChatArea.tsx` | Toggle nota/mensagem no input |
-| `src/components/dashboard/chat/MessageBubble.tsx` | Estilo visual para notas |
-
+| Arquivo                                        | Mudança                               |
+| ---------------------------------------------- | ------------------------------------- |
+| `src/contexts/DashboardContext.tsx`            | Novo — contexto de navegação          |
+| `src/pages/Dashboard.tsx`                      | Envolver com provider                 |
+| `src/components/modules/ClientesModule.tsx`    | Botão abre chat interno               |
+| `src/components/modules/ListaEsperaModule.tsx` | Botão abre chat interno               |
+| `src/components/dashboard/ChatTab.tsx`         | Auto-selecionar conversa por telefone |
