@@ -669,33 +669,70 @@ function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
     },
   });
 
-  const generatePrescription = () => {
+  const generatePrescription = (procedure?: any) => {
     if (!record) return;
+    const procedureName = procedure?.procedures?.name || "—";
+    const procedureDate = procedure ? format(new Date(procedure.date), "dd/MM/yyyy", { locale: ptBR }) : format(new Date(record.date), "dd/MM/yyyy", { locale: ptBR });
     const lines = [
       `RECEITUÁRIO`,
       ``,
       `Paciente: ${record.clients?.name || "—"}`,
-      `Data: ${format(new Date(record.date), "dd/MM/yyyy", { locale: ptBR })}`,
+      `Data: ${procedureDate}`,
       `Profissional: ${record.profiles?.full_name || "—"}`,
       ``,
-      `Diagnóstico: ${record.diagnosis || "—"}`,
+      `Procedimento Realizado: ${procedureName}`,
       ``,
-      `Tratamento Realizado: ${record.treatment_performed || "—"}`,
+      `─────────────────────────────────────────`,
+      `PRESCRIÇÃO:`,
       ``,
-      `Recomendações:`,
-      record.recommendations || "—",
+      `1. `,
+      ``,
+      `2. `,
+      ``,
+      `3. `,
+      ``,
+      `─────────────────────────────────────────`,
+      `ORIENTAÇÕES AO PACIENTE:`,
+      ``,
+      `• `,
+      ``,
+      `• `,
+      ``,
+      `─────────────────────────────────────────`,
+      `OBSERVAÇÕES:`,
+      ``,
+      ``,
+      ``,
       ``,
       `_________________________________`,
       `Assinatura do Profissional`,
+      `${record.profiles?.full_name || ""}`,
     ];
     const blob = new Blob([lines.join("\n")], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `Receita_${record.clients?.name || "paciente"}_${record.date}.txt`;
+    a.download = `Receita_${record.clients?.name || "paciente"}_${procedureDate.replace(/\//g, "-")}.txt`;
     a.click();
     URL.revokeObjectURL(url);
     toast.success("Receita gerada!");
+  };
+
+  const handleUploadForProcedure = async (files: FileList, appointmentId: string) => {
+    for (const file of Array.from(files)) {
+      const filePath = `${clinicId}/${recordId}/${Date.now()}_${file.name}`;
+      const { error: upErr } = await supabase.storage.from("record-photos").upload(filePath, file);
+      if (upErr) throw upErr;
+      const { data: urlData } = supabase.storage.from("record-photos").getPublicUrl(filePath);
+      const fileType = file.type.startsWith("image/") ? "image" : "document";
+      await supabase.from("record_documents").insert({
+        record_id: recordId, clinic_id: clinicId,
+        file_url: urlData.publicUrl, title: file.name.replace(/\.[^/.]+$/, ""),
+        file_type: fileType,
+      });
+    }
+    queryClient.invalidateQueries({ queryKey: ["record-documents", recordId] });
+    toast.success("Documento anexado ao procedimento!");
   };
 
   if (!record) return <div className="p-8 text-center text-muted-foreground">Carregando...</div>;
