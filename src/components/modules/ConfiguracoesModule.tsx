@@ -64,6 +64,7 @@ const ConfiguracoesModule = () => {
   const [editingLabel, setEditingLabel] = useState<string | null>(null);
   const [editLabelValue, setEditLabelValue] = useState("");
   const [showGoogleConfig, setShowGoogleConfig] = useState(false);
+  const [showMapsConfig, setShowMapsConfig] = useState(false);
   const { data: clinic, isLoading } = useQuery({
     queryKey: ["clinic", profile?.clinic_id],
     queryFn: async () => {
