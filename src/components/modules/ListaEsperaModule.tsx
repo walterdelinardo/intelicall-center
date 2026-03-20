@@ -142,7 +142,7 @@ const ListaEsperaModule = () => {
         client_phone: form.client_phone || null,
         client_id: form.client_id || null,
         procedure_id: form.procedure_id || null,
-        professional_id: form.professional_id || null,
+        google_calendar_account_id: form.google_calendar_account_id || null,
         desired_date: form.desired_date || null,
         time_range_start: form.time_range_start || null,
         time_range_end: form.time_range_end || null,
