@@ -1,28 +1,51 @@
 
 
-## Plano: Separadores de Data no Chat (estilo WhatsApp)
+## Plano: Anotações Internas no Chat (estilo Chatwoot)
 
-### O que muda
+### Resumo
 
-Adicionar separadores de data entre as mensagens no chat, exatamente como o WhatsApp faz — um badge centralizado com o texto "Hoje", "Ontem", ou a data formatada (ex: "15/03/2026").
+Adicionar um toggle no input do chat para alternar entre "Mensagem" e "Nota interna". Notas internas são salvas no banco mas nunca enviadas ao cliente. No corpo do chat, aparecem com visual diferenciado (fundo amarelo, ícone de nota).
 
-### Implementação
+---
 
-**Arquivo: `src/components/dashboard/chat/ChatArea.tsx`**
+### 1. Migração de banco
 
-Na seção de renderização das mensagens (linhas 150-155), agrupar mensagens por dia e inserir um separador de data antes do primeiro item de cada grupo:
+Adicionar coluna `is_internal_note` na tabela `whatsapp_messages`:
 
-- Comparar a data de cada mensagem com a anterior
-- Quando o dia muda, renderizar um `DateSeparator` antes da mensagem
-- Lógica de label: se é hoje → "Hoje", se é ontem → "Ontem", senão → `dd/MM/yyyy`
-
-O separador será um `div` centralizado com uma linha horizontal e um `span` com fundo, similar ao WhatsApp:
-
-```text
-──────── Ontem ────────
+```sql
+ALTER TABLE public.whatsapp_messages 
+ADD COLUMN is_internal_note boolean NOT NULL DEFAULT false;
 ```
 
-Estilizado com Tailwind: `flex items-center gap-3` + linhas `flex-1 h-px bg-border` + texto `text-xs text-muted-foreground bg-background px-2`.
+### 2. `useWhatsApp.ts` — Tipo e hook
 
-Nenhum novo arquivo necessário — tudo fica inline no `ChatArea.tsx` (componente `DateSeparator` local + lógica de agrupamento no map).
+- Adicionar `is_internal_note` ao tipo `WhatsAppMessage`
+- Criar função `sendInternalNote` no hook que insere direto no banco (sem chamar a edge function `send-evolution-message`), com `is_from_me = true`, `message_type = 'text'`, `is_internal_note = true`
+
+### 3. `ChatArea.tsx` — Toggle no input
+
+- Adicionar estado `isNoteMode` (boolean)
+- Botão toggle ao lado do input: ícone `StickyNote` quando ativo (amarelo), `MessageSquare` quando desativado
+- Quando `isNoteMode = true`:
+  - Barra de input muda de cor (borda amarela / fundo amarelo suave)
+  - Placeholder muda para "Escreva uma nota interna..."
+  - Ao enviar, chama `sendInternalNote` em vez de `sendMessage`
+  - Botão de anexo fica desabilitado em modo nota
+
+### 4. `MessageBubble.tsx` — Visual de nota
+
+- Se `msg.is_internal_note === true`, renderizar com estilo diferente:
+  - Fundo amarelo (`bg-yellow-100 border border-yellow-300`)
+  - Ícone de nota (`StickyNote`) no canto
+  - Label "Nota interna" em texto pequeno
+  - Alinhado à direita (como mensagens enviadas)
+
+### Arquivos alterados
+
+| Arquivo | Mudança |
+|---------|---------|
+| Migração SQL | Adicionar `is_internal_note` |
+| `src/hooks/useWhatsApp.ts` | Tipo + `sendInternalNote` |
+| `src/components/dashboard/chat/ChatArea.tsx` | Toggle nota/mensagem no input |
+| `src/components/dashboard/chat/MessageBubble.tsx` | Estilo visual para notas |
 
