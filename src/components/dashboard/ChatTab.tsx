@@ -4,16 +4,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { MessageSquare, Inbox } from "lucide-react";
 import { useWhatsAppInboxes, useWhatsAppConversations, useWhatsAppMessages } from "@/hooks/useWhatsApp";
 import { useDashboard } from "@/contexts/DashboardContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import ConversationList from "./chat/ConversationList";
 import ChatArea from "./chat/ChatArea";
 
 const ChatTab = () => {
   const { inboxes, loading: inboxesLoading } = useWhatsAppInboxes();
-  const { pendingChatPhone, clearPendingChat } = useDashboard();
+  const { pendingChatPhone, pendingChatInboxId, pendingChatContactName, clearPendingChat } = useDashboard();
+  const { profile } = useAuth();
   const [selectedInboxId, setSelectedInboxId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [assignedFilter, setAssignedFilter] = useState<'mine' | 'all'>('all');
-  const { conversations, loading: convsLoading } = useWhatsAppConversations({
+  const { conversations, loading: convsLoading, refetch: refetchConversations } = useWhatsAppConversations({
     inboxId: selectedInboxId,
     statusFilter,
     assignedToFilter: assignedFilter,
@@ -23,20 +26,60 @@ const ChatTab = () => {
 
   const selectedConv = conversations.find(c => c.id === selectedConvId) || null;
 
-  // Auto-select conversation when navigating from another module
+  // Auto-select or create conversation when navigating from another module
   useEffect(() => {
-    if (!pendingChatPhone || convsLoading || conversations.length === 0) return;
-    const normalizedPhone = pendingChatPhone.replace(/\D/g, "");
-    const match = conversations.find(c => {
-      const jid = c.remote_jid?.replace(/\D/g, "") || "";
-      const phone = c.contact_phone?.replace(/\D/g, "") || "";
-      return jid.includes(normalizedPhone) || phone.includes(normalizedPhone) || normalizedPhone.includes(phone);
-    });
-    if (match) {
-      setSelectedConvId(match.id);
-    }
-    clearPendingChat();
-  }, [pendingChatPhone, conversations, convsLoading, clearPendingChat]);
+    if (!pendingChatPhone || !pendingChatInboxId || convsLoading) return;
+
+    const handlePending = async () => {
+      // Set the inbox filter to match selected inbox
+      setSelectedInboxId(pendingChatInboxId);
+
+      const normalizedPhone = pendingChatPhone.replace(/\D/g, "");
+
+      // Wait for conversations to reload with new inbox filter - search across all
+      const { data: existingConvs } = await supabase
+        .from('whatsapp_conversations')
+        .select('*')
+        .eq('inbox_id', pendingChatInboxId)
+        .or(`remote_jid.ilike.%${normalizedPhone}%,contact_phone.ilike.%${normalizedPhone}%`);
+
+      let targetConvId: string | null = null;
+
+      if (existingConvs && existingConvs.length > 0) {
+        targetConvId = existingConvs[0].id;
+      } else if (profile?.clinic_id) {
+        // Create new conversation
+        const remoteJid = normalizedPhone.startsWith('55')
+          ? `${normalizedPhone}@s.whatsapp.net`
+          : `55${normalizedPhone}@s.whatsapp.net`;
+
+        const { data: newConv, error } = await supabase
+          .from('whatsapp_conversations')
+          .insert({
+            clinic_id: profile.clinic_id,
+            inbox_id: pendingChatInboxId,
+            remote_jid: remoteJid,
+            contact_phone: normalizedPhone,
+            contact_name: pendingChatContactName || null,
+            conversation_status: 'humano',
+          } as any)
+          .select()
+          .single();
+
+        if (!error && newConv) {
+          targetConvId = newConv.id;
+        }
+      }
+
+      if (targetConvId) {
+        await refetchConversations();
+        setSelectedConvId(targetConvId);
+      }
+      clearPendingChat();
+    };
+
+    handlePending();
+  }, [pendingChatPhone, pendingChatInboxId, convsLoading, clearPendingChat, pendingChatContactName, profile?.clinic_id, refetchConversations]);
 
 
   return (

@@ -543,7 +543,7 @@ const ClientesModule = () => {
                           <Trash2 className="w-4 h-4 text-destructive" />
                         </Button>
                         {client.whatsapp && (
-                          <Button size="icon" variant="ghost" onClick={() => openChatWithPhone(client.whatsapp!)}>
+                          <Button size="icon" variant="ghost" onClick={() => openChatWithPhone(client.whatsapp!, client.name)}>
                             <MessageSquare className="w-4 h-4 text-success" />
                           </Button>
                         )}

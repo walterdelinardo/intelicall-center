@@ -391,7 +391,7 @@ const ListaEsperaModule = () => {
                           </Button>
                         )}
                         {(item.client_phone || item.clients?.whatsapp || item.clients?.phone) && (
-                          <Button size="icon" variant="ghost" title="Conversar no chat" onClick={() => openChatWithPhone(item.client_phone || item.clients?.whatsapp || item.clients?.phone)}>
+                          <Button size="icon" variant="ghost" title="Conversar no chat" onClick={() => openChatWithPhone(item.client_phone || item.clients?.whatsapp || item.clients?.phone, item.client_name)}>
                             <MessageSquare className="w-4 h-4 text-success" />
                           </Button>
                         )}

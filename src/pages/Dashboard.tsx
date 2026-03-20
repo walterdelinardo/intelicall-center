@@ -12,6 +12,7 @@ import LeadsModule from "@/components/modules/LeadsModule";
 import UsuariosModule from "@/components/modules/UsuariosModule";
 import ConfiguracoesModule from "@/components/modules/ConfiguracoesModule";
 import ListaEsperaModule from "@/components/modules/ListaEsperaModule";
+import InboxPickerDialog from "@/components/dashboard/InboxPickerDialog";
 import { DashboardProvider, useDashboard } from "@/contexts/DashboardContext";
 
 const modules: Record<string, React.ComponentType> = {
@@ -54,6 +55,7 @@ const DashboardContent = () => {
 const Dashboard = () => (
   <DashboardProvider>
     <DashboardContent />
+    <InboxPickerDialog />
   </DashboardProvider>
 );
 
