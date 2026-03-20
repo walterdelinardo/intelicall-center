@@ -52,6 +52,7 @@ export interface WhatsAppMessage {
   status: string;
   timestamp: string;
   created_at: string;
+  is_internal_note: boolean;
 }
 
 export const useWhatsAppInboxes = (activeOnly = false) => {
@@ -237,7 +238,29 @@ export const useSendWhatsAppMessage = () => {
     }
   };
 
-  return { sendMessage, sending };
+  const sendInternalNote = async (conversationId: string, content: string) => {
+    setSending(true);
+    try {
+      const { error } = await supabase.from('whatsapp_messages').insert({
+        conversation_id: conversationId,
+        message_id: `note-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        content,
+        message_type: 'text',
+        is_from_me: true,
+        is_internal_note: true,
+        status: 'read',
+        timestamp: new Date().toISOString(),
+      } as any);
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error sending internal note:', error);
+      throw error;
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return { sendMessage, sendInternalNote, sending };
 };
 
 export const useConversationActions = () => {
