@@ -148,6 +148,10 @@ const ListaEsperaModule = () => {
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!profile?.clinic_id) throw new Error("Sem clínica");
+      if (!form.desired_date) throw new Error("Informe a data desejada");
+      if (!form.time_range_start) throw new Error("Informe o horário de início");
+      if (!form.google_calendar_account_id) throw new Error("Selecione uma agenda");
+
       const payload: any = {
         clinic_id: profile.clinic_id,
         client_name: form.client_name,
@@ -163,9 +167,12 @@ const ListaEsperaModule = () => {
         origin: form.origin,
         notes: form.notes || null,
       };
+
+      let recordId: string;
       if (editId) {
         const { error } = await supabase.from("waiting_list").update(payload).eq("id", editId);
         if (error) throw error;
+        recordId = editId;
         await supabase.from("waiting_list_history").insert({
           waiting_list_id: editId, clinic_id: profile.clinic_id,
           action: "editado", details: "Registro editado", performed_by: profile.id,
@@ -173,14 +180,44 @@ const ListaEsperaModule = () => {
       } else {
         const { data, error } = await supabase.from("waiting_list").insert(payload).select("id").single();
         if (error) throw error;
+        recordId = data.id;
         await supabase.from("waiting_list_history").insert({
           waiting_list_id: data.id, clinic_id: profile.clinic_id,
           action: "criado", details: "Adicionado à lista de espera", performed_by: profile.id,
         });
+
+        // Auto-create Google Calendar event
+        const proc = procedures.find((p: any) => p.id === form.procedure_id);
+        const title = `${proc?.name || "Agendamento"} - ${form.client_name}`;
+        const startDT = `${form.desired_date}T${form.time_range_start}:00`;
+        const durationMin = proc?.duration_minutes || 30;
+        const endDT = new Date(new Date(startDT).getTime() + durationMin * 60000).toISOString();
+
+        const success = await createGoogleEvent({
+          title,
+          description: form.notes || "",
+          startDateTime: startDT,
+          endDateTime: endDT,
+          account_id: form.google_calendar_account_id,
+          extendedProperties: {
+            clientName: form.client_name,
+            clientWhatsapp: form.client_phone || "",
+            procedureName: proc?.name || "",
+            procedureValue: proc?.price ? String(proc.price) : "",
+          },
+        });
+
+        if (success) {
+          await supabase.from("waiting_list").update({ status: "agendado" }).eq("id", recordId);
+          await supabase.from("waiting_list_history").insert({
+            waiting_list_id: recordId, clinic_id: profile.clinic_id,
+            action: "agendado", details: "Evento criado automaticamente no Google Calendar", performed_by: profile.id,
+          });
+        }
       }
     },
     onSuccess: () => {
-      toast.success(editId ? "Registro atualizado" : "Adicionado à lista de espera");
+      toast.success(editId ? "Registro atualizado" : "Adicionado e agendado com sucesso!");
       queryClient.invalidateQueries({ queryKey: ["waiting-list"] });
       setIsOpen(false);
       setEditId(null);
