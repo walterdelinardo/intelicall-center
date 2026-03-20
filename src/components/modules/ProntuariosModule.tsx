@@ -135,7 +135,7 @@ const ProntuariosModule = () => {
         <Card className="shadow-card">
           <CardContent className="pt-4 pb-4">
             <p className="text-sm text-muted-foreground">Pacientes Atendidos</p>
-            <p className="text-2xl font-bold text-emerald-600">
+            <p className="text-2xl font-bold text-primary">
               {new Set(records.map(r => r.client_id)).size}
             </p>
           </CardContent>
