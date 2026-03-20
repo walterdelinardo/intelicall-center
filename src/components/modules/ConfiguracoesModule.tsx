@@ -88,7 +88,11 @@ const ConfiguracoesModule = () => {
     state: "",
     zip_code: "",
     theme_color: "#3B82F6",
+    cnpj: "",
   });
+
+  const [googleMapsKey, setGoogleMapsKey] = useState("");
+  const [savingMapsKey, setSavingMapsKey] = useState(false);
 
   const [workingHours, setWorkingHours] = useState<WorkingHours>(defaultWorkingHours);
 
