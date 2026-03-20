@@ -54,10 +54,14 @@ const ChatArea = ({ conversation, messages, messagesLoading }: ChatAreaProps) =>
   const handleSend = async () => {
     if (!message.trim() || !conversation) return;
     try {
-      await sendMessage(conversation.remote_jid, message, conversation.inbox_id);
+      if (isNoteMode) {
+        await sendInternalNote(conversation.id, message);
+      } else {
+        await sendMessage(conversation.remote_jid, message, conversation.inbox_id);
+      }
       setMessage("");
     } catch {
-      toast.error("Erro ao enviar mensagem");
+      toast.error(isNoteMode ? "Erro ao salvar nota" : "Erro ao enviar mensagem");
     }
   };
 
