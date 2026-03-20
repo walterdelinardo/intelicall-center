@@ -437,6 +437,7 @@ const ConfiguracoesModule = () => {
                           <TableHead>Label</TableHead>
                           <TableHead>Instância</TableHead>
                           <TableHead>Telefone</TableHead>
+                          <TableHead>Agenda</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead className="w-[80px]">Ações</TableHead>
                         </TableRow>
@@ -447,6 +448,40 @@ const ConfiguracoesModule = () => {
                             <TableCell className="font-medium">{inbox.label}</TableCell>
                             <TableCell className="font-mono text-xs">{inbox.instance_name}</TableCell>
                             <TableCell>{inbox.phone_number || "—"}</TableCell>
+                            <TableCell>
+                              <Select
+                                value={(inbox as any).google_calendar_account_id || "none"}
+                                onValueChange={async (val) => {
+                                  try {
+                                    await supabase
+                                      .from('whatsapp_inboxes')
+                                      .update({ google_calendar_account_id: val === "none" ? null : val } as any)
+                                      .eq('id', inbox.id);
+                                    toast.success("Agenda vinculada!");
+                                  } catch (e: any) {
+                                    toast.error(e.message);
+                                  }
+                                }}
+                              >
+                                <SelectTrigger className="h-8 text-xs w-[140px]">
+                                  <Calendar className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
+                                  <SelectValue placeholder="Nenhuma" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">Nenhuma</SelectItem>
+                                  {googleAccounts.filter(a => a.is_active).map(acc => (
+                                    <SelectItem key={acc.id} value={acc.id}>
+                                      <span className="flex items-center gap-1.5">
+                                        {acc.color && (
+                                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: acc.color }} />
+                                        )}
+                                        {acc.label}
+                                      </span>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
                             <TableCell>
                               <Badge variant={inbox.is_active ? "default" : "secondary"}>
                                 {inbox.is_active ? "Ativo" : "Inativo"}
