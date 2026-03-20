@@ -549,6 +549,8 @@ const AgendaModule = () => {
 
     setEditLoading(false);
     if (success) {
+      const wasRescheduled = editingEvent && (editForm.date !== editingEvent.date || editForm.startTime !== editingEvent.time);
+      logNotification(wasRescheduled ? "rescheduled" : "updated", title, editingEvent?.accountId, wasRescheduled ? `Reagendado para ${editForm.date} ${editForm.startTime}` : `Evento atualizado`);
       setIsEditOpen(false);
       setEditingEvent(null);
     }
