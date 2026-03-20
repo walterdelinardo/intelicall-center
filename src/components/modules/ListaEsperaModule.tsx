@@ -513,11 +513,11 @@ const ListaEsperaModule = () => {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Profissional</Label>
-                <Select value={form.professional_id} onValueChange={(v) => setForm({ ...form, professional_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="Qualquer" /></SelectTrigger>
+                <Label>Agenda *</Label>
+                <Select value={form.google_calendar_account_id} onValueChange={(v) => setForm({ ...form, google_calendar_account_id: v })}>
+                  <SelectTrigger><SelectValue placeholder="Selecionar agenda" /></SelectTrigger>
                   <SelectContent>
-                    {professionals.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}
+                    {calendarAccounts.map((a: any) => <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
