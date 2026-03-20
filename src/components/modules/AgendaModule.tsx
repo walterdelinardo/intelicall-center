@@ -620,6 +620,7 @@ const AgendaModule = () => {
     }
     setEditLoading(false);
     if (success) {
+      logNotification("cancelled", eventToDelete?.title || "", eventToDelete?.accountId, `Cancelado: ${cancelReason}`);
       setShowCancelDialog(false);
       setEventToDelete(null);
       setCancelReason("");
