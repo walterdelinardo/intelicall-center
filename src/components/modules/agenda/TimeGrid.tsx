@@ -100,14 +100,25 @@ const statusLabels: Record<string, string> = {
   cancelado: "Cancelado",
 };
 
-export const TimeGrid = ({ events, onSlotClick, onEventClick, onStatusChange }: TimeGridProps) => {
+export const TimeGrid = ({ events, selectedDate, onSlotClick, onEventClick, onStatusChange }: TimeGridProps) => {
   const slots = generateTimeSlots();
   const gridStartMin = START_HOUR * 60;
   const totalMinutes = (END_HOUR - START_HOUR) * 60;
+  const nowMinutes = useCurrentMinutes();
+  const showNowLine = selectedDate ? isTodayFn(selectedDate) : true;
+  const nowTop = ((nowMinutes - gridStartMin) / 30) * SLOT_HEIGHT;
+  const nowTime = `${String(Math.floor(nowMinutes / 60)).padStart(2, '0')}:${String(nowMinutes % 60).padStart(2, '0')}`;
 
   return (
     <div className="border rounded-lg bg-card overflow-hidden">
       <div className="relative" style={{ height: `${(totalMinutes / 30) * SLOT_HEIGHT}px` }}>
+        {/* Past time overlay */}
+        {showNowLine && nowTop > 0 && (
+          <div
+            className="absolute left-0 right-0 top-0 bg-foreground/[0.04] pointer-events-none z-[5]"
+            style={{ height: `${nowTop}px` }}
+          />
+        )}
         {/* Time labels and grid lines */}
         {slots.map((time, i) => {
           const isHour = time.endsWith(':00');
