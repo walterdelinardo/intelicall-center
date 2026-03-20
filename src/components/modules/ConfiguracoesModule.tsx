@@ -93,8 +93,6 @@ const ConfiguracoesModule = () => {
     cnpj: "",
   });
 
-  const [googleMapsKey, setGoogleMapsKey] = useState("");
-  const [savingMapsKey, setSavingMapsKey] = useState(false);
 
   const [workingHours, setWorkingHours] = useState<WorkingHours>(defaultWorkingHours);
 
