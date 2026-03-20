@@ -1,45 +1,54 @@
-## Plano: Redirecionar botões "Conversar" para o chat interno
 
-### Problema
 
-Os botões de conversa no módulo Clientes abrem `wa.me` (link externo) e no módulo Lista de Espera enviam notificação via edge function. O usuário quer que redirecionem para o módulo de Conversas interno e antes de iniciar a conversa o sistema mostra a lisa com as instancias disponíveis para o usuário selecionar uma e abrir a conversa usando a instancia selecionada
+## Plano: Fluxo completo de "Abrir Chat" com seleção de instância
 
-### Abordagem
-
-O Dashboard.tsx gerencia a navegação entre módulos via `setActiveModule` (estado local). Os módulos não têm acesso a essa função. A solução é criar um contexto de navegação compartilhado.
+### Problema atual
+O botão de chat nos módulos Clientes e Lista de Espera apenas navega para o módulo Conversas e tenta encontrar uma conversa existente. Falta:
+1. Dialog para selecionar a instância WhatsApp
+2. Criar conversa automaticamente se não existir
+3. Filtrar pelo inbox selecionado ao redirecionar
 
 ### Alterações
 
-#### 1. Criar `DashboardContext` com navegação + conversa selecionada
+#### 1. `DashboardContext.tsx` — Expandir estado
 
-Novo contexto (`src/contexts/DashboardContext.tsx`) que expõe:
+Adicionar `pendingChatInboxId` ao contexto. Mudar `openChatWithPhone` para abrir um dialog de seleção de instância em vez de navegar diretamente. Adicionar novo campo `showInboxPicker` (boolean) e `pendingChatPhoneForPicker` para controlar o fluxo.
 
-- `navigateToModule(module: string)` — troca o módulo ativo
-- `openChatWithPhone(phone: string)` — navega para "conversas" e armazena o telefone para pré-selecionar a conversa
+Nova função `confirmChatWithInbox(inboxId: string)` que:
+- Armazena phone + inboxId no contexto
+- Navega para "conversas"
 
-#### 2. `Dashboard.tsx` — Prover o contexto
+#### 2. Novo componente `InboxPickerDialog.tsx`
 
-Envolver os módulos com `DashboardProvider`, passando `setActiveModule` e um estado `pendingChatPhone`.
+Dialog modal que:
+- Recebe as inboxes ativas da clínica (via query)
+- Lista as instâncias disponíveis com nome e número
+- Ao selecionar, chama `confirmChatWithInbox(inboxId)`
+- Renderizado no `Dashboard.tsx` (nível global)
 
-#### 3. `ClientesModule.tsx` — Alterar botão WhatsApp
+#### 3. `ChatTab.tsx` — Lógica de auto-seleção/criação
 
-Trocar o link `wa.me` por um `onClick` que chama `openChatWithPhone(client.whatsapp)`.
+Quando recebe `pendingChatPhone` + `pendingChatInboxId`:
+1. Filtra o inbox selecionado no select de caixas
+2. Busca conversa existente com aquele phone + inbox
+3. Se não encontrar, cria nova conversa na tabela `whatsapp_conversations` com:
+   - `clinic_id` do usuário
+   - `inbox_id` selecionado
+   - `remote_jid` formatado como `55PHONE@s.whatsapp.net`
+   - `contact_name` (se disponível)
+   - `contact_phone` = phone
+4. Seleciona a conversa (nova ou existente)
 
-#### 4. `ListaEsperaModule.tsx` — Adicionar botão de chat interno
+#### 4. `ClientesModule.tsx` e `ListaEsperaModule.tsx`
 
-alterar o botão existente que chama `openChatWithPhone(phone)` para abrir a conversa no chat interno. O botão de notificação pode permanecer para enviar a mensagem automática.
-
-#### 5. `ChatTab.tsx` — Auto-selecionar conversa pelo telefone
-
-Ao montar, verificar se existe um `pendingChatPhone` no contexto. Se sim, buscar a conversa correspondente na lista e selecioná-la automaticamente, depois limpar o pending.
+Sem mudanças — já chamam `openChatWithPhone`. A mudança é no contexto que agora abre o picker antes de navegar.
 
 ### Arquivos
 
+| Arquivo | Mudança |
+|---------|---------|
+| `src/contexts/DashboardContext.tsx` | Adicionar estado de picker + inboxId |
+| `src/components/dashboard/InboxPickerDialog.tsx` | Novo — dialog de seleção de instância |
+| `src/pages/Dashboard.tsx` | Renderizar InboxPickerDialog |
+| `src/components/dashboard/ChatTab.tsx` | Auto-criar conversa + filtrar inbox |
 
-| Arquivo                                        | Mudança                               |
-| ---------------------------------------------- | ------------------------------------- |
-| `src/contexts/DashboardContext.tsx`            | Novo — contexto de navegação          |
-| `src/pages/Dashboard.tsx`                      | Envolver com provider                 |
-| `src/components/modules/ClientesModule.tsx`    | Botão abre chat interno               |
-| `src/components/modules/ListaEsperaModule.tsx` | Botão abre chat interno               |
-| `src/components/dashboard/ChatTab.tsx`         | Auto-selecionar conversa por telefone |
