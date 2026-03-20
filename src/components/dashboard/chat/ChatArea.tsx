@@ -186,7 +186,13 @@ const ChatArea = ({ conversation, messages, messagesLoading }: ChatAreaProps) =>
       </ScrollArea>
 
       {/* Input */}
-      <div className="p-3 border-t">
+      <div className={`p-3 border-t ${isNoteMode ? 'bg-yellow-50 dark:bg-yellow-950/20 border-t-yellow-300 dark:border-t-yellow-700' : ''}`}>
+        {isNoteMode && (
+          <div className="flex items-center gap-1.5 mb-2 text-yellow-700 dark:text-yellow-400">
+            <StickyNote className="w-3.5 h-3.5" />
+            <span className="text-xs font-medium">Nota interna — não será enviada ao cliente</span>
+          </div>
+        )}
         <div className="flex gap-2">
           <input
             ref={fileInputRef}
@@ -200,19 +206,33 @@ const ChatArea = ({ conversation, messages, messagesLoading }: ChatAreaProps) =>
             size="icon"
             className="shrink-0"
             onClick={() => fileInputRef.current?.click()}
-            disabled={sending || uploading}
+            disabled={sending || uploading || isNoteMode}
           >
             <Paperclip className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`shrink-0 ${isNoteMode ? 'text-yellow-600 bg-yellow-100 dark:bg-yellow-900/40 dark:text-yellow-400 hover:bg-yellow-200 dark:hover:bg-yellow-900/60' : ''}`}
+            onClick={() => setIsNoteMode(!isNoteMode)}
+            title={isNoteMode ? 'Modo mensagem' : 'Modo nota interna'}
+          >
+            {isNoteMode ? <StickyNote className="w-4 h-4" /> : <MessageSquare className="w-4 h-4" />}
           </Button>
           <Input
             value={message}
             onChange={e => setMessage(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSend()}
-            placeholder="Digite sua mensagem..."
-            className="flex-1"
+            placeholder={isNoteMode ? "Escreva uma nota interna..." : "Digite sua mensagem..."}
+            className={`flex-1 ${isNoteMode ? 'border-yellow-300 dark:border-yellow-700 focus-visible:ring-yellow-400' : ''}`}
             disabled={sending || uploading}
           />
-          <Button onClick={handleSend} disabled={!message.trim() || sending || uploading} size="icon" className="shrink-0">
+          <Button
+            onClick={handleSend}
+            disabled={!message.trim() || sending || uploading}
+            size="icon"
+            className={`shrink-0 ${isNoteMode ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : ''}`}
+          >
             <Send className="w-4 h-4" />
           </Button>
         </div>

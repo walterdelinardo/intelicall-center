@@ -154,21 +154,31 @@ const MessageBubble = ({ msg }: { msg: WhatsAppMessage }) => {
     }
   };
 
+  const isNote = (msg as any).is_internal_note === true;
+
   return (
-    <div className={`flex ${msg.is_from_me ? 'justify-end' : 'justify-start'}`}>
+    <div className={`flex ${isNote || msg.is_from_me ? 'justify-end' : 'justify-start'}`}>
       <div className={`max-w-[75%] rounded-2xl px-3 py-2 ${
-        msg.message_type === 'sticker'
-          ? 'bg-transparent'
-          : msg.is_from_me
-            ? 'bg-primary text-primary-foreground rounded-br-sm'
-            : 'bg-muted rounded-bl-sm'
+        isNote
+          ? 'bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700 text-yellow-900 dark:text-yellow-100 rounded-br-sm'
+          : msg.message_type === 'sticker'
+            ? 'bg-transparent'
+            : msg.is_from_me
+              ? 'bg-primary text-primary-foreground rounded-br-sm'
+              : 'bg-muted rounded-bl-sm'
       }`}>
+        {isNote && (
+          <div className="flex items-center gap-1 mb-1">
+            <StickyNote className="w-3 h-3 text-yellow-600 dark:text-yellow-400" />
+            <span className="text-[10px] font-semibold text-yellow-600 dark:text-yellow-400">Nota interna</span>
+          </div>
+        )}
         {renderContent()}
         <div className="flex items-center justify-end gap-1 mt-0.5">
           <span className="text-[10px] opacity-60">
             {format(new Date(msg.timestamp), 'HH:mm')}
           </span>
-          {msg.is_from_me && <MessageStatusIcon status={msg.status} />}
+          {msg.is_from_me && !isNote && <MessageStatusIcon status={msg.status} />}
         </div>
       </div>
     </div>
