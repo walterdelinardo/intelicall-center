@@ -1,0 +1,1 @@
+ALTER TABLE public.appointments ADD COLUMN seq_number SERIAL;

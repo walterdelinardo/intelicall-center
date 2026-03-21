@@ -52,7 +52,7 @@ const FinanceiroModule = () => {
       if (!clinicId) return [];
       const { data, error } = await supabase
         .from("financial_transactions")
-        .select("*, clients(name)")
+        .select("*, clients(name), appointments(seq_number)")
         .eq("clinic_id", clinicId)
         .eq("date", dayStr)
         .order("created_at", { ascending: false });
@@ -71,7 +71,7 @@ const FinanceiroModule = () => {
       if (!clinicId) return [];
       const { data, error } = await supabase
         .from("financial_transactions")
-        .select("*, clients(name)")
+        .select("*, clients(name), appointments(seq_number)")
         .eq("clinic_id", clinicId)
         .gte("date", monthStart)
         .lte("date", monthEnd)
@@ -214,6 +214,7 @@ const FinanceiroModule = () => {
     <Table>
       <TableHeader>
         <TableRow>
+          <TableHead className="w-[70px]">Evento #</TableHead>
           {tab === "monthly" && <TableHead>Data</TableHead>}
           <TableHead>Descrição</TableHead>
           <TableHead>Tipo</TableHead>
@@ -226,6 +227,9 @@ const FinanceiroModule = () => {
       <TableBody>
         {data.map((tx) => (
           <TableRow key={tx.id}>
+            <TableCell className="text-xs font-mono text-muted-foreground">
+              {tx.appointments?.seq_number ? `#${tx.appointments.seq_number}` : "—"}
+            </TableCell>
             {tab === "monthly" && (
               <TableCell className="text-xs whitespace-nowrap">
                 {format(new Date(tx.date), "dd/MM", { locale: ptBR })}
