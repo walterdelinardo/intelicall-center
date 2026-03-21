@@ -1792,6 +1792,7 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
             estimated_price: proc.price,
             status: "confirmado",
             notes: `Procedimento adicional faturado: ${proc.name}`,
+            parent_appointment_id: appointmentId || null,
           });
         }
       }
