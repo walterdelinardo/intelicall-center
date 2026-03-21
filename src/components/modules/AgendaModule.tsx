@@ -1257,15 +1257,12 @@ const AgendaModule = () => {
                         size="sm"
                         onClick={async () => {
                           if (!editingEvent) return;
-                          // Check if already billed
+                          // Check if already billed via google_event_id
                           const { data: existing } = await supabase
-                            .from("financial_transactions")
+                            .from("appointments")
                             .select("id")
                             .eq("clinic_id", profile?.clinic_id || "")
-                            .eq("description", editingEvent.title)
-                            .eq("date", editingEvent.date)
-                            .eq("category", "atendimento")
-                            .neq("status", "cancelado")
+                            .eq("google_event_id", editingEvent.id)
                             .limit(1);
                           if (existing && existing.length > 0) {
                             toast.error("Este evento já foi faturado. Para refaturar, exclua a transação no módulo Financeiro primeiro.");
