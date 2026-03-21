@@ -13,9 +13,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   DollarSign, Plus, TrendingUp, TrendingDown, Wallet, ChevronLeft,
-  ChevronRight, CheckCircle, XCircle, Clock, Trash2, Edit, Users
+  ChevronRight, CheckCircle, XCircle, Clock, Trash2, Edit, Users, ChevronDown
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, startOfDay, endOfDay, addMonths, addDays, isSameDay } from "date-fns";
