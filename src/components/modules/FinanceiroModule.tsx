@@ -227,8 +227,8 @@ const FinanceiroModule = () => {
       <TableBody>
         {data.map((tx) => (
           <TableRow key={tx.id}>
-            <TableCell className="text-xs font-mono text-muted-foreground">
-              {tx.appointments?.seq_number ? `#${tx.appointments.seq_number}` : "—"}
+            <TableCell className="text-xs font-mono text-muted-foreground max-w-[120px] truncate" title={tx.appointments?.google_event_id || ""}>
+              {tx.appointments?.google_event_id ? tx.appointments.google_event_id.slice(0, 10) + "…" : "—"}
             </TableCell>
             {tab === "monthly" && (
               <TableCell className="text-xs whitespace-nowrap">
