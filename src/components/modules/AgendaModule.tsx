@@ -59,6 +59,8 @@ interface Appointment {
   estimated_price: number | null;
   status: string;
   notes: string | null;
+  google_event_id: string | null;
+  parent_appointment_id: string | null;
   clients?: { name: string } | null;
   procedures?: { name: string; price: number } | null;
 }
