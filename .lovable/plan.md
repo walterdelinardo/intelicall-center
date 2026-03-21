@@ -1,57 +1,49 @@
 
 
-## Plano de Correções — Prontuários, Financeiro, Agenda
+## Plano: Usar `seq_number` para agrupar eventos
 
-### 1. Prontuário único por paciente (corrigir duplicação)
+### Problema
+Atualmente o agrupamento de procedimentos no prontuário usa `date + start_time` como chave. O correto é usar o `seq_number` (SERIAL) que já existe na tabela `appointments`.
 
-**Problema**: O sistema cria prontuários duplicados — um com dados e outro vazio. Há dois locais que criam medical_records:
-- Criação de evento Google Calendar (linha ~404): filtra por `client_id + date` 
-- Faturamento (linha ~1762): filtra por `client_id` apenas (sem date)
+### Correções
 
-Ambos deveriam verificar se JÁ EXISTE um prontuário para aquele `client_id` (independente da data), pois a regra é **1 prontuário por paciente**.
+**Arquivo: `src/components/modules/ProntuariosModule.tsx`**
 
-**Correção**:
-- Em ambos os locais no `AgendaModule.tsx`, alterar a query de verificação para buscar apenas por `client_id + clinic_id` (sem filtrar por `date`)
-- Na listagem do `ProntuariosModule.tsx`, agrupar por paciente — a lista principal mostra 1 linha por paciente, não por data
+1. **Query de appointments** (linha 597): adicionar `seq_number` no select:
+   - De: `"*, procedures(name, price, duration_minutes)"`
+   - Para: `"*, procedures(name, price, duration_minutes)"` (seq_number já vem no `*`, mas confirmar uso)
 
-### 2. Aba Procedimentos — agrupar por agendamento
+2. **Agrupamento** (linhas 624-630): trocar chave de `date_start_time` para `seq_number`:
+   - Appointments do mesmo evento compartilham o mesmo `seq_number`? **Não** — cada appointment tem seu próprio `seq_number` (é SERIAL auto-incremento por linha).
 
-**Problema**: A aba Procedimentos lista cada appointment individualmente. O correto é agrupar todos os appointments que pertencem ao mesmo evento/data em uma única linha, com um botão "Ver Detalhes" que expande os procedimentos e produtos.
+### Problema de design
+O `seq_number` é um ID sequencial **por appointment**, não por evento. Appointments extras criados no billing recebem `seq_number` diferentes do principal. Para agrupar por evento, precisamos de uma referência ao evento principal.
 
-**Correção** em `ProntuariosModule.tsx` (ViewRecordInline):
-- Agrupar `procedures` (appointments) por `date + start_time` para formar "eventos"
-- Mostrar tabela com: Data, Horário, Status, Valor Total do evento
-- Botão "Ver Detalhes" abre um Dialog/Collapsible mostrando os procedimentos individuais e produtos vinculados
-- Incluir eventos com status `cancelado` na listagem, marcados com badge "Cancelado"
-- Mover botões "Anexar Documento" e "Gerar Receita" para dentro do detalhe de cada procedimento
+**Duas opções:**
+- **Opção A**: Adicionar coluna `parent_appointment_id` na tabela appointments para vincular extras ao principal, e agrupar por `COALESCE(parent_appointment_id, id)`. Usar o `seq_number` do appointment principal como identificador visual do evento.
+- **Opção B**: Manter agrupamento por `date + start_time` mas exibir o `seq_number` do primeiro appointment do grupo como ID visual do evento.
 
-### 3. ID sequencial para agendamentos
+### Recomendação: Opção A (parent_appointment_id)
 
-**Problema**: Não existe um ID sequencial legível nos appointments para identificar eventos no financeiro.
+**Migration:**
+```sql
+ALTER TABLE public.appointments ADD COLUMN parent_appointment_id uuid REFERENCES public.appointments(id);
+```
 
-**Correção**:
-- **Migration**: Adicionar coluna `seq_number SERIAL` na tabela `appointments`
-- No `FinanceiroModule.tsx` (TxTable / Caixa Diário): 
-  - Alterar query para incluir `appointments(seq_number)` via join no `appointment_id`
-  - Mostrar coluna "Evento #" na tabela com o `seq_number`
-- No `AgendaModule.tsx` (BillingDialog): ao criar transações de venda de produto, vincular o `appointment_id` do evento principal
+**AgendaModule.tsx (BillingDialog):** Ao criar appointments extras, setar `parent_appointment_id` com o ID do appointment principal.
 
-### 4. Aumentar opacidade dos horários passados + auto-scroll
+**ProntuariosModule.tsx:**
+- Agrupar por `COALESCE(appt.parent_appointment_id, appt.id)` — todos os extras ficam no grupo do principal
+- Exibir `Evento #${mainAppt.seq_number}` como identificador visual
+- Ordenar por `seq_number` desc
 
-**Problema**: O overlay dos horários passados usa `bg-foreground/[0.04]` — muito sutil. Não há auto-scroll para o horário atual.
+**FinanceiroModule.tsx:** Já usa `seq_number` corretamente. Para transações de produtos vinculadas a extras, o `seq_number` do pai será visível via o appointment principal.
 
-**Correção** em `TimeGrid.tsx`:
-- Alterar opacidade do overlay de `bg-foreground/[0.04]` para `bg-foreground/[0.12]` (dia) e `bg-foreground/[0.10]` (semana)
-- Adicionar `useEffect` + `useRef` no TimeGrid e WeekTimeGrid para fazer `scrollIntoView` do indicador de hora atual ao montar o componente
-- No `AgendaModule.tsx`, envolver o TimeGrid em um container com `overflow-auto` e `ref` para permitir o scroll
-
-### Resumo de arquivos afetados
+### Arquivos afetados
 
 | Arquivo | Mudança |
 |---------|---------|
-| `AgendaModule.tsx` | Corrigir criação de prontuário (1 por paciente); vincular `appointment_id` em vendas de produto |
-| `ProntuariosModule.tsx` | Agrupar procedimentos por evento; incluir cancelados; dialog de detalhes |
-| `FinanceiroModule.tsx` | Coluna "Evento #" com seq_number; join com appointments |
-| `TimeGrid.tsx` | Aumentar opacidade overlay; auto-scroll para hora atual |
-| **Migration** | `ALTER TABLE appointments ADD COLUMN seq_number SERIAL` |
+| **Migration** | `ADD COLUMN parent_appointment_id uuid` |
+| `AgendaModule.tsx` | Setar `parent_appointment_id` nos extras do billing |
+| `ProntuariosModule.tsx` | Agrupar por parent/self; mostrar `Evento #seq_number` |
 
