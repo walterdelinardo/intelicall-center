@@ -13,9 +13,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
 import {
   DollarSign, Plus, TrendingUp, TrendingDown, Wallet, ChevronLeft,
-  ChevronRight, CheckCircle, XCircle, Clock, Trash2, Edit, Users
+  ChevronRight, CheckCircle, XCircle, Clock, Trash2, Edit, Users, ChevronDown
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, startOfDay, endOfDay, addMonths, addDays, isSameDay } from "date-fns";
@@ -210,75 +211,154 @@ const FinanceiroModule = () => {
     </div>
   );
 
-  const TxTable = ({ data }: { data: any[] }) => (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead className="w-[70px]">Evento #</TableHead>
-          {tab === "monthly" && <TableHead>Data</TableHead>}
-          <TableHead>Descrição</TableHead>
-          <TableHead>Tipo</TableHead>
-          <TableHead>Valor</TableHead>
-          <TableHead className="hidden md:table-cell">Pagamento</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Ações</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {data.map((tx) => (
-          <TableRow key={tx.id}>
-            <TableCell className="text-xs font-mono text-muted-foreground max-w-[120px] truncate" title={tx.appointments?.google_event_id || ""}>
-              {tx.appointments?.google_event_id ? tx.appointments.google_event_id.slice(0, 10) + "…" : "—"}
-            </TableCell>
-            {tab === "monthly" && (
-              <TableCell className="text-xs whitespace-nowrap">
-                {format(new Date(tx.date), "dd/MM", { locale: ptBR })}
-              </TableCell>
-            )}
-            <TableCell>
-              <div>
-                <p className="font-medium text-sm">{tx.description}</p>
-                {tx.clients?.name && <p className="text-xs text-muted-foreground">{tx.clients.name}</p>}
-              </div>
-            </TableCell>
-            <TableCell>
-              <Badge variant={tx.type === "receita" ? "default" : "destructive"} className="text-xs">
-                {tx.type === "receita" ? "Receita" : "Despesa"}
-              </Badge>
-            </TableCell>
-            <TableCell className={`font-semibold ${tx.type === "receita" ? "text-success" : "text-destructive"}`}>
-              {tx.type === "receita" ? "+" : "-"} R$ {Number(tx.amount).toFixed(2)}
-            </TableCell>
-            <TableCell className="hidden md:table-cell text-xs">
-              {paymentMethods[tx.payment_method] || tx.payment_method || "—"}
-            </TableCell>
-            <TableCell>
-              <Select value={tx.status} onValueChange={(v) => updateStatusMutation.mutate({ id: tx.id, status: v })}>
-                <SelectTrigger className="h-7 w-[110px] text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pendente">Pendente</SelectItem>
-                  <SelectItem value="pago">Pago</SelectItem>
-                  <SelectItem value="cancelado">Cancelado</SelectItem>
-                </SelectContent>
-              </Select>
-            </TableCell>
-            <TableCell>
-              <div className="flex gap-1">
-                <Button size="icon" variant="ghost" onClick={() => { setEditTx(tx); setIsCreateOpen(true); }}>
-                  <Edit className="w-4 h-4 text-primary" />
-                </Button>
-                <Button size="icon" variant="ghost" onClick={() => setDeleteTxId(tx.id)}>
-                  <Trash2 className="w-4 h-4 text-destructive" />
-                </Button>
-              </div>
-            </TableCell>
+  const TxTable = ({ data }: { data: any[] }) => {
+    const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+
+    const toggleGroup = (key: string) => {
+      setExpandedGroups((prev) => {
+        const next = new Set(prev);
+        if (next.has(key)) next.delete(key); else next.add(key);
+        return next;
+      });
+    };
+
+    // Group transactions by google_event_id
+    const grouped = useMemo(() => {
+      const groups: { key: string; googleEventId: string | null; clientName: string | null; txs: any[]; total: number }[] = [];
+      const eventMap = new Map<string, any[]>();
+      const ungrouped: any[] = [];
+
+      data.forEach((tx) => {
+        const geid = tx.appointments?.google_event_id;
+        if (geid) {
+          if (!eventMap.has(geid)) eventMap.set(geid, []);
+          eventMap.get(geid)!.push(tx);
+        } else {
+          ungrouped.push(tx);
+        }
+      });
+
+      eventMap.forEach((txs, geid) => {
+        const total = txs.reduce((s, t) => s + (t.type === "receita" ? 1 : -1) * Number(t.amount), 0);
+        const clientName = txs[0]?.clients?.name || null;
+        groups.push({ key: geid, googleEventId: geid, clientName, txs, total });
+      });
+
+      ungrouped.forEach((tx) => {
+        groups.push({ key: tx.id, googleEventId: null, clientName: tx.clients?.name || null, txs: [tx], total: (tx.type === "receita" ? 1 : -1) * Number(tx.amount) });
+      });
+
+      return groups;
+    }, [data]);
+
+    const renderTxRow = (tx: any, indented = false) => (
+      <TableRow key={tx.id} className={indented ? "bg-muted/5" : ""}>
+        {tab === "monthly" && (
+          <TableCell className="text-xs whitespace-nowrap">
+            {indented ? "" : format(new Date(tx.date), "dd/MM", { locale: ptBR })}
+          </TableCell>
+        )}
+        <TableCell>
+          <div className={indented ? "pl-6" : ""}>
+            <p className="font-medium text-sm">{tx.description}</p>
+            {!indented && tx.clients?.name && <p className="text-xs text-muted-foreground">{tx.clients.name}</p>}
+          </div>
+        </TableCell>
+        <TableCell>
+          <Badge variant={tx.type === "receita" ? "default" : "destructive"} className="text-xs">
+            {tx.type === "receita" ? "Receita" : "Despesa"}
+          </Badge>
+        </TableCell>
+        <TableCell className={`font-semibold ${tx.type === "receita" ? "text-success" : "text-destructive"}`}>
+          {tx.type === "receita" ? "+" : "-"} R$ {Number(tx.amount).toFixed(2)}
+        </TableCell>
+        <TableCell className="hidden md:table-cell text-xs">
+          {paymentMethods[tx.payment_method] || tx.payment_method || "—"}
+        </TableCell>
+        <TableCell>
+          <Select value={tx.status} onValueChange={(v) => updateStatusMutation.mutate({ id: tx.id, status: v })}>
+            <SelectTrigger className="h-7 w-[110px] text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="pendente">Pendente</SelectItem>
+              <SelectItem value="pago">Pago</SelectItem>
+              <SelectItem value="cancelado">Cancelado</SelectItem>
+            </SelectContent>
+          </Select>
+        </TableCell>
+        <TableCell>
+          <div className="flex gap-1">
+            <Button size="icon" variant="ghost" onClick={() => { setEditTx(tx); setIsCreateOpen(true); }}>
+              <Edit className="w-4 h-4 text-primary" />
+            </Button>
+            <Button size="icon" variant="ghost" onClick={() => setDeleteTxId(tx.id)}>
+              <Trash2 className="w-4 h-4 text-destructive" />
+            </Button>
+          </div>
+        </TableCell>
+      </TableRow>
+    );
+
+    return (
+      <Table>
+        <TableHeader>
+          <TableRow>
+            {tab === "monthly" && <TableHead>Data</TableHead>}
+            <TableHead>Descrição</TableHead>
+            <TableHead>Tipo</TableHead>
+            <TableHead>Valor</TableHead>
+            <TableHead className="hidden md:table-cell">Pagamento</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Ações</TableHead>
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
+        </TableHeader>
+        <TableBody>
+          {grouped.map((group) => {
+            // Single ungrouped tx — flat row
+            if (group.txs.length === 1 && !group.googleEventId) {
+              return renderTxRow(group.txs[0]);
+            }
+
+            const isOpen = expandedGroups.has(group.key);
+
+            return [
+              // Group header row
+              <TableRow
+                key={`header-${group.key}`}
+                className="cursor-pointer hover:bg-muted/50 bg-muted/20"
+                onClick={() => toggleGroup(group.key)}
+              >
+                {tab === "monthly" && (
+                  <TableCell className="text-xs whitespace-nowrap">
+                    {format(new Date(group.txs[0].date), "dd/MM", { locale: ptBR })}
+                  </TableCell>
+                )}
+                <TableCell colSpan={2}>
+                  <div className="flex items-center gap-2">
+                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                    <Badge variant="secondary" className="text-[9px] px-1.5 py-0 font-mono" title={group.googleEventId || ""}>
+                      GCal: {group.googleEventId?.slice(0, 10)}…
+                    </Badge>
+                    {group.clientName && <span className="text-sm font-medium">{group.clientName}</span>}
+                    <span className="text-xs text-muted-foreground">({group.txs.length} transações)</span>
+                  </div>
+                </TableCell>
+                <TableCell className={`font-bold ${group.total >= 0 ? "text-success" : "text-destructive"}`}>
+                  R$ {Math.abs(group.total).toFixed(2)}
+                </TableCell>
+                <TableCell className="hidden md:table-cell" />
+                <TableCell />
+                <TableCell />
+              </TableRow>,
+              // Child rows when expanded
+              ...(isOpen ? group.txs.map((tx) => renderTxRow(tx, true)) : []),
+            ];
+          })}
+        </TableBody>
+      </Table>
+    );
+  };
 
   return (
     <div className="space-y-6">

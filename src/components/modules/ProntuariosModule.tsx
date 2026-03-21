@@ -938,9 +938,6 @@ function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
                             )}
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono">
-                                  Evento #{evt.seqNumber}
-                                </Badge>
                                 {evt.googleEventId && (
                                   <Badge variant="secondary" className="text-[9px] px-1.5 py-0 font-mono" title={evt.googleEventId}>
                                     GCal: {evt.googleEventId.slice(0, 10)}…
