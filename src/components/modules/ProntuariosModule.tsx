@@ -937,6 +937,9 @@ function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
                             )}
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono">
+                                  Evento #{evt.seqNumber}
+                                </Badge>
                                 <span className="text-sm font-medium">
                                   {format(new Date(evt.date), "dd/MM/yyyy", { locale: ptBR })}
                                 </span>
