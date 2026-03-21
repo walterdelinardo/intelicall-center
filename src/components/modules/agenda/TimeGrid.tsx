@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Clock, Globe, Plus } from "lucide-react";
@@ -100,6 +100,26 @@ const statusLabels: Record<string, string> = {
   cancelado: "Cancelado",
 };
 
+function useAutoScrollToNow(shouldScroll: boolean) {
+  const didScroll = useRef(false);
+  useEffect(() => {
+    if (!shouldScroll || didScroll.current) return;
+    didScroll.current = true;
+    // Small delay to let DOM render
+    const timer = setTimeout(() => {
+      const container = document.getElementById('agenda-scroll-container');
+      const nowLine = document.getElementById('now-indicator');
+      if (container && nowLine) {
+        const containerRect = container.getBoundingClientRect();
+        const lineRect = nowLine.getBoundingClientRect();
+        const offset = lineRect.top - containerRect.top + container.scrollTop - containerRect.height / 3;
+        container.scrollTo({ top: Math.max(0, offset), behavior: 'smooth' });
+      }
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [shouldScroll]);
+}
+
 export const TimeGrid = ({ events, selectedDate, onSlotClick, onEventClick, onStatusChange }: TimeGridProps) => {
   const slots = generateTimeSlots();
   const gridStartMin = START_HOUR * 60;
@@ -109,13 +129,15 @@ export const TimeGrid = ({ events, selectedDate, onSlotClick, onEventClick, onSt
   const nowTop = ((nowMinutes - gridStartMin) / 30) * SLOT_HEIGHT;
   const nowTime = `${String(Math.floor(nowMinutes / 60)).padStart(2, '0')}:${String(nowMinutes % 60).padStart(2, '0')}`;
 
+  useAutoScrollToNow(showNowLine);
+
   return (
     <div className="border rounded-lg bg-card overflow-hidden">
       <div className="relative" style={{ height: `${(totalMinutes / 30) * SLOT_HEIGHT}px` }}>
         {/* Past time overlay */}
         {showNowLine && nowTop > 0 && (
           <div
-            className="absolute left-0 right-0 top-0 bg-foreground/[0.04] pointer-events-none z-[5]"
+            className="absolute left-0 right-0 top-0 bg-foreground/[0.12] pointer-events-none z-[5]"
             style={{ height: `${nowTop}px` }}
           />
         )}
@@ -147,6 +169,7 @@ export const TimeGrid = ({ events, selectedDate, onSlotClick, onEventClick, onSt
         {/* Current time indicator */}
         {showNowLine && nowTop > 0 && nowTop < (totalMinutes / 30) * SLOT_HEIGHT && (
           <div
+            id="now-indicator"
             className="absolute left-0 right-0 z-20 pointer-events-none flex items-center"
             style={{ top: `${nowTop}px` }}
           >
@@ -232,6 +255,8 @@ export const WeekTimeGrid = ({ days, getEventsForDay, onSlotClick, onEventClick,
   const totalHeight = slots.length * SLOT_HEIGHT;
   const nowTime = `${String(Math.floor(nowMinutes / 60)).padStart(2, '0')}:${String(nowMinutes % 60).padStart(2, '0')}`;
 
+  useAutoScrollToNow(hasTodayColumn);
+
   return (
     <div className="border rounded-lg bg-card overflow-auto">
       {/* Day headers */}
@@ -259,7 +284,7 @@ export const WeekTimeGrid = ({ days, getEventsForDay, onSlotClick, onEventClick,
           const colWidth = `calc((100% - 3.5rem) / ${days.length})`;
           return (
             <div
-              className="absolute bg-foreground/[0.04] pointer-events-none z-[5]"
+              className="absolute bg-foreground/[0.10] pointer-events-none z-[5]"
               style={{ top: 0, height: `${nowTop}px`, left: colLeft, width: colWidth }}
             />
           );
@@ -268,6 +293,7 @@ export const WeekTimeGrid = ({ days, getEventsForDay, onSlotClick, onEventClick,
         {/* Current time line */}
         {hasTodayColumn && nowTop > 0 && nowTop < totalHeight && (
           <div
+            id="now-indicator"
             className="absolute left-0 right-0 z-20 pointer-events-none flex items-center"
             style={{ top: `${nowTop}px` }}
           >

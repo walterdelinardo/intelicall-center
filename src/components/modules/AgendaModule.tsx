@@ -1206,21 +1206,25 @@ const AgendaModule = () => {
       {(isLoading || googleLoading) ? (
         <div className="p-8 text-center text-muted-foreground">Carregando...</div>
       ) : view === "day" ? (
-        <TimeGrid
-          events={dayEvents(selectedDate)}
-          selectedDate={selectedDate}
-          onSlotClick={handleDaySlotClick}
-          onEventClick={(evt) => evt.type === 'google' ? handleEditEvent(evt) : undefined}
-          onStatusChange={!useGoogleAsPrimary ? (id, status) => updateStatusMutation.mutate({ id, status }) : undefined}
-        />
+        <div className="max-h-[70vh] overflow-auto" id="agenda-scroll-container">
+          <TimeGrid
+            events={dayEvents(selectedDate)}
+            selectedDate={selectedDate}
+            onSlotClick={handleDaySlotClick}
+            onEventClick={(evt) => evt.type === 'google' ? handleEditEvent(evt) : undefined}
+            onStatusChange={!useGoogleAsPrimary ? (id, status) => updateStatusMutation.mutate({ id, status }) : undefined}
+          />
+        </div>
       ) : view === "week" ? (
-        <WeekTimeGrid
-          days={weekDays}
-          getEventsForDay={dayEvents}
-          onSlotClick={handleSlotClick}
-          onEventClick={(evt) => evt.type === 'google' ? handleEditEvent(evt) : undefined}
-          isToday={isToday}
-        />
+        <div className="max-h-[70vh] overflow-auto" id="agenda-scroll-container">
+          <WeekTimeGrid
+            days={weekDays}
+            getEventsForDay={dayEvents}
+            onSlotClick={handleSlotClick}
+            onEventClick={(evt) => evt.type === 'google' ? handleEditEvent(evt) : undefined}
+            isToday={isToday}
+          />
+        </div>
       ) : (
         <MonthView
           currentMonth={selectedDate}

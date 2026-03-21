@@ -14,10 +14,12 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   FileText, Plus, Search, Eye, Calendar, User, Footprints,
   Trash2, Upload, X, Edit, ArrowLeft, ClipboardList, FileUp,
-  Brain, Loader2, Sparkles, ScrollText
+  Brain, Loader2, Sparkles, ScrollText, ChevronDown, ChevronRight,
+  Package, XCircle
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -73,6 +75,14 @@ const ProntuariosModule = () => {
     enabled: !!profile?.clinic_id,
   });
 
+  // Deduplicate: show only 1 record per patient (the most recent one)
+  const uniqueByClient = records.reduce((acc: any[], rec: any) => {
+    if (!acc.find((r: any) => r.client_id === rec.client_id)) {
+      acc.push(rec);
+    }
+    return acc;
+  }, []);
+
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("medical_records").delete().eq("id", id);
@@ -86,7 +96,7 @@ const ProntuariosModule = () => {
     onError: (e: any) => toast.error(e.message),
   });
 
-  const filtered = records.filter((r) =>
+  const filtered = uniqueByClient.filter((r) =>
     !search || (r.clients?.name || "").toLowerCase().includes(search.toLowerCase()) ||
     (r.chief_complaint || "").toLowerCase().includes(search.toLowerCase())
   );
@@ -127,7 +137,7 @@ const ProntuariosModule = () => {
         <Card className="shadow-card">
           <CardContent className="pt-4 pb-4">
             <p className="text-sm text-muted-foreground">Total de Prontuários</p>
-            <p className="text-2xl font-bold text-foreground">{records.length}</p>
+            <p className="text-2xl font-bold text-foreground">{uniqueByClient.length}</p>
           </CardContent>
         </Card>
         <Card className="shadow-card">
@@ -176,7 +186,7 @@ const ProntuariosModule = () => {
         </Button>
       </div>
 
-      {/* Records table */}
+      {/* Records table - 1 per patient */}
       <Card className="shadow-card">
         <CardContent className="p-0">
           {isLoading ? (
@@ -189,8 +199,8 @@ const ProntuariosModule = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Data</TableHead>
                   <TableHead>Paciente</TableHead>
+                  <TableHead>Última Atualização</TableHead>
                   <TableHead className="hidden md:table-cell">Queixa Principal</TableHead>
                   <TableHead className="hidden lg:table-cell">Profissional</TableHead>
                   <TableHead>Ações</TableHead>
@@ -199,13 +209,18 @@ const ProntuariosModule = () => {
               <TableBody>
                 {filtered.map((rec) => (
                   <TableRow key={rec.id} className="cursor-pointer" onClick={() => goToView(rec.id)}>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        <User className="w-4 h-4 text-muted-foreground" />
+                        {rec.clients?.name || "—"}
+                      </div>
+                    </TableCell>
                     <TableCell className="whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4 text-muted-foreground" />
                         {format(new Date(rec.date), "dd/MM/yyyy", { locale: ptBR })}
                       </div>
                     </TableCell>
-                    <TableCell className="font-medium">{rec.clients?.name || "—"}</TableCell>
                     <TableCell className="hidden md:table-cell text-muted-foreground max-w-[200px] truncate">
                       {rec.chief_complaint || "—"}
                     </TableCell>
@@ -320,9 +335,25 @@ function RecordFormInline({ clinicId, userId, clients, editRecordId, onBack }: {
         recordId = editRecordId;
         await supabase.from("foot_assessments").delete().eq("record_id", recordId);
       } else {
-        const { data: record, error } = await supabase.from("medical_records").insert(recordData).select("id").single();
-        if (error) throw error;
-        recordId = record.id;
+        // Check if patient already has a record
+        const { data: existing } = await supabase
+          .from("medical_records")
+          .select("id")
+          .eq("clinic_id", clinicId)
+          .eq("client_id", form.client_id)
+          .maybeSingle();
+        
+        if (existing) {
+          // Update existing record instead of creating a new one
+          const { error } = await supabase.from("medical_records").update(recordData).eq("id", existing.id);
+          if (error) throw error;
+          recordId = existing.id;
+          await supabase.from("foot_assessments").delete().eq("record_id", recordId);
+        } else {
+          const { data: record, error } = await supabase.from("medical_records").insert(recordData).select("id").single();
+          if (error) throw error;
+          recordId = record.id;
+        }
       }
 
       // Foot assessments
@@ -531,6 +562,7 @@ function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
   recordId: string; clinicId: string; onBack: () => void; onEdit: () => void;
 }) {
   const queryClient = useQueryClient();
+  const [expandedEvent, setExpandedEvent] = useState<string | null>(null);
 
   const { data: record } = useQuery({
     queryKey: ["medical-record", recordId],
@@ -555,7 +587,7 @@ function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
     enabled: !!recordId,
   });
 
-  // Patient procedures (from appointments)
+  // Patient procedures (from appointments) - include cancelled
   const { data: procedures = [] } = useQuery({
     queryKey: ["patient-procedures", record?.client_id],
     queryFn: async () => {
@@ -571,6 +603,60 @@ function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
     },
     enabled: !!record?.client_id && !!clinicId,
   });
+
+  // Financial transactions for this patient
+  const { data: transactions = [] } = useQuery({
+    queryKey: ["patient-transactions", record?.client_id, clinicId],
+    queryFn: async () => {
+      if (!record?.client_id || !clinicId) return [];
+      const { data, error } = await supabase
+        .from("financial_transactions")
+        .select("*")
+        .eq("client_id", record.client_id)
+        .eq("clinic_id", clinicId)
+        .order("date", { ascending: false });
+      if (error) throw error;
+      return data as any[];
+    },
+    enabled: !!record?.client_id && !!clinicId,
+  });
+
+  // Group appointments by event (date + start_time)
+  const groupedEvents = procedures.reduce((acc: Record<string, any[]>, appt: any) => {
+    const key = `${appt.date}_${appt.start_time}`;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(appt);
+    return acc;
+  }, {} as Record<string, any[]>);
+
+  const eventList = Object.entries(groupedEvents).map(([key, appts]) => {
+    const [date, time] = key.split('_');
+    // Determine overall event status
+    const statuses = appts.map((a: any) => a.status);
+    let eventStatus = statuses[0];
+    if (statuses.includes('cancelado') && statuses.every((s: string) => s === 'cancelado')) {
+      eventStatus = 'cancelado';
+    } else if (statuses.includes('compareceu')) {
+      eventStatus = 'compareceu';
+    }
+    
+    const totalValue = appts.reduce((sum: number, a: any) => sum + (Number(a.estimated_price) || Number(a.procedures?.price) || 0), 0);
+    // Get related product transactions for this event
+    const eventTransactions = transactions.filter((tx: any) => 
+      appts.some((a: any) => a.id === tx.appointment_id) && tx.category === 'produto'
+    );
+    const productTotal = eventTransactions.reduce((sum: number, tx: any) => sum + Number(tx.amount), 0);
+    
+    return {
+      key,
+      date,
+      time,
+      status: eventStatus,
+      appointments: appts,
+      totalValue: totalValue + productTotal,
+      productTransactions: eventTransactions,
+    };
+  }).sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time));
 
   // Documents from record_documents
   const { data: docs = [] } = useQuery({
@@ -742,7 +828,7 @@ function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
     confirmado: { label: "Confirmado", color: "bg-emerald-100 text-emerald-800" },
     compareceu: { label: "Compareceu", color: "bg-green-100 text-green-800" },
     faltou: { label: "Faltou", color: "bg-red-100 text-red-800" },
-    cancelado: { label: "Cancelado", color: "bg-gray-100 text-gray-800" },
+    cancelado: { label: "Cancelado", color: "bg-muted text-muted-foreground" },
     remarcado: { label: "Remarcado", color: "bg-amber-100 text-amber-800" },
   };
 
@@ -820,78 +906,140 @@ function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
             </TabsContent>
 
             <TabsContent value="procedures" className="space-y-4 mt-4">
-              <p className="text-sm text-muted-foreground mb-2">Histórico de procedimentos do paciente</p>
-              {procedures.length === 0 ? (
-                <p className="text-muted-foreground text-sm">Nenhum procedimento registrado para este paciente.</p>
+              <p className="text-sm text-muted-foreground mb-2">Histórico de eventos/agendamentos do paciente</p>
+              {eventList.length === 0 ? (
+                <p className="text-muted-foreground text-sm">Nenhum evento registrado para este paciente.</p>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Data</TableHead>
-                      <TableHead>Procedimento</TableHead>
-                      <TableHead className="hidden md:table-cell">Profissional</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="hidden md:table-cell text-right">Valor</TableHead>
-                      <TableHead>Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {procedures.map((p: any) => {
-                      const st = statusMap[p.status] || { label: p.status, color: "bg-gray-100 text-gray-800" };
-                      return (
-                        <TableRow key={p.id}>
-                          <TableCell className="whitespace-nowrap">{format(new Date(p.date), "dd/MM/yyyy")}</TableCell>
-                          <TableCell className="font-medium">{p.procedures?.name || "—"}</TableCell>
-                          <TableCell className="hidden md:table-cell">—</TableCell>
-                          <TableCell><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${st.color}`}>{st.label}</span></TableCell>
-                          <TableCell className="hidden md:table-cell text-right">
-                            {p.procedures?.price ? `R$ ${Number(p.procedures.price).toFixed(2)}` : "—"}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                title="Anexar Documento"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  const input = document.createElement('input');
-                                  input.type = 'file';
-                                  input.accept = 'image/*,application/pdf';
-                                  input.multiple = true;
-                                  input.onchange = async (ev) => {
-                                    const files = (ev.target as HTMLInputElement).files;
-                                    if (files) {
-                                      try {
-                                        await handleUploadForProcedure(files, p.id);
-                                      } catch {
-                                        toast.error("Erro ao anexar documento");
-                                      }
-                                    }
-                                  };
-                                  input.click();
-                                }}
-                              >
-                                <FileUp className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                title="Gerar Receita"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  generatePrescription(p);
-                                }}
-                              >
-                                <ScrollText className="w-4 h-4" />
-                              </Button>
+                <div className="space-y-2">
+                  {eventList.map((evt) => {
+                    const st = statusMap[evt.status] || { label: evt.status, color: "bg-muted text-muted-foreground" };
+                    const isExpanded = expandedEvent === evt.key;
+                    const mainProc = evt.appointments[0];
+                    
+                    return (
+                      <Card key={evt.key} className={`border ${evt.status === 'cancelado' ? 'opacity-60' : ''}`}>
+                        <CardContent className="p-0">
+                          {/* Event header row */}
+                          <button
+                            className="w-full flex items-center gap-3 p-3 hover:bg-muted/30 transition-colors text-left"
+                            onClick={() => setExpandedEvent(isExpanded ? null : evt.key)}
+                          >
+                            {isExpanded ? (
+                              <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+                            ) : (
+                              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm font-medium">
+                                  {format(new Date(evt.date), "dd/MM/yyyy", { locale: ptBR })}
+                                </span>
+                                <span className="text-xs text-muted-foreground">{evt.time.slice(0, 5)}</span>
+                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${st.color}`}>
+                                  {st.label}
+                                </span>
+                                {evt.status === 'cancelado' && (
+                                  <XCircle className="w-3.5 h-3.5 text-muted-foreground" />
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                                {evt.appointments.map((a: any) => a.procedures?.name || 'Procedimento').join(' + ')}
+                                {evt.productTransactions.length > 0 && ` + ${evt.productTransactions.length} produto(s)`}
+                              </p>
                             </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+                            <span className="text-sm font-semibold text-primary whitespace-nowrap">
+                              R$ {evt.totalValue.toFixed(2)}
+                            </span>
+                          </button>
+
+                          {/* Expanded details */}
+                          {isExpanded && (
+                            <div className="border-t px-4 py-3 space-y-3 bg-muted/10">
+                              {/* Procedures */}
+                              <div>
+                                <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                                  <ClipboardList className="w-3.5 h-3.5" /> Procedimentos
+                                </p>
+                                {evt.appointments.map((appt: any) => (
+                                  <div key={appt.id} className="flex items-center justify-between py-1.5 text-sm border-b border-border/30 last:border-0">
+                                    <div className="flex items-center gap-2">
+                                      <span>{appt.procedures?.name || 'Procedimento'}</span>
+                                      {appt.notes?.includes('adicional') && (
+                                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Extra</Badge>
+                                      )}
+                                    </div>
+                                    <span className="text-xs font-medium">
+                                      R$ {(Number(appt.estimated_price) || Number(appt.procedures?.price) || 0).toFixed(2)}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {/* Products */}
+                              {evt.productTransactions.length > 0 && (
+                                <div>
+                                  <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                                    <Package className="w-3.5 h-3.5" /> Produtos Vendidos
+                                  </p>
+                                  {evt.productTransactions.map((tx: any) => (
+                                    <div key={tx.id} className="flex items-center justify-between py-1.5 text-sm border-b border-border/30 last:border-0">
+                                      <span>{tx.description}</span>
+                                      <span className="text-xs font-medium">R$ {Number(tx.amount).toFixed(2)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Notes */}
+                              {mainProc.notes && (
+                                <div>
+                                  <p className="text-xs font-medium text-muted-foreground mb-1">Observações</p>
+                                  <p className="text-xs text-muted-foreground">{mainProc.notes}</p>
+                                </div>
+                              )}
+
+                              {/* Actions */}
+                              <div className="flex gap-2 pt-1">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="gap-1.5 text-xs"
+                                  onClick={() => {
+                                    const input = document.createElement('input');
+                                    input.type = 'file';
+                                    input.accept = 'image/*,application/pdf';
+                                    input.multiple = true;
+                                    input.onchange = async (ev) => {
+                                      const files = (ev.target as HTMLInputElement).files;
+                                      if (files) {
+                                        try {
+                                          await handleUploadForProcedure(files, mainProc.id);
+                                        } catch {
+                                          toast.error("Erro ao anexar documento");
+                                        }
+                                      }
+                                    };
+                                    input.click();
+                                  }}
+                                >
+                                  <FileUp className="w-3.5 h-3.5" /> Anexar Documento
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="gap-1.5 text-xs"
+                                  onClick={() => generatePrescription(mainProc)}
+                                >
+                                  <ScrollText className="w-3.5 h-3.5" /> Gerar Receita
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
               )}
             </TabsContent>
 
