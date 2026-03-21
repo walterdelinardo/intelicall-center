@@ -629,7 +629,7 @@ function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
     return acc;
   }, {} as Record<string, any[]>);
 
-  const eventList = Object.entries(groupedEvents).map(([key, appts]) => {
+  const eventList = Object.entries(groupedEvents).map(([key, appts]: [string, any[]]) => {
     const [date, time] = key.split('_');
     // Determine overall event status
     const statuses = appts.map((a: any) => a.status);
