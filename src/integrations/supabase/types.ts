@@ -26,6 +26,7 @@ export type Database = {
           notes: string | null
           procedure_id: string | null
           professional_id: string | null
+          seq_number: number
           start_time: string
           status: string
           updated_at: string
@@ -41,6 +42,7 @@ export type Database = {
           notes?: string | null
           procedure_id?: string | null
           professional_id?: string | null
+          seq_number?: number
           start_time: string
           status?: string
           updated_at?: string
@@ -56,6 +58,7 @@ export type Database = {
           notes?: string | null
           procedure_id?: string | null
           professional_id?: string | null
+          seq_number?: number
           start_time?: string
           status?: string
           updated_at?: string
