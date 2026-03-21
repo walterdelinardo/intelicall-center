@@ -1842,8 +1842,10 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
         }
       }
 
-      // Extra procedure transactions
-      for (const proc of extraProcedures) {
+      // Extra procedure transactions (linked to their appointment_id)
+      for (let i = 0; i < extraProcedures.length; i++) {
+        const proc = extraProcedures[i];
+        const extraApptId = extraApptIds[i] || null;
         await supabase.from("financial_transactions").insert({
           clinic_id: clinicId,
           type: "receita",
@@ -1854,6 +1856,7 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
           status: form.status,
           date: form.date,
           client_id: clientId,
+          appointment_id: extraApptId,
         });
       }
 
