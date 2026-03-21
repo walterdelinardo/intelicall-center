@@ -1,58 +1,57 @@
 
 
-## Diagnóstico: Lançamentos financeiros duplicados ao faturar eventos
+## Plano de Correções — Prontuários, Financeiro, Agenda
 
-### Bugs encontrados
+### 1. Prontuário único por paciente (corrigir duplicação)
 
-Há **duas fontes de duplicação** no fluxo de faturamento:
+**Problema**: O sistema cria prontuários duplicados — um com dados e outro vazio. Há dois locais que criam medical_records:
+- Criação de evento Google Calendar (linha ~404): filtra por `client_id + date` 
+- Faturamento (linha ~1762): filtra por `client_id` apenas (sem date)
 
-**Bug 1 — Trigger `auto_generate_transaction` cria transação duplicada:**
-- O código insere o appointment principal com `status: "compareceu"` (linha 1752)
-- O trigger `auto_generate_transaction` detecta esse status e cria automaticamente uma transação com o valor do procedimento
-- Logo depois, o código do faturamento cria OUTRA transação manualmente (linha 1798)
-- Resultado: **2 transações para o procedimento principal**
+Ambos deveriam verificar se JÁ EXISTE um prontuário para aquele `client_id` (independente da data), pois a regra é **1 prontuário por paciente**.
 
-**Bug 2 — `grandTotal` inclui tudo, mas extras e produtos também geram transações individuais:**
-- A transação principal usa `grandTotal` (base + extras + produtos) na linha 1803
-- Depois, cada procedimento extra gera sua própria transação individual (linhas 1836-1848)
-- Cada produto gera sua própria transação individual (linhas 1814-1825)
-- Resultado: **extras e produtos são contados 2x** (uma vez no grandTotal, outra vez individualmente)
+**Correção**:
+- Em ambos os locais no `AgendaModule.tsx`, alterar a query de verificação para buscar apenas por `client_id + clinic_id` (sem filtrar por `date`)
+- Na listagem do `ProntuariosModule.tsx`, agrupar por paciente — a lista principal mostra 1 linha por paciente, não por data
 
-**Bug 3 — Extra procedures também disparam o trigger:**
-- Appointments extras são inseridos com `status: "compareceu"` (linha 1790)
-- O trigger cria transações automáticas para cada um
-- O código também cria transações manuais para cada um
-- Resultado: **2 transações por procedimento extra**
+### 2. Aba Procedimentos — agrupar por agendamento
 
-### Exemplo concreto do usuário
-Evento com procedimento principal R$100 + procedimento extra R$50:
-- Trigger cria: R$100 (principal) + R$50 (extra) = 2 transações
-- Código cria: R$150 (grandTotal) + R$50 (extra individual) = 2 transações
-- **Total: 4 transações em vez de 2**
+**Problema**: A aba Procedimentos lista cada appointment individualmente. O correto é agrupar todos os appointments que pertencem ao mesmo evento/data em uma única linha, com um botão "Ver Detalhes" que expande os procedimentos e produtos.
 
----
+**Correção** em `ProntuariosModule.tsx` (ViewRecordInline):
+- Agrupar `procedures` (appointments) por `date + start_time` para formar "eventos"
+- Mostrar tabela com: Data, Horário, Status, Valor Total do evento
+- Botão "Ver Detalhes" abre um Dialog/Collapsible mostrando os procedimentos individuais e produtos vinculados
+- Incluir eventos com status `cancelado` na listagem, marcados com badge "Cancelado"
+- Mover botões "Anexar Documento" e "Gerar Receita" para dentro do detalhe de cada procedimento
 
-### Correção proposta
+### 3. ID sequencial para agendamentos
 
-**Arquivo**: `src/components/modules/AgendaModule.tsx` (função `BillingDialog.saveMutation`)
+**Problema**: Não existe um ID sequencial legível nos appointments para identificar eventos no financeiro.
 
-1. **Inserir appointments com status `"confirmado"` em vez de `"compareceu"`** — evita que o trigger dispare
-2. **Transação principal usa `baseAmount`** (só o procedimento principal), **não `grandTotal`**
-3. Manter as transações individuais para extras e produtos (já existem)
-4. **Após criar todas as transações**, atualizar os appointments para `status: "compareceu"` — o trigger verifica `NOT EXISTS` e não duplica
+**Correção**:
+- **Migration**: Adicionar coluna `seq_number SERIAL` na tabela `appointments`
+- No `FinanceiroModule.tsx` (TxTable / Caixa Diário): 
+  - Alterar query para incluir `appointments(seq_number)` via join no `appointment_id`
+  - Mostrar coluna "Evento #" na tabela com o `seq_number`
+- No `AgendaModule.tsx` (BillingDialog): ao criar transações de venda de produto, vincular o `appointment_id` do evento principal
 
-Mudanças específicas no código:
+### 4. Aumentar opacidade dos horários passados + auto-scroll
 
-| Linha | Atual | Corrigido |
-|-------|-------|-----------|
-| 1752 | `status: "compareceu"` | `status: "confirmado"` |
-| 1790 | `status: "compareceu"` | `status: "confirmado"` |
-| 1803 | `amount: grandTotal` | `amount: baseAmount` |
-| Novo (após linha 1848) | — | `UPDATE` todos os appointments criados para `status: "compareceu"` |
+**Problema**: O overlay dos horários passados usa `bg-foreground/[0.04]` — muito sutil. Não há auto-scroll para o horário atual.
 
-Isso garante:
-- 1 transação para o procedimento principal (baseAmount)
-- 1 transação por procedimento extra (preço individual)
-- 1 transação por produto vendido (qty × price)
-- Sem duplicações do trigger
+**Correção** em `TimeGrid.tsx`:
+- Alterar opacidade do overlay de `bg-foreground/[0.04]` para `bg-foreground/[0.12]` (dia) e `bg-foreground/[0.10]` (semana)
+- Adicionar `useEffect` + `useRef` no TimeGrid e WeekTimeGrid para fazer `scrollIntoView` do indicador de hora atual ao montar o componente
+- No `AgendaModule.tsx`, envolver o TimeGrid em um container com `overflow-auto` e `ref` para permitir o scroll
+
+### Resumo de arquivos afetados
+
+| Arquivo | Mudança |
+|---------|---------|
+| `AgendaModule.tsx` | Corrigir criação de prontuário (1 por paciente); vincular `appointment_id` em vendas de produto |
+| `ProntuariosModule.tsx` | Agrupar procedimentos por evento; incluir cancelados; dialog de detalhes |
+| `FinanceiroModule.tsx` | Coluna "Evento #" com seq_number; join com appointments |
+| `TimeGrid.tsx` | Aumentar opacidade overlay; auto-scroll para hora atual |
+| **Migration** | `ALTER TABLE appointments ADD COLUMN seq_number SERIAL` |
 
