@@ -1821,6 +1821,7 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
           status: form.status,
           date: form.date,
           client_id: clientId,
+          appointment_id: appointmentId,
         });
         // Deduct stock
         const stockItem = stockItems.find((s: any) => s.id === item.stockId);
