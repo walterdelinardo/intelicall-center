@@ -1861,19 +1861,7 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
       }
 
       // === 7. Update all appointments to "compareceu" (trigger won't duplicate because transactions already exist) ===
-      const apptIdsToUpdate = [appointmentId].filter(Boolean);
-      if (clientId) {
-        const { data: extraAppts } = await supabase
-          .from("appointments")
-          .select("id")
-          .eq("clinic_id", clinicId)
-          .eq("client_id", clientId)
-          .eq("status", "confirmado")
-          .ilike("notes", "%faturado%");
-        if (extraAppts) {
-          apptIdsToUpdate.push(...extraAppts.map((a: any) => a.id));
-        }
-      }
+      const apptIdsToUpdate = [appointmentId, ...extraApptIds].filter(Boolean) as string[];
       if (apptIdsToUpdate.length > 0) {
         await supabase
           .from("appointments")
