@@ -400,13 +400,12 @@ const AgendaModule = () => {
             }
 
             if (clientId) {
-              // Create medical_record if not exists for client+date
+              // Create medical_record if not exists for this client (1 per patient)
               const { data: existingRecord } = await supabase
                 .from("medical_records")
                 .select("id")
                 .eq("clinic_id", profile.clinic_id)
                 .eq("client_id", clientId)
-                .eq("date", form.date)
                 .maybeSingle();
 
               if (!existingRecord) {
