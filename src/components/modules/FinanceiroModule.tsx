@@ -52,7 +52,7 @@ const FinanceiroModule = () => {
       if (!clinicId) return [];
       const { data, error } = await supabase
         .from("financial_transactions")
-        .select("*, clients(name), appointments(seq_number)")
+        .select("*, clients(name), appointments(google_event_id)")
         .eq("clinic_id", clinicId)
         .eq("date", dayStr)
         .order("created_at", { ascending: false });
