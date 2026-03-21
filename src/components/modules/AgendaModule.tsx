@@ -1756,6 +1756,7 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
             status: "confirmado",
             notes: `Faturado via Google Calendar: ${event.title}`,
             google_event_id: event.id,
+            seq_number: 1,
           })
           .select("id")
           .single();
