@@ -657,6 +657,7 @@ function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
       date,
       time,
       seqNumber,
+      googleEventId: mainAppt.google_event_id,
       status: eventStatus,
       appointments: appts,
       totalValue: totalValue + productTotal,
@@ -940,6 +941,11 @@ function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
                                 <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono">
                                   Evento #{evt.seqNumber}
                                 </Badge>
+                                {evt.googleEventId && (
+                                  <Badge variant="secondary" className="text-[9px] px-1.5 py-0 font-mono" title={evt.googleEventId}>
+                                    GCal: {evt.googleEventId.slice(0, 10)}…
+                                  </Badge>
+                                )}
                                 <span className="text-sm font-medium">
                                   {format(new Date(evt.date), "dd/MM/yyyy", { locale: ptBR })}
                                 </span>
