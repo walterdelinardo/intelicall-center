@@ -1755,6 +1755,7 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
             estimated_price: parseFloat(form.amount) || null,
             status: "confirmado",
             notes: `Faturado via Google Calendar: ${event.title}`,
+            google_event_id: event.id,
           })
           .select("id")
           .single();
