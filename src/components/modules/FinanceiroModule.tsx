@@ -71,7 +71,7 @@ const FinanceiroModule = () => {
       if (!clinicId) return [];
       const { data, error } = await supabase
         .from("financial_transactions")
-        .select("*, clients(name)")
+        .select("*, clients(name), appointments(seq_number)")
         .eq("clinic_id", clinicId)
         .gte("date", monthStart)
         .lte("date", monthEnd)
