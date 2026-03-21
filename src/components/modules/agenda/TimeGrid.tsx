@@ -200,10 +200,13 @@ export const TimeGrid = ({ events, selectedDate, onSlotClick, onEventClick, onSt
             >
               {evt.type === 'google' ? (
                 <div
-                  className="h-full rounded-md px-2 py-1 overflow-hidden hover:shadow-md transition-shadow"
+                  className="h-full rounded-md px-2 py-1 overflow-hidden hover:shadow-md transition-shadow relative"
                   style={styles}
                 >
-                  <p className="font-medium text-xs truncate" style={{ color: styles.color }}>{evt.title}</p>
+                  {evt.id && (
+                    <span className="absolute top-0.5 right-1 text-[8px] font-mono opacity-50" style={{ color: styles.color }}>{evt.id.slice(0, 8)}</span>
+                  )}
+                  <p className="font-medium text-xs truncate pr-14" style={{ color: styles.color }}>{evt.title}</p>
                   <p className="text-[10px]" style={{ color: styles.color, opacity: 0.7 }}>{evt.time} · {evt.duration}</p>
                   {evt.accountLabel && (
                     <p className="text-[10px] truncate" style={{ color: styles.color, opacity: 0.5 }}>{evt.accountLabel}</p>
