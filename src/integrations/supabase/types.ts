@@ -22,6 +22,7 @@ export type Database = {
           date: string
           duration_minutes: number
           estimated_price: number | null
+          google_event_id: string | null
           id: string
           notes: string | null
           parent_appointment_id: string | null
@@ -39,6 +40,7 @@ export type Database = {
           date: string
           duration_minutes?: number
           estimated_price?: number | null
+          google_event_id?: string | null
           id?: string
           notes?: string | null
           parent_appointment_id?: string | null
@@ -56,6 +58,7 @@ export type Database = {
           date?: string
           duration_minutes?: number
           estimated_price?: number | null
+          google_event_id?: string | null
           id?: string
           notes?: string | null
           parent_appointment_id?: string | null

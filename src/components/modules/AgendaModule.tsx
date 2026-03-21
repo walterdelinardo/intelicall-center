@@ -59,6 +59,8 @@ interface Appointment {
   estimated_price: number | null;
   status: string;
   notes: string | null;
+  google_event_id: string | null;
+  parent_appointment_id: string | null;
   clients?: { name: string } | null;
   procedures?: { name: string; price: number } | null;
 }
@@ -253,16 +255,18 @@ const AgendaModule = () => {
         }));
     }
 
-    return appointments.map((apt) => ({
-      type: 'local' as const,
-      id: apt.id,
-      title: (apt.clients as any)?.name || 'Cliente',
-      date: apt.date,
-      time: apt.start_time?.slice(0, 5) || '',
-      duration: `${apt.duration_minutes}min`,
-      status: apt.status,
-      appointment: apt,
-    }));
+    return appointments
+      .filter((apt) => !apt.parent_appointment_id)
+      .map((apt) => ({
+        type: 'local' as const,
+        id: apt.id,
+        title: (apt.clients as any)?.name || 'Cliente',
+        date: apt.date,
+        time: apt.start_time?.slice(0, 5) || '',
+        duration: `${apt.duration_minutes}min`,
+        status: apt.status,
+        appointment: apt,
+      }));
   }, [appointments, googleEvents, filterAccount, useGoogleAsPrimary]);
 
   // Auto-compose title for create form
@@ -1253,15 +1257,12 @@ const AgendaModule = () => {
                         size="sm"
                         onClick={async () => {
                           if (!editingEvent) return;
-                          // Check if already billed
+                          // Check if already billed via google_event_id
                           const { data: existing } = await supabase
-                            .from("financial_transactions")
+                            .from("appointments")
                             .select("id")
                             .eq("clinic_id", profile?.clinic_id || "")
-                            .eq("description", editingEvent.title)
-                            .eq("date", editingEvent.date)
-                            .eq("category", "atendimento")
-                            .neq("status", "cancelado")
+                            .eq("google_event_id", editingEvent.id)
                             .limit(1);
                           if (existing && existing.length > 0) {
                             toast.error("Este evento já foi faturado. Para refaturar, exclua a transação no módulo Financeiro primeiro.");
@@ -1754,6 +1755,7 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
             estimated_price: parseFloat(form.amount) || null,
             status: "confirmado",
             notes: `Faturado via Google Calendar: ${event.title}`,
+            google_event_id: event.id,
           })
           .select("id")
           .single();
@@ -1780,9 +1782,10 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
       }
 
       // === 5. Create extra procedure appointments ===
+      const extraApptIds: string[] = [];
       if (clientId) {
         for (const proc of extraProcedures) {
-          await supabase.from("appointments").insert({
+          const { data: extraAppt } = await supabase.from("appointments").insert({
             clinic_id: clinicId,
             client_id: clientId,
             procedure_id: proc.procedureId,
@@ -1793,7 +1796,9 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
             status: "confirmado",
             notes: `Procedimento adicional faturado: ${proc.name}`,
             parent_appointment_id: appointmentId || null,
-          });
+            google_event_id: event?.id || null,
+          }).select("id").single();
+          if (extraAppt) extraApptIds.push(extraAppt.id);
         }
       }
 
@@ -1837,8 +1842,10 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
         }
       }
 
-      // Extra procedure transactions
-      for (const proc of extraProcedures) {
+      // Extra procedure transactions (linked to their appointment_id)
+      for (let i = 0; i < extraProcedures.length; i++) {
+        const proc = extraProcedures[i];
+        const extraApptId = extraApptIds[i] || null;
         await supabase.from("financial_transactions").insert({
           clinic_id: clinicId,
           type: "receita",
@@ -1849,23 +1856,12 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
           status: form.status,
           date: form.date,
           client_id: clientId,
+          appointment_id: extraApptId,
         });
       }
 
       // === 7. Update all appointments to "compareceu" (trigger won't duplicate because transactions already exist) ===
-      const apptIdsToUpdate = [appointmentId].filter(Boolean);
-      if (clientId) {
-        const { data: extraAppts } = await supabase
-          .from("appointments")
-          .select("id")
-          .eq("clinic_id", clinicId)
-          .eq("client_id", clientId)
-          .eq("status", "confirmado")
-          .ilike("notes", "%faturado%");
-        if (extraAppts) {
-          apptIdsToUpdate.push(...extraAppts.map((a: any) => a.id));
-        }
-      }
+      const apptIdsToUpdate = [appointmentId, ...extraApptIds].filter(Boolean) as string[];
       if (apptIdsToUpdate.length > 0) {
         await supabase
           .from("appointments")
