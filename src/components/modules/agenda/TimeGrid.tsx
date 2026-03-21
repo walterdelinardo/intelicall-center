@@ -200,10 +200,11 @@ export const TimeGrid = ({ events, selectedDate, onSlotClick, onEventClick, onSt
             >
               {evt.type === 'google' ? (
                 <div
-                  className="h-full rounded-md px-2 py-1 overflow-hidden hover:shadow-md transition-shadow"
+                  className="h-full rounded-md px-2 py-1 overflow-hidden hover:shadow-md transition-shadow relative"
                   style={styles}
                 >
-                  <p className="font-medium text-xs truncate" style={{ color: styles.color }}>{evt.title}</p>
+                  <span className="absolute top-0.5 right-1 text-[8px] font-mono opacity-50 truncate max-w-[50%]" style={{ color: styles.color }}>{evt.id}</span>
+                  <p className="font-medium text-xs truncate pr-16" style={{ color: styles.color }}>{evt.title}</p>
                   <p className="text-[10px]" style={{ color: styles.color, opacity: 0.7 }}>{evt.time} · {evt.duration}</p>
                   {evt.accountLabel && (
                     <p className="text-[10px] truncate" style={{ color: styles.color, opacity: 0.5 }}>{evt.accountLabel}</p>
@@ -362,9 +363,10 @@ export const WeekTimeGrid = ({ days, getEventsForDay, onSlotClick, onEventClick,
               >
                 {evt.type === 'google' ? (
                   <div
-                    className="h-full rounded text-[10px] px-1 py-0.5 overflow-hidden hover:shadow-md transition-shadow"
+                    className="h-full rounded text-[10px] px-1 py-0.5 overflow-hidden hover:shadow-md transition-shadow relative"
                     style={styles}
                   >
+                    <span className="absolute top-0 right-0.5 text-[7px] font-mono opacity-40 truncate max-w-[60%]" style={{ color: styles.color }}>{evt.id}</span>
                     <p className="font-medium truncate" style={{ color: styles.color }}>{evt.title}</p>
                     <p style={{ color: styles.color, opacity: 0.7 }}>{evt.time}</p>
                   </div>
