@@ -52,7 +52,7 @@ const FinanceiroModule = () => {
       if (!clinicId) return [];
       const { data, error } = await supabase
         .from("financial_transactions")
-        .select("*, clients(name), appointments(seq_number)")
+        .select("*, clients(name), appointments(google_event_id)")
         .eq("clinic_id", clinicId)
         .eq("date", dayStr)
         .order("created_at", { ascending: false });
@@ -71,7 +71,7 @@ const FinanceiroModule = () => {
       if (!clinicId) return [];
       const { data, error } = await supabase
         .from("financial_transactions")
-        .select("*, clients(name), appointments(seq_number)")
+        .select("*, clients(name), appointments(google_event_id)")
         .eq("clinic_id", clinicId)
         .gte("date", monthStart)
         .lte("date", monthEnd)
@@ -227,8 +227,8 @@ const FinanceiroModule = () => {
       <TableBody>
         {data.map((tx) => (
           <TableRow key={tx.id}>
-            <TableCell className="text-xs font-mono text-muted-foreground">
-              {tx.appointments?.seq_number ? `#${tx.appointments.seq_number}` : "—"}
+            <TableCell className="text-xs font-mono text-muted-foreground max-w-[120px] truncate" title={tx.appointments?.google_event_id || ""}>
+              {tx.appointments?.google_event_id ? tx.appointments.google_event_id.slice(0, 10) + "…" : "—"}
             </TableCell>
             {tab === "monthly" && (
               <TableCell className="text-xs whitespace-nowrap">
