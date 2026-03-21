@@ -1782,9 +1782,10 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
       }
 
       // === 5. Create extra procedure appointments ===
+      const extraApptIds: string[] = [];
       if (clientId) {
         for (const proc of extraProcedures) {
-          await supabase.from("appointments").insert({
+          const { data: extraAppt } = await supabase.from("appointments").insert({
             clinic_id: clinicId,
             client_id: clientId,
             procedure_id: proc.procedureId,
@@ -1795,7 +1796,9 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
             status: "confirmado",
             notes: `Procedimento adicional faturado: ${proc.name}`,
             parent_appointment_id: appointmentId || null,
-          });
+            google_event_id: event?.id || null,
+          }).select("id").single();
+          if (extraAppt) extraApptIds.push(extraAppt.id);
         }
       }
 
