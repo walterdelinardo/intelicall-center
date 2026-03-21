@@ -657,6 +657,7 @@ function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
       date,
       time,
       seqNumber,
+      googleEventId: mainAppt.google_event_id,
       status: eventStatus,
       appointments: appts,
       totalValue: totalValue + productTotal,
