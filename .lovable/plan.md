@@ -1,45 +1,55 @@
 
 
-## Plano: Corrigir vínculos de dados no banco
+## Plano: Vincular appointments ao Google Calendar via `google_event_id`
 
-### Dados identificados
+### Problema atual
+Quando o faturamento cria um appointment local a partir de um evento do Google Calendar, ele não armazena o ID do evento Google. Isso impossibilita:
+- Identificar qual appointment pertence a qual evento Google
+- Verificar duplicidade de faturamento de forma confiável (hoje usa description + date, que é frágil)
+- Vincular transações financeiras e procedimentos extras ao evento correto
 
-**Appointments (seq 4 e 5 sem parent):**
-- Seq 4 (`be0c0509`) e Seq 5 (`d4920517`) foram criados como extras do Seq 3 (`070d1b70`) mas estão sem `parent_appointment_id`
+### Mudanças
 
-**Transações financeiras:**
-- `d2ca6ee4` (extra Tratamento R$120) — sem `appointment_id`, deveria apontar para seq 4 (`be0c0509`)
-- `6c800cb5` (extra limpeza R$125) — sem `appointment_id`, deveria apontar para seq 5 (`d4920517`)
-- `86c8a93e` (R$120, pendente) — **duplicata** gerada pelo trigger, deletar
-- `504a666d` (R$125, pendente) — **duplicata** gerada pelo trigger, deletar
-
-### Correções (4 statements SQL)
-
+#### 1. Migration: adicionar coluna `google_event_id`
 ```sql
--- 1. Vincular seq 4 e 5 ao evento principal (seq 3)
-UPDATE appointments SET parent_appointment_id = '070d1b70-d9db-4d8a-9b0f-271720cbf186'
-WHERE id IN ('be0c0509-a84d-421f-9975-57c5426d6382', 'd4920517-0d72-41e0-8d9b-96520cbbaa19');
-
--- 2. Vincular transação extra Tratamento ao seq 4
-UPDATE financial_transactions SET appointment_id = 'be0c0509-a84d-421f-9975-57c5426d6382'
-WHERE id = 'd2ca6ee4-0c58-4f59-ae3c-2e262584d9a6';
-
--- 3. Vincular transação extra limpeza ao seq 5
-UPDATE financial_transactions SET appointment_id = 'd4920517-0d72-41e0-8d9b-96520cbbaa19'
-WHERE id = '6c800cb5-6507-43bb-921b-5d65562c60df';
-
--- 4. Deletar transações duplicadas do trigger
-DELETE FROM financial_transactions
-WHERE id IN ('86c8a93e-8d14-4e72-b8c5-1a32c576f990', '504a666d-b481-4535-bc96-345578a593d1');
+ALTER TABLE public.appointments ADD COLUMN google_event_id text;
+CREATE INDEX idx_appointments_google_event_id ON public.appointments(google_event_id);
 ```
 
-### Resultado esperado
+#### 2. AgendaModule.tsx - BillingDialog
+- Ao criar o appointment principal (linha 1745), incluir `google_event_id: event.id`
+- Atualizar a verificação de duplicidade (linha 1257) para usar `google_event_id` em vez de comparar description + date:
+  ```typescript
+  // Antes: compara description e date (frágil)
+  // Depois: verifica se já existe appointment com esse google_event_id
+  const { data: existing } = await supabase
+    .from("appointments")
+    .select("id")
+    .eq("clinic_id", clinicId)
+    .eq("google_event_id", editingEvent.id)
+    .limit(1);
+  ```
 
-| Agendamento | Parent | Evento visual |
-|-------------|--------|---------------|
-| Seq 3 (Tratamento) | NULL | Evento #3 (principal) |
-| Seq 4 (Tratamento extra) | Seq 3 | Evento #3 |
-| Seq 5 (limpeza extra) | Seq 3 | Evento #3 |
+#### 3. AgendaModule.tsx - Transações extras
+- Vincular as transações de procedimentos extras ao `appointment_id` do extra (hoje estão sem vínculo, linha 1842-1853):
+  ```typescript
+  // Para cada extra procedure, guardar o appointment_id retornado e vincular à transação
+  ```
 
-Transações financeiras do evento #3: 3 transações (R$120 + R$120 + R$125 = R$365), todas vinculadas aos seus respectivos appointments, sem duplicatas.
+#### 4. AgendaModule.tsx - mergedEvents
+- Filtrar appointments filhos (`parent_appointment_id IS NOT NULL`) do grid para não duplicar visualmente
+
+#### 5. Interface Appointment
+- Adicionar `google_event_id?: string` e `parent_appointment_id?: string` à interface
+
+#### 6. Atualizar dados de hoje no banco
+- Buscar os eventos do Google Calendar de hoje via edge function
+- Fazer UPDATE nos appointments existentes de hoje para preencher `google_event_id` com o ID correto, cruzando por `date + start_time + client name`
+
+### Arquivos afetados
+
+| Arquivo | Mudança |
+|---------|---------|
+| Migration SQL | `ADD COLUMN google_event_id text` + índice |
+| `AgendaModule.tsx` | Gravar `google_event_id` no billing; verificação de duplicidade; vincular transações extras; filtrar filhos do grid |
 
