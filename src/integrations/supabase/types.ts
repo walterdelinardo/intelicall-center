@@ -24,6 +24,7 @@ export type Database = {
           estimated_price: number | null
           id: string
           notes: string | null
+          parent_appointment_id: string | null
           procedure_id: string | null
           professional_id: string | null
           seq_number: number
@@ -40,6 +41,7 @@ export type Database = {
           estimated_price?: number | null
           id?: string
           notes?: string | null
+          parent_appointment_id?: string | null
           procedure_id?: string | null
           professional_id?: string | null
           seq_number?: number
@@ -56,6 +58,7 @@ export type Database = {
           estimated_price?: number | null
           id?: string
           notes?: string | null
+          parent_appointment_id?: string | null
           procedure_id?: string | null
           professional_id?: string | null
           seq_number?: number
@@ -76,6 +79,13 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_parent_appointment_id_fkey"
+            columns: ["parent_appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
             referencedColumns: ["id"]
           },
           {

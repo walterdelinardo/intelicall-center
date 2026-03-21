@@ -1,0 +1,1 @@
+ALTER TABLE public.appointments ADD COLUMN parent_appointment_id uuid REFERENCES public.appointments(id) ON DELETE SET NULL;
