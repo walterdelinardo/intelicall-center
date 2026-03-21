@@ -255,16 +255,18 @@ const AgendaModule = () => {
         }));
     }
 
-    return appointments.map((apt) => ({
-      type: 'local' as const,
-      id: apt.id,
-      title: (apt.clients as any)?.name || 'Cliente',
-      date: apt.date,
-      time: apt.start_time?.slice(0, 5) || '',
-      duration: `${apt.duration_minutes}min`,
-      status: apt.status,
-      appointment: apt,
-    }));
+    return appointments
+      .filter((apt) => !apt.parent_appointment_id)
+      .map((apt) => ({
+        type: 'local' as const,
+        id: apt.id,
+        title: (apt.clients as any)?.name || 'Cliente',
+        date: apt.date,
+        time: apt.start_time?.slice(0, 5) || '',
+        duration: `${apt.duration_minutes}min`,
+        status: apt.status,
+        appointment: apt,
+      }));
   }, [appointments, googleEvents, filterAccount, useGoogleAsPrimary]);
 
   // Auto-compose title for create form
