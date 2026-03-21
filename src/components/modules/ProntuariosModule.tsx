@@ -621,16 +621,21 @@ function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
     enabled: !!record?.client_id && !!clinicId,
   });
 
-  // Group appointments by event (date + start_time)
+  // Group appointments by event using parent_appointment_id (or own id if no parent)
   const groupedEvents = procedures.reduce((acc: Record<string, any[]>, appt: any) => {
-    const key = `${appt.date}_${appt.start_time}`;
+    const key = appt.parent_appointment_id || appt.id;
     if (!acc[key]) acc[key] = [];
     acc[key].push(appt);
     return acc;
   }, {} as Record<string, any[]>);
 
-  const eventList = Object.entries(groupedEvents).map(([key, appts]: [string, any[]]) => {
-    const [date, time] = key.split('_');
+  const eventList = Object.entries(groupedEvents).map(([eventId, appts]: [string, any[]]) => {
+    // The main appointment is the one without a parent (or the first one sorted by seq_number)
+    const mainAppt = appts.find((a: any) => !a.parent_appointment_id) || appts.reduce((min: any, a: any) => a.seq_number < min.seq_number ? a : min, appts[0]);
+    const date = mainAppt.date;
+    const time = mainAppt.start_time;
+    const seqNumber = mainAppt.seq_number;
+
     // Determine overall event status
     const statuses = appts.map((a: any) => a.status);
     let eventStatus = statuses[0];
@@ -648,15 +653,16 @@ function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
     const productTotal = eventTransactions.reduce((sum: number, tx: any) => sum + Number(tx.amount), 0);
     
     return {
-      key,
+      key: eventId,
       date,
       time,
+      seqNumber,
       status: eventStatus,
       appointments: appts,
       totalValue: totalValue + productTotal,
       productTransactions: eventTransactions,
     };
-  }).sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time));
+  }).sort((a, b) => b.seqNumber - a.seqNumber);
 
   // Documents from record_documents
   const { data: docs = [] } = useQuery({
