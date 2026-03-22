@@ -1,10 +1,10 @@
-import { Bell, LogOut, Building2 } from "lucide-react";
+import { Bell, LogOut, Building2, Check, Eye, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/contexts/AuthContext";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -27,6 +27,7 @@ const notifIcons: Record<string, string> = {
 
 const DashboardHeader = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { profile, roles, signOut } = useAuth();
 
   const { data: clinic } = useQuery({
@@ -43,7 +44,7 @@ const DashboardHeader = () => {
     enabled: !!profile?.clinic_id,
   });
 
-  const { data: notifications = [] } = useQuery({
+  const { data: notifications = [], refetch: refetchNotifications } = useQuery({
     queryKey: ["header-notifications", profile?.clinic_id],
     queryFn: async () => {
       if (!profile?.clinic_id) return [];
@@ -52,12 +53,29 @@ const DashboardHeader = () => {
         .select("*")
         .eq("clinic_id", profile.clinic_id)
         .order("created_at", { ascending: false })
-        .limit(10);
+        .limit(20);
       return data || [];
     },
     enabled: !!profile?.clinic_id,
     refetchInterval: 30000,
   });
+
+  const unreadCount = notifications.filter((n: any) => !n.is_read).length;
+
+  const toggleRead = async (id: string, currentRead: boolean) => {
+    await supabase.from("calendar_notifications").update({ is_read: !currentRead } as any).eq("id", id);
+    refetchNotifications();
+    queryClient.invalidateQueries({ queryKey: ["calendar-notifications"] });
+  };
+
+  const markAllRead = async () => {
+    const unread = notifications.filter((n: any) => !n.is_read);
+    for (const n of unread) {
+      await supabase.from("calendar_notifications").update({ is_read: true } as any).eq("id", (n as any).id);
+    }
+    refetchNotifications();
+    queryClient.invalidateQueries({ queryKey: ["calendar-notifications"] });
+  };
 
   const handleLogout = async () => {
     await signOut();
@@ -110,16 +128,25 @@ const DashboardHeader = () => {
             <PopoverTrigger asChild>
               <Button variant="ghost" size="icon" className="relative">
                 <Bell className="w-5 h-5" />
-                {notifications.length > 0 && (
+                {unreadCount > 0 ? (
                   <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-destructive text-destructive-foreground text-[10px] flex items-center justify-center">
-                    {notifications.length}
+                    {unreadCount}
+                  </span>
+                ) : (
+                  <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-green-500 text-white text-[10px] flex items-center justify-center">
+                    <Check className="w-3 h-3" />
                   </span>
                 )}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-80 p-0" align="end">
-              <div className="px-3 py-2 border-b border-border">
+              <div className="px-3 py-2 border-b border-border flex items-center justify-between">
                 <p className="text-sm font-semibold">Notificações da Agenda</p>
+                {unreadCount > 0 && (
+                  <Button variant="ghost" size="sm" className="text-xs h-6 px-2" onClick={markAllRead}>
+                    Marcar todas como lidas
+                  </Button>
+                )}
               </div>
               <ScrollArea className="max-h-80">
                 {notifications.length === 0 ? (
@@ -127,7 +154,7 @@ const DashboardHeader = () => {
                 ) : (
                   <div className="divide-y divide-border">
                     {notifications.map((n: any) => (
-                      <div key={n.id} className="px-3 py-2.5 hover:bg-muted/50 transition-colors">
+                      <div key={n.id} className={`px-3 py-2.5 transition-colors ${n.is_read ? "opacity-60" : "bg-primary/5"}`}>
                         <div className="flex items-start gap-2">
                           <span className="text-sm mt-0.5">{notifIcons[n.action] || "📋"}</span>
                           <div className="flex-1 min-w-0">
@@ -137,6 +164,15 @@ const DashboardHeader = () => {
                               {format(new Date(n.created_at), "dd/MM HH:mm", { locale: ptBR })} — {n.actor_name || "Sistema"}
                             </p>
                           </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 shrink-0"
+                            title={n.is_read ? "Marcar como não lida" : "Marcar como lida"}
+                            onClick={() => toggleRead(n.id, n.is_read)}
+                          >
+                            {n.is_read ? <Eye className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                          </Button>
                         </div>
                       </div>
                     ))}
