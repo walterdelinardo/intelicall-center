@@ -333,7 +333,7 @@ const ListaEsperaModule = () => {
     const matchStatus = filterStatus === "all" || item.status === filterStatus;
     const matchPriority = filterPriority === "all" || item.priority === filterPriority;
     const matchCalendar = filterCalendar === "all" || item.google_calendar_account_id === filterCalendar;
-    return matchSearch && matchStatus && matchPriority && matchProfessional;
+    return matchSearch && matchStatus && matchPriority && matchCalendar;
   });
 
   const getStatusBadge = (status: string) => {
