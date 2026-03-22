@@ -638,6 +638,35 @@ export type Database = {
           },
         ]
       }
+      google_calendar_sync_state: {
+        Row: {
+          account_id: string
+          id: string
+          last_synced_at: string | null
+          sync_token: string
+        }
+        Insert: {
+          account_id: string
+          id?: string
+          last_synced_at?: string | null
+          sync_token: string
+        }
+        Update: {
+          account_id?: string
+          id?: string
+          last_synced_at?: string | null
+          sync_token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_calendar_sync_state_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: true
+            referencedRelation: "google_calendar_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       google_oauth_config: {
         Row: {
           client_id: string
