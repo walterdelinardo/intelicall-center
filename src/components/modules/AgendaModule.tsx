@@ -1093,9 +1093,12 @@ const AgendaModule = () => {
         </TabsTrigger>
         <TabsTrigger value="notificacoes" className="gap-2">
           <Bell className="w-4 h-4" /> Notificações
-          {notifications.length > 0 && (
-            <Badge variant="secondary" className="ml-1 h-5 min-w-5 px-1 text-[10px]">{notifications.length}</Badge>
-          )}
+          {(() => {
+            const unreadCount = notifications.filter((n: any) => !n.is_read).length;
+            return unreadCount > 0 ? (
+              <Badge variant="destructive" className="ml-1 h-5 min-w-5 px-1 text-[10px]">{unreadCount}</Badge>
+            ) : null;
+          })()}
         </TabsTrigger>
       </TabsList>
 
