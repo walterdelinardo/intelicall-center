@@ -18,7 +18,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar, Plus, ChevronLeft, ChevronRight, Clock, Globe, Pencil, Trash2, Search, UserPlus, User, Phone, DollarSign, RefreshCw, Mail, Eye, XCircle, Lock, Unlock, CalendarDays, Receipt, X, ShoppingCart, Stethoscope, MessageSquare, Bell } from "lucide-react";
+import { Calendar, Plus, ChevronLeft, ChevronRight, Clock, Globe, Pencil, Trash2, Search, UserPlus, User, Phone, DollarSign, RefreshCw, Mail, Eye, CircleCheck, AlertCircle, XCircle, Lock, Unlock, CalendarDays, Receipt, X, ShoppingCart, Stethoscope, MessageSquare, Bell } from "lucide-react";
 import { toast } from "sonner";
 import { format, addDays, addMonths, subMonths, startOfWeek, endOfWeek, eachDayOfInterval, isToday, isSameDay, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -1133,7 +1133,7 @@ const AgendaModule = () => {
             ) : (
               <div className="space-y-2">
                 {notifications.map((n: any) => (
-                  <div key={n.id} className={`flex items-start gap-3 border-b border-border pb-3 last:border-0 rounded-md px-2 py-1 transition-colors ${n.is_read ? "opacity-60" : "bg-primary/5"}`}>
+                  <div key={n.id} className={`flex items-start gap-3 border-b border-border pb-3 last:border-0 rounded-md px-2 py-1 transition-colors ${n.is_read ? "opacity-60" : "bg-primary/5"} ${n.is_important ? "border-l-2 border-l-yellow-500" : ""}`}>
                     <span className="text-lg mt-0.5">{notificationActionIcons[n.action] || "📋"}</span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
@@ -1148,19 +1148,34 @@ const AgendaModule = () => {
                       {n.details && <p className="text-xs text-muted-foreground">{n.details}</p>}
                       <p className="text-xs text-muted-foreground mt-0.5">por {n.actor_name || "Sistema"}</p>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 shrink-0"
-                      title={n.is_read ? "Marcar como não lida" : "Marcar como lida"}
-                      onClick={async () => {
-                        await supabase.from("calendar_notifications").update({ is_read: !n.is_read } as any).eq("id", n.id);
-                        refetchNotifications();
-                        queryClient.invalidateQueries({ queryKey: ["header-notifications"] });
-                      }}
-                    >
-                      {n.is_read ? <Eye className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-                    </Button>
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        title={n.is_read ? "Marcar como não lida" : "Marcar como lida"}
+                        onClick={async () => {
+                          await supabase.from("calendar_notifications").update({ is_read: !n.is_read } as any).eq("id", n.id);
+                          refetchNotifications();
+                          queryClient.invalidateQueries({ queryKey: ["header-notifications"] });
+                        }}
+                      >
+                        <CircleCheck className={`w-4 h-4 ${n.is_read ? "text-green-500" : "text-muted-foreground"}`} />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        title={n.is_important ? "Remover importância" : "Marcar como importante"}
+                        onClick={async () => {
+                          await supabase.from("calendar_notifications").update({ is_important: !n.is_important } as any).eq("id", n.id);
+                          refetchNotifications();
+                          queryClient.invalidateQueries({ queryKey: ["header-notifications"] });
+                        }}
+                      >
+                        <AlertCircle className={`w-4 h-4 ${n.is_important ? "text-yellow-500" : "text-muted-foreground"}`} />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>

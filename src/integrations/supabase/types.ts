@@ -111,6 +111,7 @@ export type Database = {
           event_id: string | null
           event_title: string | null
           id: string
+          is_important: boolean
           is_read: boolean
         }
         Insert: {
@@ -123,6 +124,7 @@ export type Database = {
           event_id?: string | null
           event_title?: string | null
           id?: string
+          is_important?: boolean
           is_read?: boolean
         }
         Update: {
@@ -135,6 +137,7 @@ export type Database = {
           event_id?: string | null
           event_title?: string | null
           id?: string
+          is_important?: boolean
           is_read?: boolean
         }
         Relationships: [

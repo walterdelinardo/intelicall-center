@@ -1,0 +1,1 @@
+ALTER TABLE public.calendar_notifications ADD COLUMN is_important boolean NOT NULL DEFAULT false;

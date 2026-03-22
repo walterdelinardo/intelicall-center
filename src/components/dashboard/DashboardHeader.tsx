@@ -1,4 +1,4 @@
-import { Bell, LogOut, Building2, Check, Eye, XCircle } from "lucide-react";
+import { Bell, LogOut, Building2, Check, CircleCheck, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -64,6 +64,12 @@ const DashboardHeader = () => {
 
   const toggleRead = async (id: string, currentRead: boolean) => {
     await supabase.from("calendar_notifications").update({ is_read: !currentRead } as any).eq("id", id);
+    refetchNotifications();
+    queryClient.invalidateQueries({ queryKey: ["calendar-notifications"] });
+  };
+
+  const toggleImportant = async (id: string, currentImportant: boolean) => {
+    await supabase.from("calendar_notifications").update({ is_important: !currentImportant } as any).eq("id", id);
     refetchNotifications();
     queryClient.invalidateQueries({ queryKey: ["calendar-notifications"] });
   };
@@ -139,7 +145,7 @@ const DashboardHeader = () => {
                 )}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-80 p-0" align="end">
+            <PopoverContent className="w-96 p-0" align="end">
               <div className="px-3 py-2 border-b border-border flex items-center justify-between">
                 <p className="text-sm font-semibold">Notificações da Agenda</p>
                 {unreadCount > 0 && (
@@ -154,7 +160,7 @@ const DashboardHeader = () => {
                 ) : (
                   <div className="divide-y divide-border">
                     {notifications.map((n: any) => (
-                      <div key={n.id} className={`px-3 py-2.5 transition-colors ${n.is_read ? "opacity-60" : "bg-primary/5"}`}>
+                      <div key={n.id} className={`px-3 py-2.5 transition-colors ${n.is_read ? "opacity-60" : "bg-primary/5"} ${n.is_important ? "border-l-2 border-l-yellow-500" : ""}`}>
                         <div className="flex items-start gap-2">
                           <span className="text-sm mt-0.5">{notifIcons[n.action] || "📋"}</span>
                           <div className="flex-1 min-w-0">
@@ -164,15 +170,26 @@ const DashboardHeader = () => {
                               {format(new Date(n.created_at), "dd/MM HH:mm", { locale: ptBR })} — {n.actor_name || "Sistema"}
                             </p>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 shrink-0"
-                            title={n.is_read ? "Marcar como não lida" : "Marcar como lida"}
-                            onClick={() => toggleRead(n.id, n.is_read)}
-                          >
-                            {n.is_read ? <Eye className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                          </Button>
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              title={n.is_read ? "Marcar como não lida" : "Marcar como lida"}
+                              onClick={() => toggleRead(n.id, n.is_read)}
+                            >
+                              <CircleCheck className={`w-3.5 h-3.5 ${n.is_read ? "text-green-500" : "text-muted-foreground"}`} />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              title={n.is_important ? "Remover importância" : "Marcar como importante"}
+                              onClick={() => toggleImportant(n.id, n.is_important)}
+                            >
+                              <AlertCircle className={`w-3.5 h-3.5 ${n.is_important ? "text-yellow-500" : "text-muted-foreground"}`} />
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     ))}
