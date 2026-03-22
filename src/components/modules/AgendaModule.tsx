@@ -87,7 +87,7 @@ const AgendaModule = () => {
   const { openProntuario } = useDashboard();
   const { profile } = useAuth();
   const queryClient = useQueryClient();
-  const { events: googleEvents, loading: googleLoading, fetchEvents: fetchGoogleEvents, createEvent: createGoogleEvent, updateEvent: updateGoogleEvent, deleteEvent: deleteGoogleEvent } = useGoogleCalendar();
+  const { events: googleEvents, loading: googleLoading, fetchEvents: fetchGoogleEvents, createEvent: createGoogleEvent, updateEvent: updateGoogleEvent, deleteEvent: deleteGoogleEvent, syncChanges } = useGoogleCalendar();
   const { accounts, isConnected } = useGoogleOAuth();
   const { data: externalClients = [] } = useClients();
   const [selectedDate, setSelectedDate] = useState(new Date());
