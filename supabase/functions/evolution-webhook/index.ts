@@ -596,6 +596,17 @@ serve(async (req) => {
           .update({ unread_count: (conv.unread_count ?? 0) + 1 }).eq("id", conv.id);
       }
 
+      // Auto-unhide: if conversation is hidden (encerrado) and receives an incoming message, restore it
+      if (!isFromMe && !isDuplicate) {
+        const { data: convStatus } = await supabase.from("whatsapp_conversations")
+          .select("conversation_status").eq("id", conv.id).single();
+        if (convStatus?.conversation_status === "encerrado") {
+          await supabase.from("whatsapp_conversations")
+            .update({ conversation_status: "bot" }).eq("id", conv.id);
+          console.log(JSON.stringify({ action: "auto_unhide", convId: conv.id }));
+        }
+      }
+
       console.log(JSON.stringify({ action: "message_processed", convId: conv.id, messageType, isDuplicate, inbox: inboxId }));
     }
 
