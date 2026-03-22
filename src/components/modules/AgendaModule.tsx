@@ -135,7 +135,10 @@ const AgendaModule = () => {
   const useGoogleAsPrimary = isConnected && activeAccounts.length > 0;
 
   useEffect(() => {
-    if (isConnected) fetchGoogleEvents();
+    if (isConnected) {
+      fetchGoogleEvents();
+      syncChanges();
+    }
   }, [isConnected]);
 
   useEffect(() => {
