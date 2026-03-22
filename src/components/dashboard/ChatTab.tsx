@@ -132,10 +132,28 @@ const ChatTab = () => {
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-120px)]">
       <Card className="lg:col-span-1 flex flex-col shadow-card overflow-hidden">
         <div className="p-3 border-b space-y-2">
-          <h3 className="font-semibold flex items-center gap-2 text-sm">
-            <MessageSquare className="w-4 h-4 text-primary" />
-            WhatsApp
-          </h3>
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold flex items-center gap-2 text-sm">
+              <MessageSquare className="w-4 h-4 text-primary" />
+              WhatsApp
+            </h3>
+            <Button
+              variant={showHidden ? "secondary" : "ghost"}
+              size="sm"
+              className="text-xs h-7 gap-1"
+              onClick={() => {
+                setShowHidden(!showHidden);
+                setSelectedConvId(null);
+                setStatusFilter(null);
+              }}
+            >
+              {showHidden ? (
+                <><MessageCircle className="w-3.5 h-3.5" /> Conversas</>
+              ) : (
+                <><EyeOff className="w-3.5 h-3.5" /> Ocultas</>
+              )}
+            </Button>
+          </div>
           {inboxes.length > 0 && (
             <Select
               value={selectedInboxId || "all"}

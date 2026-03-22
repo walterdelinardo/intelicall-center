@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Bot, User, Clock, XCircle } from "lucide-react";
+import { Search, Bot, User, Clock, EyeOff } from "lucide-react";
 import { format } from "date-fns";
 import { WhatsAppConversation } from "@/hooks/useWhatsApp";
 import { type InboxMeta } from "@/components/dashboard/ChatTab";

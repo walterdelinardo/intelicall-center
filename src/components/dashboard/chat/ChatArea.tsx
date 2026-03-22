@@ -160,9 +160,13 @@ const ChatArea = ({ conversation, messages, messagesLoading }: ChatAreaProps) =>
               <Bot className="w-3 h-3" /> Devolver ao Bot
             </Button>
           )}
-          {conversation.conversation_status !== 'encerrado' && (
-            <Button variant="ghost" size="sm" onClick={handleClose} className="text-xs h-7 gap-1 text-destructive hover:text-destructive">
-              <XCircle className="w-3 h-3" /> Encerrar
+          {conversation.conversation_status === 'encerrado' ? (
+            <Button variant="outline" size="sm" onClick={handleUnhide} className="text-xs h-7 gap-1">
+              <Eye className="w-3 h-3" /> Desocultar
+            </Button>
+          ) : (
+            <Button variant="ghost" size="sm" onClick={handleHide} className="text-xs h-7 gap-1 text-muted-foreground hover:text-foreground">
+              <EyeOff className="w-3 h-3" /> Ocultar
             </Button>
           )}
         </div>
