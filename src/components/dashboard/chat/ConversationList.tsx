@@ -108,12 +108,12 @@ const ConversationList = ({
                 <button
                   key={conv.id}
                   onClick={() => onSelect(conv.id)}
-                  className={`w-full p-3 text-left transition-colors hover:bg-accent/50 ${
+                  className={`w-full p-3 text-left transition-colors hover:bg-accent/50 overflow-hidden ${
                     selectedConvId === conv.id ? "bg-accent" : ""
                   }`}
                   style={inboxColor ? { borderLeft: `3px solid ${inboxColor}` } : undefined}
                 >
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-start gap-2">
                     <Avatar className="w-10 h-10 shrink-0">
                       <AvatarFallback className="bg-primary/10 text-primary text-sm">
                         {(conv.display_name || conv.contact_name || conv.contact_phone || '?')[0].toUpperCase()}
