@@ -130,7 +130,7 @@ export const useWhatsAppConversations = (filters: ConversationFilters = {}) => {
       let query = supabase
         .from('whatsapp_conversations')
         .select('*')
-        .order('last_message_at', { ascending: false });
+        .order('last_message_at', { ascending: false, nullsFirst: false });
 
       if (inboxId) query = query.eq('inbox_id', inboxId);
       if (statusFilter) query = query.eq('conversation_status', statusFilter);
