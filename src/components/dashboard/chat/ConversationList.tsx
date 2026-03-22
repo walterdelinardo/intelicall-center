@@ -108,7 +108,7 @@ const ConversationList = ({
                 <button
                   key={conv.id}
                   onClick={() => onSelect(conv.id)}
-                  className={`w-full p-3 text-left transition-colors hover:bg-accent/50 overflow-hidden ${
+                  className={`w-full p-3 text-left transition-colors hover:bg-accent/50 ${
                     selectedConvId === conv.id ? "bg-accent" : ""
                   }`}
                   style={inboxColor ? { borderLeft: `3px solid ${inboxColor}` } : undefined}
@@ -135,16 +135,16 @@ const ConversationList = ({
                       <p className="text-xs text-muted-foreground truncate">
                         {conv.last_message || 'Sem mensagens'}
                       </p>
-                      <div className="flex items-center gap-1 mt-0.5 flex-nowrap overflow-hidden">
+                      <div className="flex items-center gap-1 mt-0.5 flex-wrap">
                         <StatusIndicator status={conv.conversation_status} />
                         {showInboxLabel && meta && (
                           <span
-                            className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground truncate max-w-[120px]"
+                            className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground"
                           >
                             {inboxColor && (
                               <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: inboxColor }} />
                             )}
-                            <span className="truncate">{meta.label}</span>
+                            {meta.label}
                           </span>
                         )}
                         {conv.unread_count > 0 && (
