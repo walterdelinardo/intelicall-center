@@ -192,5 +192,27 @@ export const useGoogleCalendar = () => {
     }
   };
 
-  return { events, loading, fetchEvents, createEvent, updateEvent, deleteEvent };
+  const syncChanges = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const { data, error } = await supabase.functions.invoke('google-calendar-sync', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+
+      if (error) {
+        console.error('Sync error:', error);
+        return;
+      }
+
+      if (data?.synced > 0) {
+        console.log(`Sync: ${data.synced} notifications generated`);
+      }
+    } catch (error) {
+      console.error('Sync error:', error);
+    }
+  };
+
+  return { events, loading, fetchEvents, createEvent, updateEvent, deleteEvent, syncChanges };
 };
