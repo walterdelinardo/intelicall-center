@@ -191,7 +191,7 @@ const ChatTab = () => {
         />
       </Card>
 
-      <Card className="lg:col-span-2 flex flex-col shadow-card overflow-hidden">
+      <Card className="lg:col-span-2 flex flex-col shadow-card overflow-hidden min-w-0 min-h-0">
         <ChatArea
           conversation={selectedConv}
           messages={messages}
