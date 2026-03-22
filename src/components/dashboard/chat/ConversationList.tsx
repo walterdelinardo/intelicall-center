@@ -108,7 +108,7 @@ const ConversationList = ({
                 <button
                   key={conv.id}
                   onClick={() => onSelect(conv.id)}
-                  className={`w-full p-3 text-left transition-colors hover:bg-accent/50 ${
+                  className={`w-full p-3 text-left transition-colors hover:bg-accent/50 overflow-hidden ${
                     selectedConvId === conv.id ? "bg-accent" : ""
                   }`}
                   style={inboxColor ? { borderLeft: `3px solid ${inboxColor}` } : undefined}
