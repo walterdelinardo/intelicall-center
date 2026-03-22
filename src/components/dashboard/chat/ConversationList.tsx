@@ -1,7 +1,6 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Bot, User, Clock, EyeOff } from "lucide-react";
 import { format, isToday } from "date-fns";
@@ -57,7 +56,7 @@ const ConversationList = ({
   });
 
   return (
-    <div className="flex flex-col h-full min-w-0 min-h-0 overflow-hidden">
+    <div className="flex flex-col h-full min-w-0 min-h-0">
       <div className="p-2 sm:p-3 border-b space-y-2">
         <div className="relative">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -91,7 +90,9 @@ const ConversationList = ({
           </Select>
         </div>
       </div>
-      <ScrollArea className="flex-1 min-h-0 min-w-0">
+
+      {/* Native scroll container instead of Radix ScrollArea */}
+      <div className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden">
         {loading ? (
           <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">Carregando...</div>
         ) : filtered.length === 0 ? (
@@ -99,7 +100,7 @@ const ConversationList = ({
             {search ? 'Nenhum resultado' : 'Nenhuma conversa'}
           </div>
         ) : (
-          <div className="p-1.5 pr-3 sm:p-2 sm:pr-4 space-y-1">
+          <div className="p-2 space-y-1">
             {filtered.map(conv => {
               const meta = conv.inbox_id ? inboxMetaMap[conv.inbox_id] : null;
               const inboxColor = meta?.color || null;
@@ -108,7 +109,7 @@ const ConversationList = ({
                 <button
                   key={conv.id}
                   onClick={() => onSelect(conv.id)}
-                  className={`w-full rounded-lg p-2 sm:p-2.5 text-left transition-colors hover:bg-accent/50 overflow-hidden ${
+                  className={`w-full rounded-lg p-2 sm:p-2.5 text-left transition-colors hover:bg-accent/50 ${
                     selectedConvId === conv.id ? "bg-accent" : ""
                   }`}
                   style={inboxColor ? { borderLeft: `3px solid ${inboxColor}` } : undefined}
@@ -120,11 +121,11 @@ const ConversationList = ({
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2 min-w-0">
-                        <span className="font-medium text-sm truncate min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium text-sm truncate flex-1 min-w-0">
                           {conv.display_name || conv.contact_name || conv.contact_phone || 'Desconhecido'}
                         </span>
-                        <span className="text-[10px] text-muted-foreground shrink-0">
+                        <span className="text-[10px] text-muted-foreground shrink-0 whitespace-nowrap">
                           {conv.last_message_at
                             ? isToday(new Date(conv.last_message_at))
                               ? format(new Date(conv.last_message_at), 'HH:mm')
@@ -132,7 +133,7 @@ const ConversationList = ({
                             : ''}
                         </span>
                       </div>
-                      <p className="text-xs text-muted-foreground truncate min-w-0">
+                      <p className="text-xs text-muted-foreground truncate">
                         {conv.last_message || 'Sem mensagens'}
                       </p>
                       <div className="flex items-center gap-1 mt-0.5 flex-wrap">
@@ -160,7 +161,7 @@ const ConversationList = ({
             })}
           </div>
         )}
-      </ScrollArea>
+      </div>
     </div>
   );
 };

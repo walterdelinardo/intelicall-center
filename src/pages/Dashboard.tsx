@@ -45,7 +45,7 @@ const DashboardContent = () => {
             <SidebarTrigger />
             <h1 className="text-lg font-semibold text-foreground capitalize">{activeModule === "dashboard" ? "Painel" : activeModule}</h1>
           </div>
-          <main className="flex-1 p-6 animate-fade-in">
+          <main className="flex-1 p-6 animate-fade-in min-w-0">
             <ActiveComponent />
           </main>
         </div>
