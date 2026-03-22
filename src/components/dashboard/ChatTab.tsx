@@ -129,8 +129,8 @@ const ChatTab = () => {
 
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-120px)] min-w-0 min-h-0">
-      <Card className="lg:col-span-1 flex flex-col shadow-card overflow-hidden min-w-0 min-h-0">
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(320px,420px)_1fr] gap-4 h-[calc(100vh-120px)] min-w-0 min-h-0">
+      <Card className="flex flex-col shadow-card min-w-0 min-h-0 overflow-hidden">
         <div className="p-3 border-b space-y-2">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold flex items-center gap-2 text-sm">
@@ -191,7 +191,7 @@ const ChatTab = () => {
         />
       </Card>
 
-      <Card className="lg:col-span-2 flex flex-col shadow-card overflow-hidden min-w-0 min-h-0">
+      <Card className="flex flex-col shadow-card overflow-hidden min-w-0 min-h-0">
         <ChatArea
           conversation={selectedConv}
           messages={messages}
