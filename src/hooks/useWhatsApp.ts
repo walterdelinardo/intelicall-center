@@ -293,10 +293,18 @@ export const useConversationActions = () => {
     if (error) throw error;
   };
 
-  const closeConversation = async (conversationId: string) => {
+  const hideConversation = async (conversationId: string) => {
     const { error } = await supabase
       .from('whatsapp_conversations')
       .update({ conversation_status: 'encerrado' } as any)
+      .eq('id', conversationId);
+    if (error) throw error;
+  };
+
+  const unhideConversation = async (conversationId: string) => {
+    const { error } = await supabase
+      .from('whatsapp_conversations')
+      .update({ conversation_status: 'bot' } as any)
       .eq('id', conversationId);
     if (error) throw error;
   };
@@ -309,5 +317,5 @@ export const useConversationActions = () => {
     if (error) throw error;
   };
 
-  return { assumeConversation, returnToBot, closeConversation, markAsRead };
+  return { assumeConversation, returnToBot, hideConversation, unhideConversation, markAsRead };
 };
