@@ -29,6 +29,7 @@ export interface WhatsAppConversation {
   assigned_to: string | null;
   created_at: string;
   updated_at: string;
+  display_name?: string | null;
 }
 
 export interface WhatsAppMessage {
@@ -152,7 +153,42 @@ export const useWhatsAppConversations = (filters: ConversationFilters = {}) => {
 
       const { data, error } = await query;
       if (error) throw error;
-      setConversations((data as WhatsAppConversation[]) || []);
+
+      const convs = (data as WhatsAppConversation[]) || [];
+
+      // Enrich with client names from clients table
+      if (convs.length > 0) {
+        const phones = convs
+          .map(c => c.contact_phone || c.remote_jid?.replace(/@.*$/, ''))
+          .filter(Boolean) as string[];
+
+        if (phones.length > 0) {
+          const { data: clients } = await supabase
+            .from('clients')
+            .select('name, whatsapp, phone');
+
+          if (clients && clients.length > 0) {
+            const clientMap = new Map<string, string>();
+            for (const client of clients) {
+              const wp = (client.whatsapp || '').replace(/\D/g, '');
+              const ph = (client.phone || '').replace(/\D/g, '');
+              if (wp && wp.length >= 10) clientMap.set(wp.slice(-11), client.name);
+              if (ph && ph.length >= 10) clientMap.set(ph.slice(-11), client.name);
+            }
+
+            for (const conv of convs) {
+              const convPhone = (conv.contact_phone || conv.remote_jid?.replace(/@.*$/, '') || '').replace(/\D/g, '');
+              if (convPhone.length >= 10) {
+                const suffix = convPhone.slice(-11);
+                const clientName = clientMap.get(suffix);
+                if (clientName) conv.display_name = clientName;
+              }
+            }
+          }
+        }
+      }
+
+      setConversations(convs);
     } catch (error) {
       console.error('Error fetching conversations:', error);
     } finally {
