@@ -65,7 +65,7 @@ const ListaEsperaModule = () => {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterPriority, setFilterPriority] = useState("all");
-  const [filterProfessional, setFilterProfessional] = useState("all");
+  const [filterCalendar, setFilterCalendar] = useState("all");
   const [isOpen, setIsOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -332,8 +332,8 @@ const ListaEsperaModule = () => {
     const matchSearch = item.client_name?.toLowerCase().includes(search.toLowerCase());
     const matchStatus = filterStatus === "all" || item.status === filterStatus;
     const matchPriority = filterPriority === "all" || item.priority === filterPriority;
-    const matchProfessional = filterProfessional === "all" || item.professional_id === filterProfessional;
-    return matchSearch && matchStatus && matchPriority && matchProfessional;
+    const matchCalendar = filterCalendar === "all" || item.google_calendar_account_id === filterCalendar;
+    return matchSearch && matchStatus && matchPriority && matchCalendar;
   });
 
   const getStatusBadge = (status: string) => {
@@ -369,11 +369,11 @@ const ListaEsperaModule = () => {
               {PRIORITIES.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Select value={filterProfessional} onValueChange={setFilterProfessional}>
-            <SelectTrigger className="w-[160px]"><SelectValue placeholder="Profissional" /></SelectTrigger>
+          <Select value={filterCalendar} onValueChange={setFilterCalendar}>
+            <SelectTrigger className="w-[160px]"><SelectValue placeholder="Agenda" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              {professionals.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}
+              <SelectItem value="all">Todas Agendas</SelectItem>
+              {calendarAccounts.map((a: any) => <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>)}
             </SelectContent>
           </Select>
           <Button onClick={() => { setEditId(null); setForm(emptyForm); setIsOpen(true); }} className="gap-1">
