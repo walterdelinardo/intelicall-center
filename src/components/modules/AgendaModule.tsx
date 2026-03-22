@@ -141,6 +141,16 @@ const AgendaModule = () => {
     }
   }, [isConnected]);
 
+  // Auto-refresh when switching tabs
+  useEffect(() => {
+    if (agendaTab === "calendario" && isConnected) {
+      fetchGoogleEvents();
+      syncChanges();
+    } else if (agendaTab === "notificacoes") {
+      refetchNotifications();
+    }
+  }, [agendaTab]);
+
   useEffect(() => {
     if (activeAccounts.length === 1 && !selectedAccountId) {
       setSelectedAccountId(activeAccounts[0].id);
