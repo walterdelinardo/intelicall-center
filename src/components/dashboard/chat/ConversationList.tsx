@@ -77,7 +77,6 @@ const ConversationList = ({
               <SelectItem value="bot">Bot</SelectItem>
               <SelectItem value="humano">Humano</SelectItem>
               <SelectItem value="aguardando_cliente">Aguardando</SelectItem>
-              <SelectItem value="encerrado">Encerrado</SelectItem>
             </SelectContent>
           </Select>
           <Select value={assignedFilter} onValueChange={v => onAssignedFilterChange(v as 'mine' | 'all')}>
