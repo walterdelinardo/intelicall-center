@@ -14,7 +14,7 @@ const StatusIndicator = ({ status }: { status: string }) => {
     bot: { icon: <Bot className="w-3 h-3" />, color: "bg-blue-500", label: "Bot" },
     humano: { icon: <User className="w-3 h-3" />, color: "bg-emerald-500", label: "Humano" },
     aguardando_cliente: { icon: <Clock className="w-3 h-3" />, color: "bg-amber-500", label: "Aguardando" },
-    encerrado: { icon: <XCircle className="w-3 h-3" />, color: "bg-muted-foreground", label: "Encerrado" },
+    encerrado: { icon: <EyeOff className="w-3 h-3" />, color: "bg-muted-foreground", label: "Oculto" },
   };
   const c = config[status] || config.bot;
   return (
