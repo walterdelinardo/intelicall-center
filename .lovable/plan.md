@@ -1,37 +1,41 @@
 
 
-## Plano: Auto-refresh + Status de leitura nas notificações
+## Plano: Corrigir popover de notificações + adicionar botão "Importante"
 
-### 1. Migration: adicionar coluna `is_read` na tabela `calendar_notifications`
+### Problemas identificados
+1. O popover de notificações no cabeçalho está com largura insuficiente (`w-80` = 320px), cortando os botões de ação
+2. Falta o botão "Importante" (com ícone `!`) em ambos os locais (cabeçalho e aba Notificações)
+3. O ícone de "lida" usa `Eye`/`XCircle` em vez de ✅ (Check)
+4. Os dois botões (lida + importante) precisam caber sem cortar
+
+### Mudanças
+
+#### 1. Migration: adicionar coluna `is_important`
 ```sql
-ALTER TABLE public.calendar_notifications ADD COLUMN is_read boolean NOT NULL DEFAULT false;
-CREATE INDEX idx_calendar_notifications_unread ON public.calendar_notifications(clinic_id, is_read) WHERE is_read = false;
+ALTER TABLE public.calendar_notifications ADD COLUMN is_important boolean NOT NULL DEFAULT false;
 ```
 
-### 2. AgendaModule.tsx - Auto-refresh ao trocar de aba
-- Quando `agendaTab` mudar para `"calendario"`, chamar `fetchGoogleEvents()` + `syncChanges()`
-- Quando mudar para `"notificacoes"`, chamar `refetchNotifications()`
-- Adicionar `useEffect` que observa `agendaTab`
-- Na aba notificações: badge mostra apenas contagem de `notifications.filter(n => !n.is_read).length`
-- Adicionar botão "Marcar como lida" / "Importante" em cada notificação (toggle `is_read`)
+#### 2. DashboardHeader.tsx
+- Aumentar largura do popover de `w-80` para `w-96` (384px)
+- Trocar ícone de lida: `Eye`/`XCircle` → `CircleCheck` (verde quando lida) 
+- Adicionar botão "Importante": ícone `AlertCircle` (amarelo/laranja quando marcada)
+- Ambos os botões lado a lado, compactos (`h-6 w-6`)
+- Notificações marcadas como importantes com indicador visual (borda ou ícone destacado)
 
-### 3. DashboardHeader.tsx - Ícone de notificações inteligente
-- Alterar query para buscar notificações e filtrar não lidas para contagem
-- Se `unreadCount > 0`: circulo vermelho com número
-- Se `unreadCount === 0`: circulo verde com ✓
-- Adicionar botão de "marcar como lida" em cada notificação no popover
-- Adicionar botão "Marcar todas como lidas" no header do popover
+#### 3. AgendaModule.tsx (aba Notificações)
+- Mesma lógica: trocar ícones de lida para ✅ (`CircleCheck`)
+- Adicionar botão "Importante" com `AlertCircle` (!)
+- Ambos os botões de ação lado a lado
 
-### 4. Notificação individual - botões de ação
-- Cada notificação terá dois botões pequenos:
-  - **Lida/Não lida** (toggle): atualiza `is_read` no banco
-  - Visual: notificações não lidas com fundo levemente destacado, lidas com opacidade reduzida
+#### 4. Ícones usados
+- **Lida**: `CircleCheck` do lucide-react (✅ semântico) — verde quando marcada
+- **Importante**: `AlertCircle` do lucide-react (!) — amarelo/laranja quando marcada
 
 ### Arquivos afetados
 
 | Arquivo | Mudança |
 |---------|---------|
-| Migration SQL | `ADD COLUMN is_read boolean DEFAULT false` + índice |
-| `AgendaModule.tsx` | Auto-refresh por aba, badge de não lidas, botões de lida |
-| `DashboardHeader.tsx` | Contagem de não lidas, circulo verde/vermelho, botão marcar como lida |
+| Migration SQL | `ADD COLUMN is_important boolean DEFAULT false` |
+| `DashboardHeader.tsx` | Popover maior, botões lida (✅) e importante (!), ícones corretos |
+| `AgendaModule.tsx` | Botões lida (✅) e importante (!) na aba notificações |
 
