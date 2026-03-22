@@ -50,6 +50,7 @@ const ConversationList = ({
     if (!search.trim()) return true;
     const q = search.toLowerCase();
     return (
+      (c.display_name || '').toLowerCase().includes(q) ||
       (c.contact_name || '').toLowerCase().includes(q) ||
       (c.contact_phone || '').toLowerCase().includes(q)
     );
