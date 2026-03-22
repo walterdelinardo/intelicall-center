@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Send, MessageSquare, Bot, User, XCircle, Paperclip, StickyNote } from "lucide-react";
+import { Send, MessageSquare, Bot, User, EyeOff, Eye, Paperclip, StickyNote } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { WhatsAppConversation, WhatsAppMessage, useSendWhatsAppMessage, useConversationActions } from "@/hooks/useWhatsApp";
@@ -34,7 +34,7 @@ interface ChatAreaProps {
 
 const ChatArea = ({ conversation, messages, messagesLoading }: ChatAreaProps) => {
   const { sendMessage, sendInternalNote, sending } = useSendWhatsAppMessage();
-  const { assumeConversation, returnToBot, closeConversation, markAsRead } = useConversationActions();
+  const { assumeConversation, returnToBot, hideConversation, unhideConversation, markAsRead } = useConversationActions();
   const [message, setMessage] = useState("");
   const [uploading, setUploading] = useState(false);
   const [isNoteMode, setIsNoteMode] = useState(false);
@@ -111,10 +111,16 @@ const ChatArea = ({ conversation, messages, messagesLoading }: ChatAreaProps) =>
     catch { toast.error("Erro ao devolver ao bot"); }
   };
 
-  const handleClose = async () => {
+  const handleHide = async () => {
     if (!conversation) return;
-    try { await closeConversation(conversation.id); toast.success("Conversa encerrada"); }
-    catch { toast.error("Erro ao encerrar"); }
+    try { await hideConversation(conversation.id); toast.success("Conversa oculta"); }
+    catch { toast.error("Erro ao ocultar"); }
+  };
+
+  const handleUnhide = async () => {
+    if (!conversation) return;
+    try { await unhideConversation(conversation.id); toast.success("Conversa restaurada"); }
+    catch { toast.error("Erro ao restaurar"); }
   };
 
   if (!conversation) {
@@ -154,9 +160,13 @@ const ChatArea = ({ conversation, messages, messagesLoading }: ChatAreaProps) =>
               <Bot className="w-3 h-3" /> Devolver ao Bot
             </Button>
           )}
-          {conversation.conversation_status !== 'encerrado' && (
-            <Button variant="ghost" size="sm" onClick={handleClose} className="text-xs h-7 gap-1 text-destructive hover:text-destructive">
-              <XCircle className="w-3 h-3" /> Encerrar
+          {conversation.conversation_status === 'encerrado' ? (
+            <Button variant="outline" size="sm" onClick={handleUnhide} className="text-xs h-7 gap-1">
+              <Eye className="w-3 h-3" /> Desocultar
+            </Button>
+          ) : (
+            <Button variant="ghost" size="sm" onClick={handleHide} className="text-xs h-7 gap-1 text-muted-foreground hover:text-foreground">
+              <EyeOff className="w-3 h-3" /> Ocultar
             </Button>
           )}
         </div>

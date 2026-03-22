@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Bot, User, Clock, XCircle } from "lucide-react";
+import { Search, Bot, User, Clock, EyeOff } from "lucide-react";
 import { format } from "date-fns";
 import { WhatsAppConversation } from "@/hooks/useWhatsApp";
 import { type InboxMeta } from "@/components/dashboard/ChatTab";
@@ -14,7 +14,7 @@ const StatusIndicator = ({ status }: { status: string }) => {
     bot: { icon: <Bot className="w-3 h-3" />, color: "bg-blue-500", label: "Bot" },
     humano: { icon: <User className="w-3 h-3" />, color: "bg-emerald-500", label: "Humano" },
     aguardando_cliente: { icon: <Clock className="w-3 h-3" />, color: "bg-amber-500", label: "Aguardando" },
-    encerrado: { icon: <XCircle className="w-3 h-3" />, color: "bg-muted-foreground", label: "Encerrado" },
+    encerrado: { icon: <EyeOff className="w-3 h-3" />, color: "bg-muted-foreground", label: "Oculto" },
   };
   const c = config[status] || config.bot;
   return (
@@ -77,7 +77,6 @@ const ConversationList = ({
               <SelectItem value="bot">Bot</SelectItem>
               <SelectItem value="humano">Humano</SelectItem>
               <SelectItem value="aguardando_cliente">Aguardando</SelectItem>
-              <SelectItem value="encerrado">Encerrado</SelectItem>
             </SelectContent>
           </Select>
           <Select value={assignedFilter} onValueChange={v => onAssignedFilterChange(v as 'mine' | 'all')}>

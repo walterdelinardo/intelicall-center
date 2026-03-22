@@ -118,10 +118,11 @@ interface ConversationFilters {
   inboxId?: string | null;
   statusFilter?: string | null;
   assignedToFilter?: 'mine' | 'all';
+  showHidden?: boolean;
 }
 
 export const useWhatsAppConversations = (filters: ConversationFilters = {}) => {
-  const { inboxId, statusFilter, assignedToFilter } = filters;
+  const { inboxId, statusFilter, assignedToFilter, showHidden = false } = filters;
   const [conversations, setConversations] = useState<WhatsAppConversation[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -133,7 +134,17 @@ export const useWhatsAppConversations = (filters: ConversationFilters = {}) => {
         .order('last_message_at', { ascending: false, nullsFirst: false });
 
       if (inboxId) query = query.eq('inbox_id', inboxId);
-      if (statusFilter) query = query.eq('conversation_status', statusFilter);
+
+      if (showHidden) {
+        query = query.eq('conversation_status', 'encerrado');
+      } else {
+        if (statusFilter) {
+          query = query.eq('conversation_status', statusFilter);
+        } else {
+          query = query.neq('conversation_status', 'encerrado');
+        }
+      }
+
       if (assignedToFilter === 'mine') {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) query = query.eq('assigned_to', user.id);
@@ -147,16 +158,16 @@ export const useWhatsAppConversations = (filters: ConversationFilters = {}) => {
     } finally {
       setLoading(false);
     }
-  }, [inboxId, statusFilter, assignedToFilter]);
+  }, [inboxId, statusFilter, assignedToFilter, showHidden]);
 
   useEffect(() => {
     fetchConversations();
     const channel = supabase
-      .channel(`whatsapp-conversations-${inboxId || 'all'}-${statusFilter || 'all'}`)
+      .channel(`whatsapp-conversations-${inboxId || 'all'}-${statusFilter || 'all'}-${showHidden}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_conversations' }, () => fetchConversations())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [fetchConversations, inboxId, statusFilter]);
+  }, [fetchConversations, inboxId, statusFilter, showHidden]);
 
   return { conversations, loading, refetch: fetchConversations };
 };
@@ -282,10 +293,18 @@ export const useConversationActions = () => {
     if (error) throw error;
   };
 
-  const closeConversation = async (conversationId: string) => {
+  const hideConversation = async (conversationId: string) => {
     const { error } = await supabase
       .from('whatsapp_conversations')
       .update({ conversation_status: 'encerrado' } as any)
+      .eq('id', conversationId);
+    if (error) throw error;
+  };
+
+  const unhideConversation = async (conversationId: string) => {
+    const { error } = await supabase
+      .from('whatsapp_conversations')
+      .update({ conversation_status: 'bot' } as any)
       .eq('id', conversationId);
     if (error) throw error;
   };
@@ -298,5 +317,5 @@ export const useConversationActions = () => {
     if (error) throw error;
   };
 
-  return { assumeConversation, returnToBot, closeConversation, markAsRead };
+  return { assumeConversation, returnToBot, hideConversation, unhideConversation, markAsRead };
 };
