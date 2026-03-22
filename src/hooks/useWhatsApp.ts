@@ -29,6 +29,7 @@ export interface WhatsAppConversation {
   assigned_to: string | null;
   created_at: string;
   updated_at: string;
+  display_name?: string | null;
 }
 
 export interface WhatsAppMessage {
