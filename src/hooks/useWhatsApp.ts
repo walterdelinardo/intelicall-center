@@ -122,7 +122,7 @@ interface ConversationFilters {
 }
 
 export const useWhatsAppConversations = (filters: ConversationFilters = {}) => {
-  const { inboxId, statusFilter, assignedToFilter } = filters;
+  const { inboxId, statusFilter, assignedToFilter, showHidden = false } = filters;
   const [conversations, setConversations] = useState<WhatsAppConversation[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -134,7 +134,17 @@ export const useWhatsAppConversations = (filters: ConversationFilters = {}) => {
         .order('last_message_at', { ascending: false, nullsFirst: false });
 
       if (inboxId) query = query.eq('inbox_id', inboxId);
-      if (statusFilter) query = query.eq('conversation_status', statusFilter);
+
+      if (showHidden) {
+        query = query.eq('conversation_status', 'encerrado');
+      } else {
+        if (statusFilter) {
+          query = query.eq('conversation_status', statusFilter);
+        } else {
+          query = query.neq('conversation_status', 'encerrado');
+        }
+      }
+
       if (assignedToFilter === 'mine') {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) query = query.eq('assigned_to', user.id);
@@ -148,7 +158,7 @@ export const useWhatsAppConversations = (filters: ConversationFilters = {}) => {
     } finally {
       setLoading(false);
     }
-  }, [inboxId, statusFilter, assignedToFilter]);
+  }, [inboxId, statusFilter, assignedToFilter, showHidden]);
 
   useEffect(() => {
     fetchConversations();
