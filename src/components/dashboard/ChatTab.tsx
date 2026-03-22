@@ -23,10 +23,12 @@ const ChatTab = () => {
   const [selectedInboxId, setSelectedInboxId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [assignedFilter, setAssignedFilter] = useState<'mine' | 'all'>('all');
+  const [showHidden, setShowHidden] = useState(false);
   const { conversations, loading: convsLoading, refetch: refetchConversations } = useWhatsAppConversations({
     inboxId: selectedInboxId,
     statusFilter,
     assignedToFilter: assignedFilter,
+    showHidden,
   });
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
   const { messages, loading: msgsLoading } = useWhatsAppMessages(selectedConvId);
