@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Send, MessageSquare, Bot, User, XCircle, Paperclip, StickyNote } from "lucide-react";
+import { Send, MessageSquare, Bot, User, EyeOff, Eye, Paperclip, StickyNote } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { WhatsAppConversation, WhatsAppMessage, useSendWhatsAppMessage, useConversationActions } from "@/hooks/useWhatsApp";
