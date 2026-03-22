@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MessageSquare, Inbox } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { MessageSquare, Inbox, EyeOff, MessageCircle } from "lucide-react";
 import { useWhatsAppInboxes, useWhatsAppConversations, useWhatsAppMessages } from "@/hooks/useWhatsApp";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { useAuth } from "@/contexts/AuthContext";
