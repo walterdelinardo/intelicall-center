@@ -369,11 +369,11 @@ const ListaEsperaModule = () => {
               {PRIORITIES.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Select value={filterProfessional} onValueChange={setFilterProfessional}>
-            <SelectTrigger className="w-[160px]"><SelectValue placeholder="Profissional" /></SelectTrigger>
+          <Select value={filterCalendar} onValueChange={setFilterCalendar}>
+            <SelectTrigger className="w-[160px]"><SelectValue placeholder="Agenda" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              {professionals.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}
+              <SelectItem value="all">Todas Agendas</SelectItem>
+              {calendarAccounts.map((a: any) => <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>)}
             </SelectContent>
           </Select>
           <Button onClick={() => { setEditId(null); setForm(emptyForm); setIsOpen(true); }} className="gap-1">
