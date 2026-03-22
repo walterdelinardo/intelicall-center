@@ -332,7 +332,7 @@ const ListaEsperaModule = () => {
     const matchSearch = item.client_name?.toLowerCase().includes(search.toLowerCase());
     const matchStatus = filterStatus === "all" || item.status === filterStatus;
     const matchPriority = filterPriority === "all" || item.priority === filterPriority;
-    const matchProfessional = filterProfessional === "all" || item.professional_id === filterProfessional;
+    const matchCalendar = filterCalendar === "all" || item.google_calendar_account_id === filterCalendar;
     return matchSearch && matchStatus && matchPriority && matchProfessional;
   });
 
