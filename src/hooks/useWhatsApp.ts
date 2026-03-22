@@ -163,7 +163,7 @@ export const useWhatsAppConversations = (filters: ConversationFilters = {}) => {
   useEffect(() => {
     fetchConversations();
     const channel = supabase
-      .channel(`whatsapp-conversations-${inboxId || 'all'}-${statusFilter || 'all'}`)
+      .channel(`whatsapp-conversations-${inboxId || 'all'}-${statusFilter || 'all'}-${showHidden}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_conversations' }, () => fetchConversations())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
