@@ -118,6 +118,7 @@ interface ConversationFilters {
   inboxId?: string | null;
   statusFilter?: string | null;
   assignedToFilter?: 'mine' | 'all';
+  showHidden?: boolean;
 }
 
 export const useWhatsAppConversations = (filters: ConversationFilters = {}) => {
