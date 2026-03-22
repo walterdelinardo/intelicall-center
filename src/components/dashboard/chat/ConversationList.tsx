@@ -99,7 +99,7 @@ const ConversationList = ({
             {search ? 'Nenhum resultado' : 'Nenhuma conversa'}
           </div>
         ) : (
-          <div className="p-1.5 sm:p-2 space-y-1">
+          <div className="p-1.5 pr-3 sm:p-2 sm:pr-4 space-y-1">
             {filtered.map(conv => {
               const meta = conv.inbox_id ? inboxMetaMap[conv.inbox_id] : null;
               const inboxColor = meta?.color || null;
