@@ -138,12 +138,12 @@ const ChatArea = ({ conversation, messages, messagesLoading }: ChatAreaProps) =>
       <div className="p-3 border-b flex items-center gap-3">
         <Avatar className="w-9 h-9">
           <AvatarFallback className="bg-primary/10 text-primary text-sm">
-            {(conversation.contact_name || conversation.contact_phone || '?')[0].toUpperCase()}
+            {(conversation.display_name || conversation.contact_name || conversation.contact_phone || '?')[0].toUpperCase()}
           </AvatarFallback>
         </Avatar>
         <div className="flex-1 min-w-0">
           <h4 className="font-semibold text-sm truncate">
-            {conversation.contact_name || conversation.contact_phone || 'Desconhecido'}
+            {conversation.display_name || conversation.contact_name || conversation.contact_phone || 'Desconhecido'}
           </h4>
           {conversation.contact_phone && (
             <p className="text-xs text-muted-foreground">+{conversation.contact_phone}</p>
