@@ -119,7 +119,7 @@ const ConversationList = ({
                         {(conv.display_name || conv.contact_name || conv.contact_phone || '?')[0].toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 overflow-hidden">
                       <div className="flex items-center justify-between mb-0.5">
                         <span className="font-medium text-sm truncate">
                           {conv.display_name || conv.contact_name || conv.contact_phone || 'Desconhecido'}
