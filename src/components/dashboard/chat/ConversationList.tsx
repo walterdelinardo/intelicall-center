@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Bot, User, Clock, EyeOff } from "lucide-react";
-import { format } from "date-fns";
+import { format, isToday } from "date-fns";
 import { WhatsAppConversation } from "@/hooks/useWhatsApp";
 import { type InboxMeta } from "@/components/dashboard/ChatTab";
 import { useState } from "react";
@@ -125,7 +125,11 @@ const ConversationList = ({
                           {conv.display_name || conv.contact_name || conv.contact_phone || 'Desconhecido'}
                         </span>
                         <span className="text-[10px] text-muted-foreground shrink-0 ml-2">
-                          {conv.last_message_at ? format(new Date(conv.last_message_at), 'HH:mm') : ''}
+                          {conv.last_message_at
+                            ? isToday(new Date(conv.last_message_at))
+                              ? format(new Date(conv.last_message_at), 'HH:mm')
+                              : format(new Date(conv.last_message_at), 'dd/MM/yyyy')
+                            : ''}
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground truncate">
