@@ -111,10 +111,16 @@ const ChatArea = ({ conversation, messages, messagesLoading }: ChatAreaProps) =>
     catch { toast.error("Erro ao devolver ao bot"); }
   };
 
-  const handleClose = async () => {
+  const handleHide = async () => {
     if (!conversation) return;
-    try { await closeConversation(conversation.id); toast.success("Conversa encerrada"); }
-    catch { toast.error("Erro ao encerrar"); }
+    try { await hideConversation(conversation.id); toast.success("Conversa oculta"); }
+    catch { toast.error("Erro ao ocultar"); }
+  };
+
+  const handleUnhide = async () => {
+    if (!conversation) return;
+    try { await unhideConversation(conversation.id); toast.success("Conversa restaurada"); }
+    catch { toast.error("Erro ao restaurar"); }
   };
 
   if (!conversation) {
