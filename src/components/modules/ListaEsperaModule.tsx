@@ -65,7 +65,7 @@ const ListaEsperaModule = () => {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterPriority, setFilterPriority] = useState("all");
-  const [filterProfessional, setFilterProfessional] = useState("all");
+  const [filterCalendar, setFilterCalendar] = useState("all");
   const [isOpen, setIsOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
