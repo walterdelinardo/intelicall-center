@@ -1,41 +1,17 @@
 
 
-## Plano: Trocar "Encerrar" por "Ocultar" (sem novo status/coluna)
+## Ajustes na lista de conversas
 
-Reutilizar o status `encerrado` existente como mecanismo de ocultação. Conversas com `conversation_status = 'encerrado'` ficam ocultas da lista principal e visíveis numa aba separada.
+O código atual já posiciona o horário/data no canto superior direito do card e usa a classe `truncate` para a última mensagem. No entanto, podem existir questões de overflow que impedem o truncamento correto.
 
-### Mudanças
+### Mudanças em `ConversationList.tsx`
 
-#### 1. `useWhatsApp.ts` — Filtrar ocultos por padrão
-- Adicionar flag `showHidden` ao `ConversationFilters`
-- Quando `showHidden = false` (padrão): excluir `conversation_status = 'encerrado'`
-- Quando `showHidden = true`: filtrar apenas `conversation_status = 'encerrado'`
-- Renomear `closeConversation` para `hideConversation` (mesma lógica)
-- Adicionar `unhideConversation` que muda status de `encerrado` para `bot`
+1. **Horário/data** — já está no canto superior direito (linha 123-133). Sem alteração necessária.
 
-#### 2. `ChatArea.tsx` — Renomear botão
-- Trocar label "Encerrar" → "Ocultar"
-- Trocar ícone `XCircle` → `EyeOff`
-- Adicionar botão "Desocultar" (`Eye`) quando conversa está oculta (status `encerrado`)
-- Renomear `handleClose` → `handleHide`
+2. **Última mensagem com ellipsis** — garantir que a classe `truncate` funcione corretamente adicionando `overflow-hidden` no container pai e assegurando `max-w` adequado. A classe `truncate` do Tailwind já aplica `text-overflow: ellipsis`, mas o container precisa ter largura limitada para funcionar. Adicionar `max-w-full` ou garantir que `min-w-0` + `flex-1` estejam aplicados corretamente no wrapper.
 
-#### 3. `ChatTab.tsx` — Toggle de ocultos
-- Adicionar estado `showHidden` (boolean, default false)
-- Passar `showHidden` para o hook `useWhatsAppConversations`
-- Adicionar botão/toggle no header do painel de conversas para alternar entre "Conversas" e "Ocultas"
-
-#### 4. `ConversationList.tsx` — Remover "Encerrado" do filtro de status
-- Remover opção "Encerrado" do select de status (já que ocultos têm aba própria)
-- Quando em modo ocultos, mostrar botão "Desocultar" (ícone `Eye`) em cada item
-
-### Arquivos afetados
-
+### Arquivo afetado
 | Arquivo | Mudança |
 |---------|---------|
-| `useWhatsApp.ts` | Flag `showHidden`, filtro, rename close→hide, add unhide |
-| `ChatArea.tsx` | Botão "Ocultar" com `EyeOff`, botão "Desocultar" com `Eye` |
-| `ChatTab.tsx` | Toggle para ver conversas ocultas |
-| `ConversationList.tsx` | Remover "Encerrado" do filtro, botão desocultar em modo ocultos |
-
-Nenhuma migration necessária — reutiliza o status `encerrado` existente.
+| `ConversationList.tsx` | Garantir truncamento com ellipsis na última mensagem |
 
