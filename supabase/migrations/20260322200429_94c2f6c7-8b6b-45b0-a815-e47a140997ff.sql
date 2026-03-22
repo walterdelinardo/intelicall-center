@@ -1,0 +1,3 @@
+ALTER TABLE public.calendar_notifications ADD COLUMN is_read boolean NOT NULL DEFAULT false;
+CREATE INDEX idx_calendar_notifications_unread ON public.calendar_notifications(clinic_id, is_read) WHERE is_read = false;
+CREATE POLICY "Users can update notifications in their clinic" ON public.calendar_notifications FOR UPDATE TO authenticated USING (clinic_id = get_user_clinic_id(auth.uid())) WITH CHECK (clinic_id = get_user_clinic_id(auth.uid()));

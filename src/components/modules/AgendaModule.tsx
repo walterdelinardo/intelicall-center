@@ -141,6 +141,16 @@ const AgendaModule = () => {
     }
   }, [isConnected]);
 
+  // Auto-refresh when switching tabs
+  useEffect(() => {
+    if (agendaTab === "calendario" && isConnected) {
+      fetchGoogleEvents();
+      syncChanges();
+    } else if (agendaTab === "notificacoes") {
+      refetchNotifications();
+    }
+  }, [agendaTab]);
+
   useEffect(() => {
     if (activeAccounts.length === 1 && !selectedAccountId) {
       setSelectedAccountId(activeAccounts[0].id);
@@ -1083,25 +1093,47 @@ const AgendaModule = () => {
         </TabsTrigger>
         <TabsTrigger value="notificacoes" className="gap-2">
           <Bell className="w-4 h-4" /> Notificações
-          {notifications.length > 0 && (
-            <Badge variant="secondary" className="ml-1 h-5 min-w-5 px-1 text-[10px]">{notifications.length}</Badge>
-          )}
+          {(() => {
+            const unreadCount = notifications.filter((n: any) => !n.is_read).length;
+            return unreadCount > 0 ? (
+              <Badge variant="destructive" className="ml-1 h-5 min-w-5 px-1 text-[10px]">{unreadCount}</Badge>
+            ) : null;
+          })()}
         </TabsTrigger>
       </TabsList>
 
       <TabsContent value="notificacoes" className="space-y-4">
         <Card className="shadow-card">
           <CardContent className="p-4">
-            <h3 className="font-semibold text-sm mb-4 flex items-center gap-2">
-              <Bell className="w-4 h-4 text-primary" />
-              Histórico de Ações na Agenda
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-sm flex items-center gap-2">
+                <Bell className="w-4 h-4 text-primary" />
+                Histórico de Ações na Agenda
+              </h3>
+              {notifications.filter((n: any) => !n.is_read).length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs h-7"
+                  onClick={async () => {
+                    const unreadIds = notifications.filter((n: any) => !n.is_read).map((n: any) => n.id);
+                    for (const id of unreadIds) {
+                      await supabase.from("calendar_notifications").update({ is_read: true } as any).eq("id", id);
+                    }
+                    refetchNotifications();
+                    queryClient.invalidateQueries({ queryKey: ["header-notifications"] });
+                  }}
+                >
+                  Marcar todas como lidas
+                </Button>
+              )}
+            </div>
             {notifications.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">Nenhuma notificação registrada</p>
             ) : (
               <div className="space-y-2">
                 {notifications.map((n: any) => (
-                  <div key={n.id} className="flex items-start gap-3 border-b border-border pb-3 last:border-0">
+                  <div key={n.id} className={`flex items-start gap-3 border-b border-border pb-3 last:border-0 rounded-md px-2 py-1 transition-colors ${n.is_read ? "opacity-60" : "bg-primary/5"}`}>
                     <span className="text-lg mt-0.5">{notificationActionIcons[n.action] || "📋"}</span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
@@ -1116,6 +1148,19 @@ const AgendaModule = () => {
                       {n.details && <p className="text-xs text-muted-foreground">{n.details}</p>}
                       <p className="text-xs text-muted-foreground mt-0.5">por {n.actor_name || "Sistema"}</p>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0"
+                      title={n.is_read ? "Marcar como não lida" : "Marcar como lida"}
+                      onClick={async () => {
+                        await supabase.from("calendar_notifications").update({ is_read: !n.is_read } as any).eq("id", n.id);
+                        refetchNotifications();
+                        queryClient.invalidateQueries({ queryKey: ["header-notifications"] });
+                      }}
+                    >
+                      {n.is_read ? <Eye className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                    </Button>
                   </div>
                 ))}
               </div>
