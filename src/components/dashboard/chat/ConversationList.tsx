@@ -115,13 +115,13 @@ const ConversationList = ({
                   <div className="flex items-start gap-3">
                     <Avatar className="w-10 h-10 shrink-0">
                       <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                        {(conv.contact_name || conv.contact_phone || '?')[0].toUpperCase()}
+                        {(conv.display_name || conv.contact_name || conv.contact_phone || '?')[0].toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-0.5">
                         <span className="font-medium text-sm truncate">
-                          {conv.contact_name || conv.contact_phone || 'Desconhecido'}
+                          {conv.display_name || conv.contact_name || conv.contact_phone || 'Desconhecido'}
                         </span>
                         <span className="text-[10px] text-muted-foreground shrink-0 ml-2">
                           {conv.last_message_at ? format(new Date(conv.last_message_at), 'HH:mm') : ''}
