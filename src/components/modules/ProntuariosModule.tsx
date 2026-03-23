@@ -1231,6 +1231,11 @@ function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
                             )}
                           </div>
                           <div className="flex flex-col gap-1 shrink-0">
+                            <a href={doc.file_url} download={doc.title} target="_blank" rel="noopener noreferrer">
+                              <Button size="sm" variant="outline" className="gap-1.5 text-xs w-full">
+                                <Download className="w-3.5 h-3.5" /> Baixar
+                              </Button>
+                            </a>
                             <Button
                               size="sm" variant="outline" className="gap-1.5 text-xs"
                               disabled={analyzingId === doc.id}
