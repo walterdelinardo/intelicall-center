@@ -146,6 +146,7 @@ const ConfiguracoesModule = () => {
           city: form.city || null,
           state: form.state || null,
           zip_code: form.zip_code || null,
+          neighborhood: form.neighborhood || null,
           theme_color: form.theme_color || null,
           cnpj: form.cnpj || null,
         } as any)
