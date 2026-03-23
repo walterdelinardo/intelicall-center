@@ -382,6 +382,8 @@ export type Database = {
       clients: {
         Row: {
           address: string | null
+          address_complement: string | null
+          address_number: string | null
           average_ticket: number | null
           birth_date: string | null
           city: string | null
@@ -406,6 +408,8 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          address_complement?: string | null
+          address_number?: string | null
           average_ticket?: number | null
           birth_date?: string | null
           city?: string | null
@@ -430,6 +434,8 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          address_complement?: string | null
+          address_number?: string | null
           average_ticket?: number | null
           birth_date?: string | null
           city?: string | null
@@ -472,6 +478,8 @@ export type Database = {
       clinics: {
         Row: {
           address: string | null
+          address_complement: string | null
+          address_number: string | null
           city: string | null
           cnpj: string | null
           created_at: string
@@ -492,6 +500,8 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          address_complement?: string | null
+          address_number?: string | null
           city?: string | null
           cnpj?: string | null
           created_at?: string
@@ -512,6 +522,8 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          address_complement?: string | null
+          address_number?: string | null
           city?: string | null
           cnpj?: string | null
           created_at?: string
