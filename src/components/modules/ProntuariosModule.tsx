@@ -623,6 +623,29 @@ function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
     enabled: !!record?.client_id && !!clinicId,
   });
 
+  // Appointment materials (from billing)
+  const { data: appointmentMaterials = [] } = useQuery({
+    queryKey: ["appointment-materials", record?.client_id, clinicId],
+    queryFn: async () => {
+      if (!record?.client_id || !clinicId) return [];
+      // Get all appointment IDs for this patient
+      const { data: appts } = await supabase
+        .from("appointments")
+        .select("id")
+        .eq("client_id", record.client_id)
+        .eq("clinic_id", clinicId);
+      if (!appts || appts.length === 0) return [];
+      const ids = appts.map((a: any) => a.id);
+      const { data, error } = await supabase
+        .from("appointment_materials")
+        .select("*")
+        .in("appointment_id", ids);
+      if (error) throw error;
+      return data as any[];
+    },
+    enabled: !!record?.client_id && !!clinicId,
+  });
+
   // Group appointments by event using parent_appointment_id (or own id if no parent)
   const groupedEvents = procedures.reduce((acc: Record<string, any[]>, appt: any) => {
     const key = appt.parent_appointment_id || appt.id;
