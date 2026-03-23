@@ -55,7 +55,7 @@ type SortDir = "asc" | "desc";
 
 const emptyForm = {
   name: "", phone: "", whatsapp: "", email: "", birth_date: "",
-  cpf: "", address: "", city: "", state: "", zip_code: "", notes: "", lead_source: "",
+  cpf: "", address: "", city: "", state: "", zip_code: "", neighborhood: "", notes: "", lead_source: "",
 };
 
 const ClientesModule = () => {
