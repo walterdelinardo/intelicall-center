@@ -86,6 +86,8 @@ const ConfiguracoesModule = () => {
     phone: "",
     email: "",
     address: "",
+    address_number: "",
+    address_complement: "",
     location_url: "",
     city: "",
     state: "",
