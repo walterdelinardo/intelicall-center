@@ -83,6 +83,19 @@ const ClientesModule = () => {
     setEditClient(null);
   };
 
+  const handleClientCepBlur = useCallback(async () => {
+    const result = await fetchViaCep(form.zip_code);
+    if (result) {
+      setForm((prev) => ({
+        ...prev,
+        address: result.logradouro || prev.address,
+        neighborhood: result.bairro || prev.neighborhood,
+        city: result.localidade || prev.city,
+        state: result.uf || prev.state,
+      }));
+    }
+  }, [form.zip_code]);
+
   const openEdit = (client: Client) => {
     setEditClient(client);
     setForm({
