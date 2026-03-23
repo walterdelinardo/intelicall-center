@@ -1818,15 +1818,15 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
     setShowProcPicker(false);
   };
 
-  const addInternalMaterial = (item: any) => {
-    setInternalMaterials([...internalMaterials, {
+  const addExtraMaterial = (item: any) => {
+    setProcedureMaterials([...procedureMaterials, {
       stockId: item.id,
       name: item.name,
       qty: 1,
       unit: item.unit || "un",
     }]);
-    setInternalSearch("");
-    setShowInternalPicker(false);
+    setMaterialSearch("");
+    setShowMaterialPicker(false);
   };
 
   const saveMutation = useMutation({
