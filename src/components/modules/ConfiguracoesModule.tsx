@@ -107,6 +107,8 @@ const ConfiguracoesModule = () => {
         phone: clinic.phone || "",
         email: clinic.email || "",
         address: clinic.address || "",
+        address_number: (clinic as any).address_number || "",
+        address_complement: (clinic as any).address_complement || "",
         location_url: (clinic as any).location_url || "",
         city: clinic.city || "",
         state: clinic.state || "",
