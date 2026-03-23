@@ -18,7 +18,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar, Plus, ChevronLeft, ChevronRight, Clock, Globe, Pencil, Trash2, Search, UserPlus, User, Phone, DollarSign, RefreshCw, Mail, Eye, CircleCheck, AlertCircle, XCircle, Lock, Unlock, CalendarDays, Receipt, X, ShoppingCart, Stethoscope, MessageSquare, Bell } from "lucide-react";
+import { Calendar, Plus, ChevronLeft, ChevronRight, Clock, Globe, Pencil, Trash2, Search, UserPlus, User, Phone, DollarSign, RefreshCw, Mail, Eye, CircleCheck, AlertCircle, XCircle, Lock, Unlock, CalendarDays, Receipt, X, ShoppingCart, Stethoscope, MessageSquare, Bell, Package } from "lucide-react";
 import { toast } from "sonner";
 import { format, addDays, addMonths, subMonths, startOfWeek, endOfWeek, eachDayOfInterval, isToday, isSameDay, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -1646,6 +1646,7 @@ const AgendaModule = () => {
 // ===================== BILLING DIALOG =====================
 interface SaleItem { stockId: string; name: string; qty: number; price: number; }
 interface ExtraProcedure { procedureId: string; name: string; price: number; }
+interface MaterialItem { stockId: string; name: string; qty: number; unit: string; }
 
 function BillingDialog({ open, onOpenChange, event, clinicId }: {
   open: boolean; onOpenChange: (o: boolean) => void; event: MergedEvent | null; clinicId: string;
@@ -1663,6 +1664,12 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
   const [procSearch, setProcSearch] = useState("");
   const [showItemPicker, setShowItemPicker] = useState(false);
   const [showProcPicker, setShowProcPicker] = useState(false);
+
+  // Procedure materials & internal materials state
+  const [procedureMaterials, setProcedureMaterials] = useState<MaterialItem[]>([]);
+  const [internalMaterials, setInternalMaterials] = useState<MaterialItem[]>([]);
+  const [showInternalPicker, setShowInternalPicker] = useState(false);
+  const [internalSearch, setInternalSearch] = useState("");
 
   // Fetch stock items
   const { data: stockItems = [] } = useQuery({
@@ -1698,7 +1705,7 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
     enabled: !!clinicId && open,
   });
 
-  // Pre-fill from event
+  // Pre-fill from event + load procedure materials
   useEffect(() => {
     if (open && event && !initialized) {
       const ep = event.extendedProperties;
@@ -1714,10 +1721,53 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
       });
       setSaleItems([]);
       setExtraProcedures([]);
+      setInternalMaterials([]);
+      setProcedureMaterials([]);
       setInitialized(true);
+
+      // Load procedure materials
+      if (ep?.procedureName && clinicId) {
+        (async () => {
+          try {
+            const { data: proc } = await supabase
+              .from("procedures")
+              .select("id")
+              .eq("clinic_id", clinicId)
+              .eq("name", ep.procedureName)
+              .maybeSingle();
+            if (proc) {
+              const { data: mats } = await supabase
+                .from("procedure_materials")
+                .select("stock_item_id, quantity")
+                .eq("procedure_id", proc.id);
+              if (mats && mats.length > 0) {
+                // Fetch stock item details
+                const stockIds = mats.map(m => m.stock_item_id);
+                const { data: stockDetails } = await supabase
+                  .from("stock_items")
+                  .select("id, name, unit")
+                  .in("id", stockIds);
+                const stockMap = new Map((stockDetails || []).map(s => [s.id, s]));
+                const items: MaterialItem[] = mats.map(m => {
+                  const s = stockMap.get(m.stock_item_id);
+                  return {
+                    stockId: m.stock_item_id,
+                    name: s?.name || "Item desconhecido",
+                    qty: Number(m.quantity) || 1,
+                    unit: s?.unit || "un",
+                  };
+                });
+                setProcedureMaterials(items);
+              }
+            }
+          } catch (err) {
+            console.error("Error loading procedure materials:", err);
+          }
+        })();
+      }
     }
     if (!open) setInitialized(false);
-  }, [open, event, initialized]);
+  }, [open, event, initialized, clinicId]);
 
   // Calculate total
   const baseAmount = parseFloat(form.amount) || 0;
@@ -1729,6 +1779,14 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
     const q = itemSearch.toLowerCase();
     return stockItems.filter((s: any) => s.name.toLowerCase().includes(q)).slice(0, 10);
   }, [stockItems, itemSearch]);
+
+  const filteredInternalStock = useMemo(() => {
+    const q = internalSearch.toLowerCase();
+    const usedIds = new Set([...procedureMaterials.map(m => m.stockId), ...internalMaterials.map(m => m.stockId)]);
+    return stockItems
+      .filter((s: any) => !usedIds.has(s.id) && (!q || s.name.toLowerCase().includes(q)))
+      .slice(0, 10);
+  }, [stockItems, internalSearch, procedureMaterials, internalMaterials]);
 
   const filteredProcs = useMemo(() => {
     const q = procSearch.toLowerCase();
@@ -1759,6 +1817,17 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
     }]);
     setProcSearch("");
     setShowProcPicker(false);
+  };
+
+  const addInternalMaterial = (item: any) => {
+    setInternalMaterials([...internalMaterials, {
+      stockId: item.id,
+      name: item.name,
+      qty: 1,
+      unit: item.unit || "un",
+    }]);
+    setInternalSearch("");
+    setShowInternalPicker(false);
   };
 
   const saveMutation = useMutation({
@@ -1923,7 +1992,18 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
         });
       }
 
-      // === 7. Update all appointments to "compareceu" (trigger won't duplicate because transactions already exist) ===
+      // === 7. Deduct stock for procedure materials and internal materials (no financial transaction) ===
+      const allMaterialDeductions = [...procedureMaterials, ...internalMaterials];
+      for (const mat of allMaterialDeductions) {
+        const stockItem = stockItems.find((s: any) => s.id === mat.stockId);
+        if (stockItem) {
+          await supabase.from("stock_items").update({
+            quantity: (stockItem as any).quantity - mat.qty,
+          }).eq("id", mat.stockId);
+        }
+      }
+
+      // === 8. Update all appointments to "compareceu" (trigger won't duplicate because transactions already exist) ===
       const apptIdsToUpdate = [appointmentId, ...extraApptIds].filter(Boolean) as string[];
       if (apptIdsToUpdate.length > 0) {
         await supabase
@@ -1936,6 +2016,7 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
       queryClient.invalidateQueries({ queryKey: ["financial-daily"] });
       queryClient.invalidateQueries({ queryKey: ["financial-monthly"] });
       queryClient.invalidateQueries({ queryKey: ["stock"] });
+      queryClient.invalidateQueries({ queryKey: ["stock-for-billing"] });
       queryClient.invalidateQueries({ queryKey: ["appointments"] });
       queryClient.invalidateQueries({ queryKey: ["medical-records"] });
       toast.success("Faturamento realizado com sucesso!");
@@ -1994,6 +2075,89 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
               <Label>Data *</Label>
               <Input type="date" required value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
             </div>
+          </div>
+
+          {/* Procedure Materials Section */}
+          {procedureMaterials.length > 0 && (
+            <div className="space-y-2 border rounded-lg p-3 bg-muted/30">
+              <Label className="flex items-center gap-1 text-sm font-medium">
+                <Package className="w-4 h-4 text-primary" /> Materiais do Procedimento
+              </Label>
+              <p className="text-[11px] text-muted-foreground">Descontados do estoque, sem cobrança ao cliente</p>
+              {procedureMaterials.map((mat, idx) => (
+                <div key={idx} className="flex items-center gap-2 text-sm">
+                  <span className="flex-1 truncate">{mat.name}</span>
+                  <Input
+                    type="number"
+                    min="0.1"
+                    step="0.1"
+                    className="w-20 h-7 text-xs"
+                    value={mat.qty}
+                    onChange={(e) => {
+                      const updated = [...procedureMaterials];
+                      updated[idx].qty = parseFloat(e.target.value) || 0;
+                      setProcedureMaterials(updated);
+                    }}
+                  />
+                  <span className="text-xs text-muted-foreground w-8">{mat.unit}</span>
+                  <Button type="button" size="icon" variant="ghost" className="h-6 w-6" onClick={() => setProcedureMaterials(procedureMaterials.filter((_, i) => i !== idx))}>
+                    <X className="w-3 h-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Internal Materials Section */}
+          <div className="space-y-2 border rounded-lg p-3 bg-muted/30">
+            <Label className="flex items-center gap-1 text-sm font-medium">
+              <Package className="w-4 h-4 text-primary" /> Material de Uso Interno
+            </Label>
+            <p className="text-[11px] text-muted-foreground">Materiais extras, descontados do estoque, sem cobrança</p>
+            {internalMaterials.map((mat, idx) => (
+              <div key={idx} className="flex items-center gap-2 text-sm">
+                <span className="flex-1 truncate">{mat.name}</span>
+                <Input
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  className="w-20 h-7 text-xs"
+                  value={mat.qty}
+                  onChange={(e) => {
+                    const updated = [...internalMaterials];
+                    updated[idx].qty = parseFloat(e.target.value) || 0;
+                    setInternalMaterials(updated);
+                  }}
+                />
+                <span className="text-xs text-muted-foreground w-8">{mat.unit}</span>
+                <Button type="button" size="icon" variant="ghost" className="h-6 w-6" onClick={() => setInternalMaterials(internalMaterials.filter((_, i) => i !== idx))}>
+                  <X className="w-3 h-3" />
+                </Button>
+              </div>
+            ))}
+            <Popover open={showInternalPicker} onOpenChange={setShowInternalPicker}>
+              <PopoverTrigger asChild>
+                <Button type="button" variant="outline" size="sm" className="gap-1 text-xs">
+                  <Plus className="w-3 h-3" /> Adicionar Material
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[280px] p-0" align="start">
+                <Command shouldFilter={false}>
+                  <CommandInput placeholder="Buscar item do estoque..." value={internalSearch} onValueChange={setInternalSearch} />
+                  <CommandList>
+                    <CommandEmpty>Nenhum item encontrado</CommandEmpty>
+                    <CommandGroup>
+                      {filteredInternalStock.map((s: any) => (
+                        <CommandItem key={s.id} onSelect={() => addInternalMaterial(s)}>
+                          <span>{s.name}</span>
+                          <span className="ml-auto text-xs text-muted-foreground">{s.unit || 'un'}</span>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
 
           {/* Sale Items Section */}
