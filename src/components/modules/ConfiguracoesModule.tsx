@@ -90,6 +90,7 @@ const ConfiguracoesModule = () => {
     city: "",
     state: "",
     zip_code: "",
+    neighborhood: "",
     theme_color: "#3B82F6",
     cnpj: "",
   });
