@@ -1,44 +1,36 @@
 
 
-## Adicionar campo Bairro e auto-preenchimento por CEP
-
-### Resumo
-Adicionar o campo "Bairro" (neighborhood) nas tabelas `clinics` e `clients`, e implementar busca automática via API ViaCEP quando o CEP é informado, preenchendo Logradouro, Bairro, Cidade e Estado automaticamente. Campos "Número" e "Complemento" não existem separados atualmente — o campo "Endereço" atual será mantido como logradouro.
-
----
+## Adicionar Número e Complemento em Clínica e Clientes + Reorganizar campos
 
 ### Migração SQL
-Adicionar coluna `neighborhood` em ambas as tabelas:
+Adicionar colunas em ambas as tabelas:
 ```sql
-ALTER TABLE public.clinics ADD COLUMN neighborhood TEXT;
-ALTER TABLE public.clients ADD COLUMN neighborhood TEXT;
+ALTER TABLE public.clinics ADD COLUMN IF NOT EXISTS address_number TEXT;
+ALTER TABLE public.clinics ADD COLUMN IF NOT EXISTS address_complement TEXT;
+ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS address_number TEXT;
+ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS address_complement TEXT;
 ```
 
-### Lógica de auto-preenchimento (ViaCEP)
-Criar uma função utilitária reutilizável que:
-1. Ao digitar/colar um CEP com 8 dígitos (ou formato 00000-000), chama `https://viacep.com.br/ws/{cep}/json/`
-2. Com a resposta, preenche automaticamente: `address` (logradouro), `neighborhood` (bairro), `city` (localidade), `state` (uf)
-3. Não altera campos "Número" e "Complemento" (que ficam vazios para o usuário preencher)
+### ConfiguracoesModule.tsx
+1. Adicionar `address_number` e `address_complement` ao estado `form` e ao `useEffect` de carregamento
+2. Incluir no `updateClinicMutation`
+3. Reorganizar layout de endereço:
+   - Linha 1: CEP (1 col, onBlur ViaCEP)
+   - Linha 2: Logradouro (2 cols) | Numero (1 col) | Complemento (1 col)
+   - Linha 3: Bairro (1 col) | Cidade (1 col) | Estado (1 col)
+4. Alterar placeholder do Logradouro de "Rua, número, complemento" para "Logradouro"
 
-### Alterações em `ConfiguracoesModule.tsx`
-- Adicionar `neighborhood` ao estado `form`
-- Adicionar campo "Bairro" na UI (grid junto com Cidade/Estado/CEP)
-- No campo CEP, adicionar `onBlur` ou detecção de 8 dígitos para chamar ViaCEP
-- Incluir `neighborhood` no `updateClinicMutation`
-- Reorganizar grid: CEP primeiro (para auto-preencher os demais), depois Logradouro, Bairro, Cidade, Estado
+### ClientesModule.tsx
+1. Adicionar `address_number` e `address_complement` ao `emptyForm`
+2. Incluir no `openEdit` e no `saveMutation`
+3. Adicionar campos Número e Complemento no formulário, após Endereço
+4. Reorganizar campos: CEP → Endereço → Número → Complemento → Bairro → Cidade → Estado
 
-### Alterações em `ClientesModule.tsx`
-- Adicionar `neighborhood` ao `emptyForm` e ao `openEdit`
-- Adicionar campo "Bairro" no formulário de cadastro/edição
-- Adicionar campo "CEP" (que não aparece no form atual) com auto-preenchimento via ViaCEP
-- Incluir `neighborhood` no `saveMutation`
-- Reorganizar campos de endereço: CEP → Endereço → Bairro → Cidade → Estado
-
-### Alterações em `ClientDetailsDialog.tsx`
-- Exibir bairro no endereço formatado
+### ClientDetailsDialog.tsx
+- Incluir número e complemento no endereço formatado
 
 ### Arquivos afetados
-- Nova migração SQL (1 arquivo)
+- Nova migração SQL
 - `src/components/modules/ConfiguracoesModule.tsx`
 - `src/components/modules/ClientesModule.tsx`
 - `src/components/modules/clients/ClientDetailsDialog.tsx`
