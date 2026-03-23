@@ -148,6 +148,7 @@ const ClientesModule = () => {
         phone: form.phone || null, whatsapp: form.whatsapp || null,
         email: form.email || null, birth_date: form.birth_date || null,
         cpf: form.cpf || null, address: form.address || null,
+        address_number: form.address_number || null, address_complement: form.address_complement || null,
         city: form.city || null, state: form.state || null,
         zip_code: form.zip_code || null, neighborhood: form.neighborhood || null,
         notes: form.notes || null,
