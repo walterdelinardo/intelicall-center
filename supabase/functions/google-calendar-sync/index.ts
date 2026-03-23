@@ -51,6 +51,57 @@ async function getValidAccessToken(supabase: any, account: any): Promise<string>
   return refreshAccessToken(supabase, account, oauthConfig.client_id, oauthConfig.client_secret);
 }
 
+async function determineAction(
+  supabase: any,
+  event: any,
+  clinicId: string
+): Promise<string> {
+  const eventId = event.id;
+
+  if (event.status === 'cancelled') return 'cancelled';
+
+  // Check if this event already exists in appointments (created internally)
+  const { data: existingAppt } = await supabase
+    .from('appointments')
+    .select('id')
+    .eq('google_event_id', eventId)
+    .maybeSingle();
+
+  if (existingAppt) return 'updated';
+
+  // Check if we already have a notification for this event_id (meaning it was seen before)
+  const { data: existingNotif } = await supabase
+    .from('calendar_notifications')
+    .select('id')
+    .eq('event_id', eventId)
+    .eq('clinic_id', clinicId)
+    .limit(1);
+
+  if (existingNotif && existingNotif.length > 0) return 'updated';
+
+  return 'created';
+}
+
+async function isDuplicate(
+  supabase: any,
+  clinicId: string,
+  eventTitle: string,
+  action: string
+): Promise<boolean> {
+  const twoMinAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+
+  const { data } = await supabase
+    .from('calendar_notifications')
+    .select('id')
+    .eq('clinic_id', clinicId)
+    .eq('event_title', eventTitle)
+    .eq('action', action)
+    .gte('created_at', twoMinAgo)
+    .limit(1);
+
+  return !!(data && data.length > 0);
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -83,7 +134,6 @@ Deno.serve(async (req) => {
     const userId = claimsData.claims.sub;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get user's clinic
     const { data: profile } = await supabase
       .from('profiles')
       .select('clinic_id')
@@ -93,7 +143,6 @@ Deno.serve(async (req) => {
     if (!profile?.clinic_id) throw new Error('User has no clinic');
     const clinicId = profile.clinic_id;
 
-    // Get all active OAuth accounts for this clinic
     const { data: accounts } = await supabase
       .from('google_calendar_accounts')
       .select('*')
@@ -113,7 +162,6 @@ Deno.serve(async (req) => {
       try {
         const accessToken = await getValidAccessToken(supabase, account);
 
-        // Get stored sync token
         const { data: syncState } = await supabase
           .from('google_calendar_sync_state')
           .select('sync_token')
@@ -122,12 +170,10 @@ Deno.serve(async (req) => {
 
         const isFirstSync = !syncState;
 
-        // Build URL - if we have a sync token, use it; otherwise do a full list to get one
         let url: string;
         if (syncState?.sync_token) {
           url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(account.calendar_id)}/events?syncToken=${encodeURIComponent(syncState.sync_token)}`;
         } else {
-          // First sync: list all events to get the initial sync token
           const timeMin = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
           url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(account.calendar_id)}/events?timeMin=${timeMin}&singleEvents=true&maxResults=2500`;
         }
@@ -136,7 +182,6 @@ Deno.serve(async (req) => {
         let allItems: any[] = [];
         let pageToken = '';
 
-        // Paginate through results
         do {
           const fetchUrl = pageToken ? `${url}&pageToken=${pageToken}` : url;
           const response = await fetch(fetchUrl, {
@@ -144,7 +189,6 @@ Deno.serve(async (req) => {
           });
 
           if (response.status === 410) {
-            // Sync token invalid (Gone) - reset and do full sync next time
             console.log(`Sync token expired for account ${account.id}, resetting...`);
             await supabase
               .from('google_calendar_sync_state')
@@ -164,7 +208,6 @@ Deno.serve(async (req) => {
           if (data.nextSyncToken) nextSyncToken = data.nextSyncToken;
         } while (pageToken);
 
-        // Save the new sync token
         if (nextSyncToken) {
           await supabase
             .from('google_calendar_sync_state')
@@ -175,67 +218,47 @@ Deno.serve(async (req) => {
             }, { onConflict: 'account_id' });
         }
 
-        // On first sync, don't generate notifications - just save the token
         if (isFirstSync) {
           console.log(`First sync for account ${account.id}: saved initial token, ${allItems.length} events indexed`);
           continue;
         }
 
-        // Process changed events and generate notifications
         for (const event of allItems) {
           const eventId = event.id;
           const eventTitle = event.summary || 'Sem título';
 
-          if (event.status === 'cancelled') {
-            // Event was cancelled externally
-            await supabase.from('calendar_notifications').insert({
-              clinic_id: clinicId,
-              account_id: account.id,
-              event_id: eventId,
-              event_title: eventTitle,
-              action: 'cancelled_external',
-              details: `Evento cancelado externamente`,
-              actor_name: event.creator?.email || 'Externo',
-            });
-            totalNotifications++;
-          } else {
-            // Event was created or updated externally
-            // Check if we know this event from our appointments table
-            const { data: existingAppt } = await supabase
-              .from('appointments')
-              .select('id')
-              .eq('google_event_id', eventId)
-              .maybeSingle();
+          const action = await determineAction(supabase, event, clinicId);
 
-            const startDT = event.start?.dateTime
-              ? new Date(event.start.dateTime).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
-              : event.start?.date || '';
-
-            if (existingAppt) {
-              // Known event was updated externally
-              await supabase.from('calendar_notifications').insert({
-                clinic_id: clinicId,
-                account_id: account.id,
-                event_id: eventId,
-                event_title: eventTitle,
-                action: 'updated_external',
-                details: `Evento atualizado externamente — ${startDT}`,
-                actor_name: event.creator?.email || 'Externo',
-              });
-            } else {
-              // New event created externally
-              await supabase.from('calendar_notifications').insert({
-                clinic_id: clinicId,
-                account_id: account.id,
-                event_id: eventId,
-                event_title: eventTitle,
-                action: 'created_external',
-                details: `Novo evento criado externamente — ${startDT}`,
-                actor_name: event.creator?.email || 'Externo',
-              });
-            }
-            totalNotifications++;
+          // Check for duplicate (internal notification created moments ago)
+          const duplicate = await isDuplicate(supabase, clinicId, eventTitle, action);
+          if (duplicate) {
+            console.log(`Skipping duplicate notification for "${eventTitle}" action=${action}`);
+            continue;
           }
+
+          const startDT = event.start?.dateTime
+            ? new Date(event.start.dateTime).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+            : event.start?.date || '';
+
+          let details = '';
+          if (action === 'cancelled') {
+            details = `Evento cancelado externamente`;
+          } else if (action === 'updated') {
+            details = `Evento atualizado externamente — ${startDT}`;
+          } else {
+            details = `Novo evento criado externamente — ${startDT}`;
+          }
+
+          await supabase.from('calendar_notifications').insert({
+            clinic_id: clinicId,
+            account_id: account.id,
+            event_id: eventId,
+            event_title: eventTitle,
+            action,
+            details,
+            actor_name: event.creator?.email || 'Externo',
+          });
+          totalNotifications++;
         }
 
         console.log(`Account ${account.id}: ${allItems.length} changes, ${totalNotifications} notifications`);
