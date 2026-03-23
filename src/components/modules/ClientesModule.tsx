@@ -106,6 +106,7 @@ const ClientesModule = () => {
       city: client.city || "", state: client.state || "",
       zip_code: client.zip_code || "", neighborhood: (client as any).neighborhood || "",
       notes: client.notes || "", lead_source: client.lead_source || "",
+      preferred_professional_id: (client as any).preferred_professional_id || "",
     });
     setIsFormOpen(true);
   };
