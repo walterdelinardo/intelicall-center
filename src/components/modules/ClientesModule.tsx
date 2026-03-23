@@ -135,9 +135,10 @@ const ClientesModule = () => {
         email: form.email || null, birth_date: form.birth_date || null,
         cpf: form.cpf || null, address: form.address || null,
         city: form.city || null, state: form.state || null,
-        zip_code: form.zip_code || null, notes: form.notes || null,
+        zip_code: form.zip_code || null, neighborhood: form.neighborhood || null,
+        notes: form.notes || null,
         lead_source: form.lead_source || null,
-      };
+      } as any;
       if (editClient) {
         const { error } = await supabase.from("clients").update(payload).eq("id", editClient.id);
         if (error) throw error;
