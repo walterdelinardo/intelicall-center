@@ -1665,11 +1665,10 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
   const [showItemPicker, setShowItemPicker] = useState(false);
   const [showProcPicker, setShowProcPicker] = useState(false);
 
-  // Procedure materials & internal materials state
+  // Procedure materials state (includes auto-loaded + manually added extras)
   const [procedureMaterials, setProcedureMaterials] = useState<MaterialItem[]>([]);
-  const [internalMaterials, setInternalMaterials] = useState<MaterialItem[]>([]);
-  const [showInternalPicker, setShowInternalPicker] = useState(false);
-  const [internalSearch, setInternalSearch] = useState("");
+  const [showMaterialPicker, setShowMaterialPicker] = useState(false);
+  const [materialSearch, setMaterialSearch] = useState("");
 
   // Fetch stock items
   const { data: stockItems = [] } = useQuery({
@@ -1721,7 +1720,7 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
       });
       setSaleItems([]);
       setExtraProcedures([]);
-      setInternalMaterials([]);
+      
       setProcedureMaterials([]);
       setInitialized(true);
 
@@ -1780,13 +1779,13 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
     return stockItems.filter((s: any) => s.name.toLowerCase().includes(q)).slice(0, 10);
   }, [stockItems, itemSearch]);
 
-  const filteredInternalStock = useMemo(() => {
-    const q = internalSearch.toLowerCase();
-    const usedIds = new Set([...procedureMaterials.map(m => m.stockId), ...internalMaterials.map(m => m.stockId)]);
+  const filteredMaterialStock = useMemo(() => {
+    const q = materialSearch.toLowerCase();
+    const usedIds = new Set(procedureMaterials.map(m => m.stockId));
     return stockItems
       .filter((s: any) => !usedIds.has(s.id) && (!q || s.name.toLowerCase().includes(q)))
       .slice(0, 10);
-  }, [stockItems, internalSearch, procedureMaterials, internalMaterials]);
+  }, [stockItems, materialSearch, procedureMaterials]);
 
   const filteredProcs = useMemo(() => {
     const q = procSearch.toLowerCase();
@@ -1819,15 +1818,15 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
     setShowProcPicker(false);
   };
 
-  const addInternalMaterial = (item: any) => {
-    setInternalMaterials([...internalMaterials, {
+  const addExtraMaterial = (item: any) => {
+    setProcedureMaterials([...procedureMaterials, {
       stockId: item.id,
       name: item.name,
       qty: 1,
       unit: item.unit || "un",
     }]);
-    setInternalSearch("");
-    setShowInternalPicker(false);
+    setMaterialSearch("");
+    setShowMaterialPicker(false);
   };
 
   const saveMutation = useMutation({
@@ -1992,8 +1991,8 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
         });
       }
 
-      // === 7. Deduct stock for procedure materials and internal materials (no financial transaction) ===
-      const allMaterialDeductions = [...procedureMaterials, ...internalMaterials];
+      // === 7. Deduct stock for procedure materials (no financial transaction) ===
+      const allMaterialDeductions = procedureMaterials;
       for (const mat of allMaterialDeductions) {
         const stockItem = stockItems.find((s: any) => s.id === mat.stockId);
         if (stockItem) {
@@ -2078,43 +2077,12 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
           </div>
 
           {/* Procedure Materials Section */}
-          {procedureMaterials.length > 0 && (
-            <div className="space-y-2 border rounded-lg p-3 bg-muted/30">
-              <Label className="flex items-center gap-1 text-sm font-medium">
-                <Package className="w-4 h-4 text-primary" /> Materiais do Procedimento
-              </Label>
-              <p className="text-[11px] text-muted-foreground">Descontados do estoque, sem cobrança ao cliente</p>
-              {procedureMaterials.map((mat, idx) => (
-                <div key={idx} className="flex items-center gap-2 text-sm">
-                  <span className="flex-1 truncate">{mat.name}</span>
-                  <Input
-                    type="number"
-                    min="0.1"
-                    step="0.1"
-                    className="w-20 h-7 text-xs"
-                    value={mat.qty}
-                    onChange={(e) => {
-                      const updated = [...procedureMaterials];
-                      updated[idx].qty = parseFloat(e.target.value) || 0;
-                      setProcedureMaterials(updated);
-                    }}
-                  />
-                  <span className="text-xs text-muted-foreground w-8">{mat.unit}</span>
-                  <Button type="button" size="icon" variant="ghost" className="h-6 w-6" onClick={() => setProcedureMaterials(procedureMaterials.filter((_, i) => i !== idx))}>
-                    <X className="w-3 h-3" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Internal Materials Section */}
           <div className="space-y-2 border rounded-lg p-3 bg-muted/30">
             <Label className="flex items-center gap-1 text-sm font-medium">
-              <Package className="w-4 h-4 text-primary" /> Material de Uso Interno
+              <Package className="w-4 h-4 text-primary" /> Materiais do Procedimento
             </Label>
-            <p className="text-[11px] text-muted-foreground">Materiais extras, descontados do estoque, sem cobrança</p>
-            {internalMaterials.map((mat, idx) => (
+            <p className="text-[11px] text-muted-foreground">Descontados do estoque, sem cobrança</p>
+            {procedureMaterials.map((mat, idx) => (
               <div key={idx} className="flex items-center gap-2 text-sm">
                 <span className="flex-1 truncate">{mat.name}</span>
                 <Input
@@ -2124,18 +2092,18 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
                   className="w-20 h-7 text-xs"
                   value={mat.qty}
                   onChange={(e) => {
-                    const updated = [...internalMaterials];
+                    const updated = [...procedureMaterials];
                     updated[idx].qty = parseFloat(e.target.value) || 0;
-                    setInternalMaterials(updated);
+                    setProcedureMaterials(updated);
                   }}
                 />
                 <span className="text-xs text-muted-foreground w-8">{mat.unit}</span>
-                <Button type="button" size="icon" variant="ghost" className="h-6 w-6" onClick={() => setInternalMaterials(internalMaterials.filter((_, i) => i !== idx))}>
+                <Button type="button" size="icon" variant="ghost" className="h-6 w-6" onClick={() => setProcedureMaterials(procedureMaterials.filter((_, i) => i !== idx))}>
                   <X className="w-3 h-3" />
                 </Button>
               </div>
             ))}
-            <Popover open={showInternalPicker} onOpenChange={setShowInternalPicker}>
+            <Popover open={showMaterialPicker} onOpenChange={setShowMaterialPicker}>
               <PopoverTrigger asChild>
                 <Button type="button" variant="outline" size="sm" className="gap-1 text-xs">
                   <Plus className="w-3 h-3" /> Adicionar Material
@@ -2143,12 +2111,12 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
               </PopoverTrigger>
               <PopoverContent className="w-[280px] p-0" align="start">
                 <Command shouldFilter={false}>
-                  <CommandInput placeholder="Buscar item do estoque..." value={internalSearch} onValueChange={setInternalSearch} />
+                  <CommandInput placeholder="Buscar item do estoque..." value={materialSearch} onValueChange={setMaterialSearch} />
                   <CommandList>
                     <CommandEmpty>Nenhum item encontrado</CommandEmpty>
                     <CommandGroup>
-                      {filteredInternalStock.map((s: any) => (
-                        <CommandItem key={s.id} onSelect={() => addInternalMaterial(s)}>
+                      {filteredMaterialStock.map((s: any) => (
+                        <CommandItem key={s.id} onSelect={() => addExtraMaterial(s)}>
                           <span>{s.name}</span>
                           <span className="ml-auto text-xs text-muted-foreground">{s.unit || 'un'}</span>
                         </CommandItem>
