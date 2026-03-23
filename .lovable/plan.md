@@ -1,44 +1,29 @@
 
 
-## Materiais do Procedimento e Uso Interno no Faturamento
+## Unificar materiais em uma única seção "Materiais do Procedimento"
 
-### Resumo
-Ao abrir o diálogo de faturamento, carregar automaticamente os materiais vinculados ao procedimento (da tabela `procedure_materials`). Exibir com quantidade editável. Permitir adicionar materiais extras de uso interno. Nenhum dos dois grupos gera cobrança ao cliente -- ambos apenas descontam do estoque.
+### O que muda
+Eliminar a seção separada "Material de Uso Interno" e mover o botão "Adicionar Material" para dentro da seção "Materiais do Procedimento". Materiais extras adicionados manualmente ficam na mesma lista, todos descontam do estoque sem cobrança.
 
-### Alterações em `src/components/modules/AgendaModule.tsx` (BillingDialog)
+### Alterações em `src/components/modules/AgendaModule.tsx`
 
-**1. Novo estado e interface**
-- Interface `MaterialItem { stockId: string; name: string; qty: number; unit: string }`
-- Estado `procedureMaterials: MaterialItem[]` (carregados do cadastro do procedimento)
-- Estado `internalMaterials: MaterialItem[]` (adicionados manualmente)
-- Estado `showInternalPicker` e `internalSearch`
+**1. Unificar estado**: Eliminar `internalMaterials` e `showInternalPicker`/`internalSearch`. Reutilizar `procedureMaterials` para tudo. Renomear os estados do picker para algo genérico (ex: `showMaterialPicker`, `materialSearch`).
 
-**2. Nova query: buscar materiais do procedimento**
-- Quando o dialog abrir e `ep?.procedureName` existir, resolver o `procedure_id` via query na tabela `procedures`
-- Buscar `procedure_materials` com join em `stock_items` (nome, unidade) filtrando pelo `procedure_id`
-- Popular `procedureMaterials` no `useEffect` de inicialização
+**2. Função `addInternalMaterial`**: Passa a fazer `setProcedureMaterials([...procedureMaterials, { ... }])` em vez de usar `setInternalMaterials`.
 
-**3. Nova seção UI: "Materiais do Procedimento"**
-- Posicionar entre "Valor Principal / Data" e "Venda de Itens"
-- Cada linha: nome (truncado), input de quantidade editável, unidade, botão remover
-- Icone `Package` no label
-- Subtítulo discreto: "Descontados do estoque, sem cobrança"
+**3. `filteredInternalStock`**: Filtrar apenas contra `procedureMaterials` (sem referência a `internalMaterials`).
 
-**4. Nova seção UI: "Material de Uso Interno"**
-- Logo abaixo dos materiais do procedimento
-- Mesmo layout: lista com nome, qty editável, unidade, botão remover
-- Botão "Adicionar Material" com picker do estoque (mesmo padrão do picker de venda)
-- Subtítulo: "Materiais extras, descontados do estoque, sem cobrança"
+**4. UI**: 
+- Remover toda a seção "Material de Uso Interno" (linhas ~2111-2161)
+- Na seção "Materiais do Procedimento" (linhas ~2080-2109):
+  - Sempre exibir a seção (remover o condicional `procedureMaterials.length > 0`)
+  - Mover o botão "Adicionar Material" com o Popover/Command picker para dentro desta seção, após a lista de materiais
+  - Alterar subtítulo para: "Descontados do estoque, sem cobrança"
 
-**5. Cálculo do total: sem alteração**
-- `grandTotal` continua sendo `baseAmount + itemsTotal + procsTotal`
-- Materiais do procedimento e internos NÃO entram no cálculo
+**5. `saveMutation`**: Simplificar para iterar apenas `procedureMaterials` (já que `internalMaterials` não existe mais).
 
-**6. No `saveMutation`: descontar estoque**
-- Após as transações financeiras existentes, iterar `[...procedureMaterials, ...internalMaterials]`
-- Para cada item, buscar a quantidade atual do `stock_items` e fazer `update quantity = quantity - item.qty`
-- NÃO criar `financial_transaction` para esses itens
+**6. Reset no dialog**: Remover `setInternalMaterials([])` do reset, manter apenas `setProcedureMaterials([])`.
 
-**7. Import adicional**
-- Adicionar `Package` ao import do lucide-react (já existe no projeto)
+### Resultado
+Uma única seção "Materiais do Procedimento" com os materiais importados automaticamente + botão para adicionar extras, todos tratados igualmente para baixa de estoque.
 
