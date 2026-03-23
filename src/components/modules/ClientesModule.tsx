@@ -124,6 +124,19 @@ const ClientesModule = () => {
     enabled: !!profile?.clinic_id,
   });
 
+  const { data: professionals = [] } = useQuery({
+    queryKey: ["professionals", profile?.clinic_id],
+    queryFn: async () => {
+      if (!profile?.clinic_id) return [];
+      const { data, error } = await supabase
+        .from("profiles").select("id, full_name")
+        .eq("clinic_id", profile.clinic_id).eq("is_active", true).order("full_name");
+      if (error) throw error;
+      return data as { id: string; full_name: string }[];
+    },
+    enabled: !!profile?.clinic_id,
+  });
+
   const { data: clients = [], isLoading } = useQuery({
     queryKey: ["clients", profile?.clinic_id],
     queryFn: async () => {
