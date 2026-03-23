@@ -19,7 +19,7 @@ import {
   FileText, Plus, Search, Eye, Calendar, User, Footprints,
   Trash2, Upload, X, Edit, ArrowLeft, ClipboardList, FileUp,
   Brain, Loader2, Sparkles, ScrollText, ChevronDown, ChevronRight,
-  Package, XCircle
+  Package, XCircle, Download, Printer, Save
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
