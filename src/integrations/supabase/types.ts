@@ -14,6 +14,61 @@ export type Database = {
   }
   public: {
     Tables: {
+      appointment_materials: {
+        Row: {
+          appointment_id: string
+          clinic_id: string
+          created_at: string
+          id: string
+          name: string
+          quantity: number
+          stock_item_id: string
+          unit: string | null
+        }
+        Insert: {
+          appointment_id: string
+          clinic_id: string
+          created_at?: string
+          id?: string
+          name: string
+          quantity?: number
+          stock_item_id: string
+          unit?: string | null
+        }
+        Update: {
+          appointment_id?: string
+          clinic_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          quantity?: number
+          stock_item_id?: string
+          unit?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointment_materials_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_materials_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_materials_stock_item_id_fkey"
+            columns: ["stock_item_id"]
+            isOneToOne: false
+            referencedRelation: "stock_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       appointments: {
         Row: {
           client_id: string
