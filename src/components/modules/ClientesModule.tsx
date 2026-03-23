@@ -55,7 +55,7 @@ type SortDir = "asc" | "desc";
 
 const emptyForm = {
   name: "", phone: "", whatsapp: "", email: "", birth_date: "",
-  cpf: "", address: "", city: "", state: "", zip_code: "", neighborhood: "", notes: "", lead_source: "",
+  cpf: "", address: "", address_number: "", address_complement: "", city: "", state: "", zip_code: "", neighborhood: "", notes: "", lead_source: "",
 };
 
 const ClientesModule = () => {
@@ -101,7 +101,8 @@ const ClientesModule = () => {
     setForm({
       name: client.name, phone: client.phone || "", whatsapp: client.whatsapp || "",
       email: client.email || "", birth_date: client.birth_date || "", cpf: client.cpf || "",
-      address: client.address || "", city: client.city || "", state: client.state || "",
+      address: client.address || "", address_number: (client as any).address_number || "", address_complement: (client as any).address_complement || "",
+      city: client.city || "", state: client.state || "",
       zip_code: client.zip_code || "", neighborhood: (client as any).neighborhood || "",
       notes: client.notes || "", lead_source: client.lead_source || "",
     });
@@ -147,6 +148,7 @@ const ClientesModule = () => {
         phone: form.phone || null, whatsapp: form.whatsapp || null,
         email: form.email || null, birth_date: form.birth_date || null,
         cpf: form.cpf || null, address: form.address || null,
+        address_number: form.address_number || null, address_complement: form.address_complement || null,
         city: form.city || null, state: form.state || null,
         zip_code: form.zip_code || null, neighborhood: form.neighborhood || null,
         notes: form.notes || null,
@@ -472,8 +474,16 @@ const ClientesModule = () => {
               <Input value={form.zip_code} onChange={(e) => setForm({ ...form, zip_code: e.target.value })} onBlur={handleClientCepBlur} placeholder="00000-000" />
             </div>
             <div className="space-y-2">
-              <Label>Endereço</Label>
-              <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+              <Label>Endereço (Logradouro)</Label>
+              <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Logradouro" />
+            </div>
+            <div className="space-y-2">
+              <Label>Número</Label>
+              <Input value={form.address_number} onChange={(e) => setForm({ ...form, address_number: e.target.value })} placeholder="Nº" />
+            </div>
+            <div className="space-y-2">
+              <Label>Complemento</Label>
+              <Input value={form.address_complement} onChange={(e) => setForm({ ...form, address_complement: e.target.value })} placeholder="Apto, sala, bloco..." />
             </div>
             <div className="space-y-2">
               <Label>Bairro</Label>

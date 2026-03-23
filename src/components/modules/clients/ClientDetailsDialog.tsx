@@ -109,7 +109,7 @@ const ClientDetailsDialog = ({ client, open, onOpenChange }: Props) => {
               <Separator />
               <div className="flex items-start gap-2 text-sm">
                 <MapPin className="w-4 h-4 text-muted-foreground mt-0.5" />
-                <span>{client.address}{(client as any).neighborhood ? `, ${(client as any).neighborhood}` : ""}{client.city ? `, ${client.city}` : ""}{client.state ? ` - ${client.state}` : ""}</span>
+                <span>{client.address}{(client as any).address_number ? `, ${(client as any).address_number}` : ""}{(client as any).address_complement ? ` - ${(client as any).address_complement}` : ""}{(client as any).neighborhood ? `, ${(client as any).neighborhood}` : ""}{client.city ? `, ${client.city}` : ""}{client.state ? ` - ${client.state}` : ""}</span>
               </div>
             </>
           )}

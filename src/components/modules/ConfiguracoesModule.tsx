@@ -86,6 +86,8 @@ const ConfiguracoesModule = () => {
     phone: "",
     email: "",
     address: "",
+    address_number: "",
+    address_complement: "",
     location_url: "",
     city: "",
     state: "",
@@ -105,6 +107,8 @@ const ConfiguracoesModule = () => {
         phone: clinic.phone || "",
         email: clinic.email || "",
         address: clinic.address || "",
+        address_number: (clinic as any).address_number || "",
+        address_complement: (clinic as any).address_complement || "",
         location_url: (clinic as any).location_url || "",
         city: clinic.city || "",
         state: clinic.state || "",
@@ -142,6 +146,8 @@ const ConfiguracoesModule = () => {
           phone: form.phone || null,
           email: form.email || null,
           address: form.address || null,
+          address_number: form.address_number || null,
+          address_complement: form.address_complement || null,
           location_url: form.location_url || null,
           city: form.city || null,
           state: form.state || null,
@@ -288,27 +294,6 @@ const ConfiguracoesModule = () => {
                     <MapPin className="w-4 h-4 text-muted-foreground" />
                     Endereço
                   </Label>
-                  <Input
-                    value={form.address}
-                    onChange={(e) => setForm({ ...form, address: e.target.value })}
-                    placeholder="Rua, número, complemento"
-                  />
-                </div>
-
-                {/* Location URL */}
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <Globe className="w-4 h-4 text-muted-foreground" />
-                    URL do Local (Google Maps)
-                  </Label>
-                  <Input
-                    value={form.location_url}
-                    onChange={(e) => setForm({ ...form, location_url: e.target.value })}
-                    placeholder="https://maps.google.com/..."
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Este link será usado como localização nos eventos do Google Calendar.
-                  </p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
@@ -321,6 +306,36 @@ const ConfiguracoesModule = () => {
                       placeholder="00000-000"
                     />
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label>Logradouro</Label>
+                    <Input
+                      value={form.address}
+                      onChange={(e) => setForm({ ...form, address: e.target.value })}
+                      placeholder="Logradouro"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Número</Label>
+                    <Input
+                      value={form.address_number}
+                      onChange={(e) => setForm({ ...form, address_number: e.target.value })}
+                      placeholder="Nº"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Complemento</Label>
+                    <Input
+                      value={form.address_complement}
+                      onChange={(e) => setForm({ ...form, address_complement: e.target.value })}
+                      placeholder="Apto, sala, bloco..."
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label>Bairro</Label>
                     <Input
@@ -346,6 +361,22 @@ const ConfiguracoesModule = () => {
                       maxLength={2}
                     />
                   </div>
+                </div>
+
+                {/* Location URL */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Globe className="w-4 h-4 text-muted-foreground" />
+                    URL do Local (Google Maps)
+                  </Label>
+                  <Input
+                    value={form.location_url}
+                    onChange={(e) => setForm({ ...form, location_url: e.target.value })}
+                    placeholder="https://maps.google.com/..."
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Este link será usado como localização nos eventos do Google Calendar.
+                  </p>
                 </div>
 
                 {/* Theme Color */}
