@@ -1991,8 +1991,20 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
         });
       }
 
-      // === 7. Deduct stock for procedure materials (no financial transaction) ===
+      // === 7. Deduct stock for procedure materials + persist in appointment_materials ===
       const allMaterialDeductions = procedureMaterials;
+      if (allMaterialDeductions.length > 0 && appointmentId) {
+        await supabase.from("appointment_materials").insert(
+          allMaterialDeductions.map((mat) => ({
+            appointment_id: appointmentId,
+            stock_item_id: mat.stockId,
+            clinic_id: clinicId,
+            quantity: mat.qty,
+            name: mat.name,
+            unit: mat.unit || 'un',
+          }))
+        );
+      }
       for (const mat of allMaterialDeductions) {
         const stockItem = stockItems.find((s: any) => s.id === mat.stockId);
         if (stockItem) {
