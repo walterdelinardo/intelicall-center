@@ -125,12 +125,19 @@ const ClientesModule = () => {
   });
 
   const { data: professionals = [] } = useQuery({
-    queryKey: ["professionals", profile?.clinic_id],
+    queryKey: ["professionals-podologos", profile?.clinic_id],
     queryFn: async () => {
       if (!profile?.clinic_id) return [];
+      // Get user IDs with 'podologo' role in this clinic
+      const { data: roleData, error: roleError } = await supabase
+        .from("user_roles").select("user_id")
+        .eq("clinic_id", profile.clinic_id).eq("role", "podologo");
+      if (roleError) throw roleError;
+      const podologoIds = (roleData || []).map((r) => r.user_id);
+      if (podologoIds.length === 0) return [];
       const { data, error } = await supabase
         .from("profiles").select("id, full_name")
-        .eq("clinic_id", profile.clinic_id).eq("is_active", true).order("full_name");
+        .in("id", podologoIds).eq("is_active", true).order("full_name");
       if (error) throw error;
       return data as { id: string; full_name: string }[];
     },
