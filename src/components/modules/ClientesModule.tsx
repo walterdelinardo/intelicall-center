@@ -621,7 +621,14 @@ const ClientesModule = () => {
 
       {/* Details dialog */}
       {selectedClient && (
-        <ClientDetailsDialog client={selectedClient} open={isDetailsOpen} onOpenChange={setIsDetailsOpen} />
+        <ClientDetailsDialog
+          client={{
+            ...selectedClient,
+            preferred_professional_name: professionals.find((p) => p.id === (selectedClient as any).preferred_professional_id)?.full_name || null,
+          } as any}
+          open={isDetailsOpen}
+          onOpenChange={setIsDetailsOpen}
+        />
       )}
 
       {/* Delete confirmation */}
