@@ -89,7 +89,8 @@ const ClientesModule = () => {
       name: client.name, phone: client.phone || "", whatsapp: client.whatsapp || "",
       email: client.email || "", birth_date: client.birth_date || "", cpf: client.cpf || "",
       address: client.address || "", city: client.city || "", state: client.state || "",
-      zip_code: client.zip_code || "", notes: client.notes || "", lead_source: client.lead_source || "",
+      zip_code: client.zip_code || "", neighborhood: (client as any).neighborhood || "",
+      notes: client.notes || "", lead_source: client.lead_source || "",
     });
     setIsFormOpen(true);
   };
