@@ -472,6 +472,18 @@ const ClientesModule = () => {
               <Input value={form.cpf} onChange={(e) => setForm({ ...form, cpf: e.target.value })} placeholder="000.000.000-00" />
             </div>
             <div className="space-y-2">
+              <Label>Profissional de Preferência</Label>
+              <Select value={form.preferred_professional_id} onValueChange={(v) => setForm({ ...form, preferred_professional_id: v === "none" ? "" : v })}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum</SelectItem>
+                  {professionals.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label>Origem do Lead</Label>
               <Select value={form.lead_source} onValueChange={(v) => setForm({ ...form, lead_source: v })}>
                 <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
