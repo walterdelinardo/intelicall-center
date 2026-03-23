@@ -787,53 +787,37 @@ function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
     },
   });
 
-  const generatePrescription = (procedure?: any) => {
+  const openPrescription = (procedure?: any) => {
+    if (!record) return;
+    setPrescriptionForAppt(procedure?.id || "general");
+    setPrescriptionData({ prescription: "", orientations: "", observations: "" });
+  };
+
+  const printPrescription = (procedure?: any) => {
     if (!record) return;
     const procedureName = procedure?.procedures?.name || "—";
     const procedureDate = procedure ? format(new Date(procedure.date), "dd/MM/yyyy", { locale: ptBR }) : format(new Date(record.date), "dd/MM/yyyy", { locale: ptBR });
-    const lines = [
-      `RECEITUÁRIO`,
-      ``,
-      `Paciente: ${record.clients?.name || "—"}`,
-      `Data: ${procedureDate}`,
-      `Profissional: ${record.profiles?.full_name || "—"}`,
-      ``,
-      `Procedimento Realizado: ${procedureName}`,
-      ``,
-      `─────────────────────────────────────────`,
-      `PRESCRIÇÃO:`,
-      ``,
-      `1. `,
-      ``,
-      `2. `,
-      ``,
-      `3. `,
-      ``,
-      `─────────────────────────────────────────`,
-      `ORIENTAÇÕES AO PACIENTE:`,
-      ``,
-      `• `,
-      ``,
-      `• `,
-      ``,
-      `─────────────────────────────────────────`,
-      `OBSERVAÇÕES:`,
-      ``,
-      ``,
-      ``,
-      ``,
-      `_________________________________`,
-      `Assinatura do Profissional`,
-      `${record.profiles?.full_name || ""}`,
-    ];
-    const blob = new Blob([lines.join("\n")], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `Receita_${record.clients?.name || "paciente"}_${procedureDate.replace(/\//g, "-")}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Receita gerada!");
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    printWindow.document.write(`
+      <html><head><title>Receita</title>
+      <style>body{font-family:Arial,sans-serif;padding:40px;max-width:600px;margin:0 auto}h1{font-size:18px;text-align:center;border-bottom:2px solid #000;padding-bottom:10px}
+      .field{margin:16px 0}.label{font-weight:bold;font-size:12px;color:#555;margin-bottom:4px}.value{font-size:14px;white-space:pre-wrap}
+      .signature{margin-top:60px;text-align:center;border-top:1px solid #000;padding-top:8px;width:250px;margin-left:auto;margin-right:auto}</style></head><body>
+      <h1>RECEITUÁRIO</h1>
+      <div class="field"><div class="label">Paciente</div><div class="value">${record.clients?.name || "—"}</div></div>
+      <div class="field"><div class="label">Data</div><div class="value">${procedureDate}</div></div>
+      <div class="field"><div class="label">Profissional</div><div class="value">${record.profiles?.full_name || "—"}</div></div>
+      <div class="field"><div class="label">Procedimento</div><div class="value">${procedureName}</div></div>
+      <hr/>
+      <div class="field"><div class="label">PRESCRIÇÃO</div><div class="value">${prescriptionData.prescription || "(vazio)"}</div></div>
+      <div class="field"><div class="label">ORIENTAÇÕES AO PACIENTE</div><div class="value">${prescriptionData.orientations || "(vazio)"}</div></div>
+      <div class="field"><div class="label">OBSERVAÇÕES</div><div class="value">${prescriptionData.observations || "(vazio)"}</div></div>
+      <div class="signature">${record.profiles?.full_name || ""}<br/>Assinatura do Profissional</div>
+      </body></html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
   };
 
   const handleUploadForProcedure = async (files: FileList, appointmentId: string) => {
