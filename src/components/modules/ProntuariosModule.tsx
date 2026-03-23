@@ -1462,9 +1462,9 @@ function ViewRecordInline({ recordId, clinicId, onBack }: {
                                     </div>
                                   )}
                                   {safetyResult && safetyResult.safe && safetyResult.warnings.length === 0 && (
-                                    <div className="p-2 rounded-lg border border-green-300 bg-green-50 flex items-center gap-1.5">
-                                      <CheckCircle className="w-4 h-4 text-green-600" />
-                                      <span className="text-xs text-green-700">Nenhuma contraindicação identificada pela IA.</span>
+                                    <div className="p-2 rounded-lg border border-primary/30 bg-primary/5 flex items-center gap-1.5">
+                                      <CheckCircle className="w-4 h-4 text-primary" />
+                                      <span className="text-xs text-primary">Nenhuma contraindicação identificada pela IA.</span>
                                     </div>
                                   )}
 
