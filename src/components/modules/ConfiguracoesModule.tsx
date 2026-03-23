@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { fetchViaCep } from "@/lib/viaCep";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -89,6 +90,7 @@ const ConfiguracoesModule = () => {
     city: "",
     state: "",
     zip_code: "",
+    neighborhood: "",
     theme_color: "#3B82F6",
     cnpj: "",
   });
@@ -107,6 +109,7 @@ const ConfiguracoesModule = () => {
         city: clinic.city || "",
         state: clinic.state || "",
         zip_code: clinic.zip_code || "",
+        neighborhood: (clinic as any).neighborhood || "",
         theme_color: clinic.theme_color || "#3B82F6",
         cnpj: (clinic as any).cnpj || "",
       });
@@ -115,6 +118,19 @@ const ConfiguracoesModule = () => {
       }
     }
   }, [clinic]);
+
+  const handleClinicCepBlur = useCallback(async () => {
+    const result = await fetchViaCep(form.zip_code);
+    if (result) {
+      setForm((prev) => ({
+        ...prev,
+        address: result.logradouro || prev.address,
+        neighborhood: result.bairro || prev.neighborhood,
+        city: result.localidade || prev.city,
+        state: result.uf || prev.state,
+      }));
+    }
+  }, [form.zip_code]);
 
   const updateClinicMutation = useMutation({
     mutationFn: async () => {
@@ -130,6 +146,7 @@ const ConfiguracoesModule = () => {
           city: form.city || null,
           state: form.state || null,
           zip_code: form.zip_code || null,
+          neighborhood: form.neighborhood || null,
           theme_color: form.theme_color || null,
           cnpj: form.cnpj || null,
         } as any)
@@ -294,7 +311,24 @@ const ConfiguracoesModule = () => {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <Label>CEP</Label>
+                    <Input
+                      value={form.zip_code}
+                      onChange={(e) => setForm({ ...form, zip_code: e.target.value })}
+                      onBlur={handleClinicCepBlur}
+                      placeholder="00000-000"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Bairro</Label>
+                    <Input
+                      value={form.neighborhood}
+                      onChange={(e) => setForm({ ...form, neighborhood: e.target.value })}
+                      placeholder="Bairro"
+                    />
+                  </div>
                   <div className="space-y-2">
                     <Label>Cidade</Label>
                     <Input
@@ -310,14 +344,6 @@ const ConfiguracoesModule = () => {
                       onChange={(e) => setForm({ ...form, state: e.target.value })}
                       placeholder="UF"
                       maxLength={2}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>CEP</Label>
-                    <Input
-                      value={form.zip_code}
-                      onChange={(e) => setForm({ ...form, zip_code: e.target.value })}
-                      placeholder="00000-000"
                     />
                   </div>
                 </div>

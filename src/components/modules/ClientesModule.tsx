@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
+import { fetchViaCep } from "@/lib/viaCep";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -54,7 +55,7 @@ type SortDir = "asc" | "desc";
 
 const emptyForm = {
   name: "", phone: "", whatsapp: "", email: "", birth_date: "",
-  cpf: "", address: "", city: "", state: "", zip_code: "", notes: "", lead_source: "",
+  cpf: "", address: "", city: "", state: "", zip_code: "", neighborhood: "", notes: "", lead_source: "",
 };
 
 const ClientesModule = () => {
@@ -82,13 +83,27 @@ const ClientesModule = () => {
     setEditClient(null);
   };
 
+  const handleClientCepBlur = useCallback(async () => {
+    const result = await fetchViaCep(form.zip_code);
+    if (result) {
+      setForm((prev) => ({
+        ...prev,
+        address: result.logradouro || prev.address,
+        neighborhood: result.bairro || prev.neighborhood,
+        city: result.localidade || prev.city,
+        state: result.uf || prev.state,
+      }));
+    }
+  }, [form.zip_code]);
+
   const openEdit = (client: Client) => {
     setEditClient(client);
     setForm({
       name: client.name, phone: client.phone || "", whatsapp: client.whatsapp || "",
       email: client.email || "", birth_date: client.birth_date || "", cpf: client.cpf || "",
       address: client.address || "", city: client.city || "", state: client.state || "",
-      zip_code: client.zip_code || "", notes: client.notes || "", lead_source: client.lead_source || "",
+      zip_code: client.zip_code || "", neighborhood: (client as any).neighborhood || "",
+      notes: client.notes || "", lead_source: client.lead_source || "",
     });
     setIsFormOpen(true);
   };
@@ -133,9 +148,10 @@ const ClientesModule = () => {
         email: form.email || null, birth_date: form.birth_date || null,
         cpf: form.cpf || null, address: form.address || null,
         city: form.city || null, state: form.state || null,
-        zip_code: form.zip_code || null, notes: form.notes || null,
+        zip_code: form.zip_code || null, neighborhood: form.neighborhood || null,
+        notes: form.notes || null,
         lead_source: form.lead_source || null,
-      };
+      } as any;
       if (editClient) {
         const { error } = await supabase.from("clients").update(payload).eq("id", editClient.id);
         if (error) throw error;
@@ -451,9 +467,17 @@ const ClientesModule = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2 sm:col-span-2">
+            <div className="space-y-2">
+              <Label>CEP</Label>
+              <Input value={form.zip_code} onChange={(e) => setForm({ ...form, zip_code: e.target.value })} onBlur={handleClientCepBlur} placeholder="00000-000" />
+            </div>
+            <div className="space-y-2">
               <Label>Endereço</Label>
               <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Bairro</Label>
+              <Input value={form.neighborhood} onChange={(e) => setForm({ ...form, neighborhood: e.target.value })} placeholder="Bairro" />
             </div>
             <div className="space-y-2">
               <Label>Cidade</Label>
