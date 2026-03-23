@@ -996,6 +996,26 @@ function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
                                 ))}
                               </div>
 
+                              {/* Materials used (from billing) */}
+                              {(() => {
+                                const evtApptIds = evt.appointments.map((a: any) => a.id);
+                                const evtMaterials = appointmentMaterials.filter((m: any) => evtApptIds.includes(m.appointment_id));
+                                if (evtMaterials.length === 0) return null;
+                                return (
+                                  <div>
+                                    <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                                      <Package className="w-3.5 h-3.5" /> Materiais Utilizados
+                                    </p>
+                                    {evtMaterials.map((mat: any) => (
+                                      <div key={mat.id} className="flex items-center justify-between py-1 text-sm border-b border-border/30 last:border-0">
+                                        <span>{mat.name}</span>
+                                        <span className="text-xs text-muted-foreground">{mat.quantity} {mat.unit}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                );
+                              })()}
+
                               {/* Products */}
                               {evt.productTransactions.length > 0 && (
                                 <div>
@@ -1011,11 +1031,91 @@ function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
                                 </div>
                               )}
 
+                              {/* Attached documents for this event */}
+                              {(() => {
+                                const evtApptIds = evt.appointments.map((a: any) => a.id);
+                                // Filter docs that were created around the same date as this event
+                                const evtDocs = docs.filter((d: any) => {
+                                  const docDate = format(new Date(d.created_at), "yyyy-MM-dd");
+                                  return docDate === evt.date;
+                                });
+                                if (evtDocs.length === 0) return null;
+                                return (
+                                  <div>
+                                    <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                                      <FileText className="w-3.5 h-3.5" /> Documentos Anexos
+                                    </p>
+                                    {evtDocs.map((doc: any) => (
+                                      <div key={doc.id} className="flex items-center justify-between py-1.5 text-sm border-b border-border/30 last:border-0">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          {editingTitleId === doc.id ? (
+                                            <div className="flex gap-1.5 items-center">
+                                              <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="h-7 text-xs w-40" autoFocus />
+                                              <Button size="sm" variant="outline" className="h-7 text-xs px-2" onClick={() => updateTitleMutation.mutate({ id: doc.id, title: editTitle })}>OK</Button>
+                                              <Button size="sm" variant="ghost" className="h-7 px-1" onClick={() => setEditingTitleId(null)}><X className="w-3 h-3" /></Button>
+                                            </div>
+                                          ) : (
+                                            <span className="truncate cursor-pointer hover:text-primary" onClick={() => { setEditingTitleId(doc.id); setEditTitle(doc.title); }}>
+                                              {doc.title} <Edit className="w-3 h-3 inline text-muted-foreground" />
+                                            </span>
+                                          )}
+                                        </div>
+                                        <a href={doc.file_url} download={doc.title} target="_blank" rel="noopener noreferrer">
+                                          <Button size="sm" variant="ghost" className="h-7 px-2 gap-1 text-xs">
+                                            <Download className="w-3.5 h-3.5" /> Baixar
+                                          </Button>
+                                        </a>
+                                      </div>
+                                    ))}
+                                  </div>
+                                );
+                              })()}
+
                               {/* Notes */}
                               {mainProc.notes && (
                                 <div>
                                   <p className="text-xs font-medium text-muted-foreground mb-1">Observações</p>
                                   <p className="text-xs text-muted-foreground">{mainProc.notes}</p>
+                                </div>
+                              )}
+
+                              {/* Inline Prescription Form */}
+                              {prescriptionForAppt === mainProc.id && (
+                                <div className="border rounded-lg p-4 bg-background space-y-3">
+                                  <div className="flex items-center justify-between">
+                                    <h4 className="text-sm font-semibold flex items-center gap-2">
+                                      <ScrollText className="w-4 h-4 text-primary" /> Receituário
+                                    </h4>
+                                    <Button size="sm" variant="ghost" onClick={() => setPrescriptionForAppt(null)}>
+                                      <X className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                                    <span>Paciente: {record?.clients?.name}</span>
+                                    <span>Data: {format(new Date(evt.date), "dd/MM/yyyy", { locale: ptBR })}</span>
+                                    <span>Profissional: {record?.profiles?.full_name}</span>
+                                    <span>Procedimento: {mainProc.procedures?.name || "—"}</span>
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label className="text-xs">Prescrição</Label>
+                                    <Textarea rows={3} value={prescriptionData.prescription} onChange={(e) => setPrescriptionData({ ...prescriptionData, prescription: e.target.value })} placeholder="1. Medicamento / posologia..." />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label className="text-xs">Orientações ao Paciente</Label>
+                                    <Textarea rows={3} value={prescriptionData.orientations} onChange={(e) => setPrescriptionData({ ...prescriptionData, orientations: e.target.value })} placeholder="Cuidados, repouso, retorno..." />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label className="text-xs">Observações</Label>
+                                    <Textarea rows={2} value={prescriptionData.observations} onChange={(e) => setPrescriptionData({ ...prescriptionData, observations: e.target.value })} />
+                                  </div>
+                                  <div className="flex gap-2 justify-end">
+                                    <Button size="sm" variant="outline" className="gap-1.5" onClick={() => printPrescription(mainProc)}>
+                                      <Printer className="w-3.5 h-3.5" /> Imprimir
+                                    </Button>
+                                    <Button size="sm" className="gap-1.5 bg-gradient-primary" onClick={() => { setPrescriptionForAppt(null); toast.success("Receita salva!"); }}>
+                                      <Save className="w-3.5 h-3.5" /> Salvar
+                                    </Button>
+                                  </div>
                                 </div>
                               )}
 
@@ -1049,7 +1149,7 @@ function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
                                   variant="outline"
                                   size="sm"
                                   className="gap-1.5 text-xs"
-                                  onClick={() => generatePrescription(mainProc)}
+                                  onClick={() => openPrescription(mainProc)}
                                 >
                                   <ScrollText className="w-3.5 h-3.5" /> Gerar Receita
                                 </Button>
