@@ -146,6 +146,8 @@ const ConfiguracoesModule = () => {
           phone: form.phone || null,
           email: form.email || null,
           address: form.address || null,
+          address_number: form.address_number || null,
+          address_complement: form.address_complement || null,
           location_url: form.location_url || null,
           city: form.city || null,
           state: form.state || null,
