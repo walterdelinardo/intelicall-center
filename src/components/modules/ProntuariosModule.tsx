@@ -558,6 +558,7 @@ function ViewRecordInline({ recordId, clinicId, onBack }: {
   const [prescriptionSaved, setPrescriptionSaved] = useState(false);
   const [savingPrescription, setSavingPrescription] = useState(false);
   const [safetyResult, setSafetyResult] = useState<{ safe: boolean; warnings: string[] } | null>(null);
+  const [viewingPrescriptionId, setViewingPrescriptionId] = useState<string | null>(null);
 
   // Editable clinical form state
   const [clinicalForm, setClinicalForm] = useState<any>(null);
@@ -1412,22 +1413,33 @@ function ViewRecordInline({ recordId, clinicId, onBack }: {
                                     <ScrollText className="w-3.5 h-3.5" /> Receituários Salvos
                                   </p>
                                   {evtPrescriptions.map((rx: any) => (
-                                    <Card key={rx.id} className="border bg-muted/20">
-                                      <CardContent className="p-3 text-sm space-y-1">
-                                        <div className="flex items-center justify-between">
-                                          <span className="text-xs font-medium">{rx.professional_name} — {format(new Date(rx.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}</span>
+                                    <div key={rx.id} className="space-y-1">
+                                      <div className="flex items-center justify-between p-2 rounded-md border bg-muted/20">
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-xs font-medium">{rx.professional_name}</span>
+                                          <span className="text-xs text-muted-foreground">{format(new Date(rx.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}</span>
                                           {rx.ai_safety_check && (
                                             <Badge variant="destructive" className="text-[10px]">
                                               <AlertTriangle className="w-3 h-3 mr-1" /> Alerta IA
                                             </Badge>
                                           )}
                                         </div>
-                                        {rx.prescription && <div><span className="text-xs text-muted-foreground">Prescrição:</span> <span className="whitespace-pre-wrap">{rx.prescription}</span></div>}
-                                        {rx.orientations && <div><span className="text-xs text-muted-foreground">Orientações:</span> <span className="whitespace-pre-wrap">{rx.orientations}</span></div>}
-                                        {rx.observations && <div><span className="text-xs text-muted-foreground">Observações:</span> <span className="whitespace-pre-wrap">{rx.observations}</span></div>}
-                                        {rx.ai_safety_check && <p className="text-xs text-destructive mt-1">{rx.ai_safety_check}</p>}
-                                      </CardContent>
-                                    </Card>
+                                        <Button size="sm" variant="ghost" onClick={() => setViewingPrescriptionId(viewingPrescriptionId === rx.id ? null : rx.id)}>
+                                          {viewingPrescriptionId === rx.id ? <ChevronDown className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                          <span className="ml-1 text-xs">{viewingPrescriptionId === rx.id ? "Fechar" : "Detalhes"}</span>
+                                        </Button>
+                                      </div>
+                                      {viewingPrescriptionId === rx.id && (
+                                        <Card className="border bg-muted/10">
+                                          <CardContent className="p-3 text-sm space-y-1">
+                                            {rx.prescription && <div><span className="text-xs text-muted-foreground">Prescrição:</span> <span className="whitespace-pre-wrap">{rx.prescription}</span></div>}
+                                            {rx.orientations && <div><span className="text-xs text-muted-foreground">Orientações:</span> <span className="whitespace-pre-wrap">{rx.orientations}</span></div>}
+                                            {rx.observations && <div><span className="text-xs text-muted-foreground">Observações:</span> <span className="whitespace-pre-wrap">{rx.observations}</span></div>}
+                                            {rx.ai_safety_check && <p className="text-xs text-destructive mt-1">{rx.ai_safety_check}</p>}
+                                          </CardContent>
+                                        </Card>
+                                      )}
+                                    </div>
                                   ))}
                                 </div>
                               )}
