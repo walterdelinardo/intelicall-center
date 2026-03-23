@@ -347,9 +347,49 @@ const FinanceiroModule = () => {
                 <TableCell className={`font-bold ${group.total >= 0 ? "text-success" : "text-destructive"}`}>
                   R$ {Math.abs(group.total).toFixed(2)}
                 </TableCell>
-                <TableCell className="hidden md:table-cell" />
-                <TableCell />
-                <TableCell />
+                <TableCell className="hidden md:table-cell text-xs">
+                  {(() => {
+                    const methods = group.txs.map(t => t.payment_method).filter(Boolean);
+                    const allSame = methods.length > 0 && methods.every(m => m === methods[0]);
+                    return allSame ? (paymentMethods[methods[0]] || methods[0]) : methods.length > 0 ? "Diversos" : "—";
+                  })()}
+                </TableCell>
+                <TableCell>
+                  {(() => {
+                    const statuses = group.txs.map(t => t.status);
+                    const allSame = statuses.every(s => s === statuses[0]);
+                    if (allSame) {
+                      return (
+                        <Select
+                          value={statuses[0]}
+                          onValueChange={(v) => {
+                            group.txs.forEach(tx => updateStatusMutation.mutate({ id: tx.id, status: v }));
+                          }}
+                        >
+                          <SelectTrigger className="h-7 w-[110px] text-xs" onClick={(e) => e.stopPropagation()}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pendente">Pendente</SelectItem>
+                            <SelectItem value="pago">Pago</SelectItem>
+                            <SelectItem value="cancelado">Cancelado</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      );
+                    }
+                    return <Badge variant="outline" className="text-xs">Misto</Badge>;
+                  })()}
+                </TableCell>
+                <TableCell>
+                  <div className="flex gap-1">
+                    <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); setEditTx(group.txs[0]); setIsCreateOpen(true); }}>
+                      <Edit className="w-4 h-4 text-primary" />
+                    </Button>
+                    <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); setDeleteTxId(group.txs[0].id); }}>
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </Button>
+                  </div>
+                </TableCell>
               </TableRow>,
               // Child rows when expanded
               ...(isOpen ? group.txs.map((tx) => renderTxRow(tx, true)) : []),
