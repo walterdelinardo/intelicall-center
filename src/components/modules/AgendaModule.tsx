@@ -1779,13 +1779,13 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
     return stockItems.filter((s: any) => s.name.toLowerCase().includes(q)).slice(0, 10);
   }, [stockItems, itemSearch]);
 
-  const filteredInternalStock = useMemo(() => {
-    const q = internalSearch.toLowerCase();
-    const usedIds = new Set([...procedureMaterials.map(m => m.stockId), ...internalMaterials.map(m => m.stockId)]);
+  const filteredMaterialStock = useMemo(() => {
+    const q = materialSearch.toLowerCase();
+    const usedIds = new Set(procedureMaterials.map(m => m.stockId));
     return stockItems
       .filter((s: any) => !usedIds.has(s.id) && (!q || s.name.toLowerCase().includes(q)))
       .slice(0, 10);
-  }, [stockItems, internalSearch, procedureMaterials, internalMaterials]);
+  }, [stockItems, materialSearch, procedureMaterials]);
 
   const filteredProcs = useMemo(() => {
     const q = procSearch.toLowerCase();
