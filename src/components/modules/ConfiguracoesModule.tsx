@@ -109,6 +109,7 @@ const ConfiguracoesModule = () => {
         city: clinic.city || "",
         state: clinic.state || "",
         zip_code: clinic.zip_code || "",
+        neighborhood: (clinic as any).neighborhood || "",
         theme_color: clinic.theme_color || "#3B82F6",
         cnpj: (clinic as any).cnpj || "",
       });
@@ -117,6 +118,19 @@ const ConfiguracoesModule = () => {
       }
     }
   }, [clinic]);
+
+  const handleClinicCepBlur = useCallback(async () => {
+    const result = await fetchViaCep(form.zip_code);
+    if (result) {
+      setForm((prev) => ({
+        ...prev,
+        address: result.logradouro || prev.address,
+        neighborhood: result.bairro || prev.neighborhood,
+        city: result.localidade || prev.city,
+        state: result.uf || prev.state,
+      }));
+    }
+  }, [form.zip_code]);
 
   const updateClinicMutation = useMutation({
     mutationFn: async () => {
