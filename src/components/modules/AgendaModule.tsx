@@ -1991,8 +1991,8 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
         });
       }
 
-      // === 7. Deduct stock for procedure materials and internal materials (no financial transaction) ===
-      const allMaterialDeductions = [...procedureMaterials, ...internalMaterials];
+      // === 7. Deduct stock for procedure materials (no financial transaction) ===
+      const allMaterialDeductions = procedureMaterials;
       for (const mat of allMaterialDeductions) {
         const stockItem = stockItems.find((s: any) => s.id === mat.stockId);
         if (stockItem) {
