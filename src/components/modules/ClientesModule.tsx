@@ -454,9 +454,17 @@ const ClientesModule = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2 sm:col-span-2">
+            <div className="space-y-2">
+              <Label>CEP</Label>
+              <Input value={form.zip_code} onChange={(e) => setForm({ ...form, zip_code: e.target.value })} onBlur={handleClientCepBlur} placeholder="00000-000" />
+            </div>
+            <div className="space-y-2">
               <Label>Endereço</Label>
               <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Bairro</Label>
+              <Input value={form.neighborhood} onChange={(e) => setForm({ ...form, neighborhood: e.target.value })} placeholder="Bairro" />
             </div>
             <div className="space-y-2">
               <Label>Cidade</Label>

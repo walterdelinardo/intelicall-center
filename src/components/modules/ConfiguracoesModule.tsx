@@ -311,7 +311,24 @@ const ConfiguracoesModule = () => {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <Label>CEP</Label>
+                    <Input
+                      value={form.zip_code}
+                      onChange={(e) => setForm({ ...form, zip_code: e.target.value })}
+                      onBlur={handleClinicCepBlur}
+                      placeholder="00000-000"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Bairro</Label>
+                    <Input
+                      value={form.neighborhood}
+                      onChange={(e) => setForm({ ...form, neighborhood: e.target.value })}
+                      placeholder="Bairro"
+                    />
+                  </div>
                   <div className="space-y-2">
                     <Label>Cidade</Label>
                     <Input
@@ -327,14 +344,6 @@ const ConfiguracoesModule = () => {
                       onChange={(e) => setForm({ ...form, state: e.target.value })}
                       placeholder="UF"
                       maxLength={2}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>CEP</Label>
-                    <Input
-                      value={form.zip_code}
-                      onChange={(e) => setForm({ ...form, zip_code: e.target.value })}
-                      placeholder="00000-000"
                     />
                   </div>
                 </div>
