@@ -104,6 +104,16 @@ const ClientDetailsDialog = ({ client, open, onOpenChange }: Props) => {
             )}
           </div>
 
+          {((client as any).preferred_professional_name) && (
+            <>
+              <Separator />
+              <div>
+                <p className="text-xs text-muted-foreground">Profissional de Preferência</p>
+                <p className="text-sm font-medium">{(client as any).preferred_professional_name}</p>
+              </div>
+            </>
+          )}
+
           {client.address && (
             <>
               <Separator />

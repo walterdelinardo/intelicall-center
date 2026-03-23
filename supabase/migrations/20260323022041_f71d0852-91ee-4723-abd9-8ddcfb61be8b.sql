@@ -1,0 +1,1 @@
+ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS preferred_professional_id UUID REFERENCES public.profiles(id);

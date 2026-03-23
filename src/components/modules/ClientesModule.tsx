@@ -56,6 +56,7 @@ type SortDir = "asc" | "desc";
 const emptyForm = {
   name: "", phone: "", whatsapp: "", email: "", birth_date: "",
   cpf: "", address: "", address_number: "", address_complement: "", city: "", state: "", zip_code: "", neighborhood: "", notes: "", lead_source: "",
+  preferred_professional_id: "",
 };
 
 const ClientesModule = () => {
@@ -105,6 +106,7 @@ const ClientesModule = () => {
       city: client.city || "", state: client.state || "",
       zip_code: client.zip_code || "", neighborhood: (client as any).neighborhood || "",
       notes: client.notes || "", lead_source: client.lead_source || "",
+      preferred_professional_id: (client as any).preferred_professional_id || "",
     });
     setIsFormOpen(true);
   };
@@ -118,6 +120,19 @@ const ClientesModule = () => {
         .eq("clinic_id", profile.clinic_id).eq("is_active", true);
       if (error) throw error;
       return data as Inbox[];
+    },
+    enabled: !!profile?.clinic_id,
+  });
+
+  const { data: professionals = [] } = useQuery({
+    queryKey: ["professionals", profile?.clinic_id],
+    queryFn: async () => {
+      if (!profile?.clinic_id) return [];
+      const { data, error } = await supabase
+        .from("profiles").select("id, full_name")
+        .eq("clinic_id", profile.clinic_id).eq("is_active", true).order("full_name");
+      if (error) throw error;
+      return data as { id: string; full_name: string }[];
     },
     enabled: !!profile?.clinic_id,
   });
@@ -153,6 +168,7 @@ const ClientesModule = () => {
         zip_code: form.zip_code || null, neighborhood: form.neighborhood || null,
         notes: form.notes || null,
         lead_source: form.lead_source || null,
+        preferred_professional_id: form.preferred_professional_id || null,
       } as any;
       if (editClient) {
         const { error } = await supabase.from("clients").update(payload).eq("id", editClient.id);
@@ -456,6 +472,18 @@ const ClientesModule = () => {
               <Input value={form.cpf} onChange={(e) => setForm({ ...form, cpf: e.target.value })} placeholder="000.000.000-00" />
             </div>
             <div className="space-y-2">
+              <Label>Profissional de Preferência</Label>
+              <Select value={form.preferred_professional_id} onValueChange={(v) => setForm({ ...form, preferred_professional_id: v === "none" ? "" : v })}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum</SelectItem>
+                  {professionals.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label>Origem do Lead</Label>
               <Select value={form.lead_source} onValueChange={(v) => setForm({ ...form, lead_source: v })}>
                 <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
@@ -593,7 +621,14 @@ const ClientesModule = () => {
 
       {/* Details dialog */}
       {selectedClient && (
-        <ClientDetailsDialog client={selectedClient} open={isDetailsOpen} onOpenChange={setIsDetailsOpen} />
+        <ClientDetailsDialog
+          client={{
+            ...selectedClient,
+            preferred_professional_name: professionals.find((p) => p.id === (selectedClient as any).preferred_professional_id)?.full_name || null,
+          } as any}
+          open={isDetailsOpen}
+          onOpenChange={setIsDetailsOpen}
+        />
       )}
 
       {/* Delete confirmation */}
