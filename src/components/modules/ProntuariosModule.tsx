@@ -558,6 +558,7 @@ function ViewRecordInline({ recordId, clinicId, onBack }: {
   const [prescriptionSaved, setPrescriptionSaved] = useState(false);
   const [savingPrescription, setSavingPrescription] = useState(false);
   const [safetyResult, setSafetyResult] = useState<{ safe: boolean; warnings: string[] } | null>(null);
+  const [viewingPrescriptionId, setViewingPrescriptionId] = useState<string | null>(null);
 
   // Editable clinical form state
   const [clinicalForm, setClinicalForm] = useState<any>(null);
