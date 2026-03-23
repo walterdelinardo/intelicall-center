@@ -101,7 +101,8 @@ const ClientesModule = () => {
     setForm({
       name: client.name, phone: client.phone || "", whatsapp: client.whatsapp || "",
       email: client.email || "", birth_date: client.birth_date || "", cpf: client.cpf || "",
-      address: client.address || "", city: client.city || "", state: client.state || "",
+      address: client.address || "", address_number: (client as any).address_number || "", address_complement: (client as any).address_complement || "",
+      city: client.city || "", state: client.state || "",
       zip_code: client.zip_code || "", neighborhood: (client as any).neighborhood || "",
       notes: client.notes || "", lead_source: client.lead_source || "",
     });
