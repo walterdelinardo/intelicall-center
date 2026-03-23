@@ -1720,7 +1720,7 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
       });
       setSaleItems([]);
       setExtraProcedures([]);
-      setInternalMaterials([]);
+      
       setProcedureMaterials([]);
       setInitialized(true);
 
