@@ -380,16 +380,7 @@ const FinanceiroModule = () => {
                     return <Badge variant="outline" className="text-xs">Misto</Badge>;
                   })()}
                 </TableCell>
-                <TableCell>
-                  <div className="flex gap-1">
-                    <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); setEditTx(group.txs[0]); setIsCreateOpen(true); }}>
-                      <Edit className="w-4 h-4 text-primary" />
-                    </Button>
-                    <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); setDeleteTxId(group.txs[0].id); }}>
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
-                  </div>
-                </TableCell>
+                <TableCell />
               </TableRow>,
               // Child rows when expanded
               ...(isOpen ? group.txs.map((tx) => renderTxRow(tx, true)) : []),
