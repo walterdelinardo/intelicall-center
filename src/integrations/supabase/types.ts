@@ -399,6 +399,7 @@ export type Database = {
           neighborhood: string | null
           notes: string | null
           phone: string | null
+          preferred_professional_id: string | null
           state: string | null
           total_visits: number
           updated_at: string
@@ -425,6 +426,7 @@ export type Database = {
           neighborhood?: string | null
           notes?: string | null
           phone?: string | null
+          preferred_professional_id?: string | null
           state?: string | null
           total_visits?: number
           updated_at?: string
@@ -451,6 +453,7 @@ export type Database = {
           neighborhood?: string | null
           notes?: string | null
           phone?: string | null
+          preferred_professional_id?: string | null
           state?: string | null
           total_visits?: number
           updated_at?: string
@@ -464,6 +467,13 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clients_preferred_professional_id_fkey"
+            columns: ["preferred_professional_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {

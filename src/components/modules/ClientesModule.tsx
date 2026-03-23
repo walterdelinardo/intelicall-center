@@ -155,6 +155,7 @@ const ClientesModule = () => {
         zip_code: form.zip_code || null, neighborhood: form.neighborhood || null,
         notes: form.notes || null,
         lead_source: form.lead_source || null,
+        preferred_professional_id: form.preferred_professional_id || null,
       } as any;
       if (editClient) {
         const { error } = await supabase.from("clients").update(payload).eq("id", editClient.id);
