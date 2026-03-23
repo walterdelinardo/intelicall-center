@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.google-calendar-sync]
 verify_jwt = false
+
+[functions.check-prescription-safety]
+verify_jwt = false

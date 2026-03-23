@@ -155,6 +155,93 @@ export type Database = {
           },
         ]
       }
+      assessment_types: {
+        Row: {
+          clinic_id: string
+          created_at: string | null
+          fields: Json
+          id: string
+          is_active: boolean | null
+          name: string
+        }
+        Insert: {
+          clinic_id: string
+          created_at?: string | null
+          fields?: Json
+          id?: string
+          is_active?: boolean | null
+          name: string
+        }
+        Update: {
+          clinic_id?: string
+          created_at?: string | null
+          fields?: Json
+          id?: string
+          is_active?: boolean | null
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessment_types_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assessments: {
+        Row: {
+          assessment_type_id: string
+          clinic_id: string
+          created_at: string | null
+          data: Json
+          id: string
+          professional_id: string
+          record_id: string
+        }
+        Insert: {
+          assessment_type_id: string
+          clinic_id: string
+          created_at?: string | null
+          data?: Json
+          id?: string
+          professional_id: string
+          record_id: string
+        }
+        Update: {
+          assessment_type_id?: string
+          clinic_id?: string
+          created_at?: string | null
+          data?: Json
+          id?: string
+          professional_id?: string
+          record_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assessments_assessment_type_id_fkey"
+            columns: ["assessment_type_id"]
+            isOneToOne: false
+            referencedRelation: "assessment_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessments_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessments_record_id_fkey"
+            columns: ["record_id"]
+            isOneToOne: false
+            referencedRelation: "medical_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       calendar_notifications: {
         Row: {
           account_id: string | null
@@ -943,6 +1030,76 @@ export type Database = {
           },
         ]
       }
+      prescriptions: {
+        Row: {
+          ai_safety_check: string | null
+          appointment_id: string | null
+          clinic_id: string
+          created_at: string
+          id: string
+          observations: string | null
+          orientations: string | null
+          patient_name: string
+          prescription: string | null
+          procedure_name: string | null
+          professional_id: string
+          professional_name: string
+          record_id: string
+        }
+        Insert: {
+          ai_safety_check?: string | null
+          appointment_id?: string | null
+          clinic_id: string
+          created_at?: string
+          id?: string
+          observations?: string | null
+          orientations?: string | null
+          patient_name: string
+          prescription?: string | null
+          procedure_name?: string | null
+          professional_id: string
+          professional_name: string
+          record_id: string
+        }
+        Update: {
+          ai_safety_check?: string | null
+          appointment_id?: string | null
+          clinic_id?: string
+          created_at?: string
+          id?: string
+          observations?: string | null
+          orientations?: string | null
+          patient_name?: string
+          prescription?: string | null
+          procedure_name?: string | null
+          professional_id?: string
+          professional_name?: string
+          record_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prescriptions_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prescriptions_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prescriptions_record_id_fkey"
+            columns: ["record_id"]
+            isOneToOne: false
+            referencedRelation: "medical_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       procedure_materials: {
         Row: {
           clinic_id: string
@@ -1066,6 +1223,60 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      record_audit_log: {
+        Row: {
+          action: string
+          clinic_id: string
+          created_at: string | null
+          details: Json | null
+          id: string
+          record_id: string
+          summary: string
+          tab: string
+          user_id: string
+          user_name: string
+        }
+        Insert: {
+          action: string
+          clinic_id: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          record_id: string
+          summary: string
+          tab: string
+          user_id: string
+          user_name: string
+        }
+        Update: {
+          action?: string
+          clinic_id?: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          record_id?: string
+          summary?: string
+          tab?: string
+          user_id?: string
+          user_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "record_audit_log_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "record_audit_log_record_id_fkey"
+            columns: ["record_id"]
+            isOneToOne: false
+            referencedRelation: "medical_records"
             referencedColumns: ["id"]
           },
         ]
