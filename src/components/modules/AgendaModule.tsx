@@ -1665,11 +1665,10 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
   const [showItemPicker, setShowItemPicker] = useState(false);
   const [showProcPicker, setShowProcPicker] = useState(false);
 
-  // Procedure materials & internal materials state
+  // Procedure materials state (includes auto-loaded + manually added extras)
   const [procedureMaterials, setProcedureMaterials] = useState<MaterialItem[]>([]);
-  const [internalMaterials, setInternalMaterials] = useState<MaterialItem[]>([]);
-  const [showInternalPicker, setShowInternalPicker] = useState(false);
-  const [internalSearch, setInternalSearch] = useState("");
+  const [showMaterialPicker, setShowMaterialPicker] = useState(false);
+  const [materialSearch, setMaterialSearch] = useState("");
 
   // Fetch stock items
   const { data: stockItems = [] } = useQuery({
