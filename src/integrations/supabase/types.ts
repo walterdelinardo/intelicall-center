@@ -394,6 +394,7 @@ export type Database = {
           last_visit_at: string | null
           lead_source: string | null
           name: string
+          neighborhood: string | null
           notes: string | null
           phone: string | null
           state: string | null
@@ -417,6 +418,7 @@ export type Database = {
           last_visit_at?: string | null
           lead_source?: string | null
           name: string
+          neighborhood?: string | null
           notes?: string | null
           phone?: string | null
           state?: string | null
@@ -440,6 +442,7 @@ export type Database = {
           last_visit_at?: string | null
           lead_source?: string | null
           name?: string
+          neighborhood?: string | null
           notes?: string | null
           phone?: string | null
           state?: string | null
@@ -479,6 +482,7 @@ export type Database = {
           location_url: string | null
           logo_url: string | null
           name: string
+          neighborhood: string | null
           phone: string | null
           state: string | null
           theme_color: string | null
@@ -498,6 +502,7 @@ export type Database = {
           location_url?: string | null
           logo_url?: string | null
           name: string
+          neighborhood?: string | null
           phone?: string | null
           state?: string | null
           theme_color?: string | null
@@ -517,6 +522,7 @@ export type Database = {
           location_url?: string | null
           logo_url?: string | null
           name?: string
+          neighborhood?: string | null
           phone?: string | null
           state?: string | null
           theme_color?: string | null
