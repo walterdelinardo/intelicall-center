@@ -1,37 +1,12 @@
 
 
-## Adicionar Número e Complemento em Clínica e Clientes + Reorganizar campos
+## Remover migração desnecessária
 
-### Migração SQL
-Adicionar colunas em ambas as tabelas:
-```sql
-ALTER TABLE public.clinics ADD COLUMN IF NOT EXISTS address_number TEXT;
-ALTER TABLE public.clinics ADD COLUMN IF NOT EXISTS address_complement TEXT;
-ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS address_number TEXT;
-ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS address_complement TEXT;
-```
+A migração `20260323022604_38c6f835-8d65-4f51-862d-f44ef32a205a.sql` adiciona `'podologo'` ao enum `app_role`, mas esse valor já existe no banco. O código em `ClientesModule.tsx` que filtra profissionais pelo role `'podologo'` já está correto e funcional.
 
-### ConfiguracoesModule.tsx
-1. Adicionar `address_number` e `address_complement` ao estado `form` e ao `useEffect` de carregamento
-2. Incluir no `updateClinicMutation`
-3. Reorganizar layout de endereço:
-   - Linha 1: CEP (1 col, onBlur ViaCEP)
-   - Linha 2: Logradouro (2 cols) | Numero (1 col) | Complemento (1 col)
-   - Linha 3: Bairro (1 col) | Cidade (1 col) | Estado (1 col)
-4. Alterar placeholder do Logradouro de "Rua, número, complemento" para "Logradouro"
+### Ação necessária
 
-### ClientesModule.tsx
-1. Adicionar `address_number` e `address_complement` ao `emptyForm`
-2. Incluir no `openEdit` e no `saveMutation`
-3. Adicionar campos Número e Complemento no formulário, após Endereço
-4. Reorganizar campos: CEP → Endereço → Número → Complemento → Bairro → Cidade → Estado
+1. **Remover o arquivo de migração** `supabase/migrations/20260323022604_38c6f835-8d65-4f51-862d-f44ef32a205a.sql` — ele é redundante pois o role `podologo` já existe no enum `app_role`.
 
-### ClientDetailsDialog.tsx
-- Incluir número e complemento no endereço formatado
-
-### Arquivos afetados
-- Nova migração SQL
-- `src/components/modules/ConfiguracoesModule.tsx`
-- `src/components/modules/ClientesModule.tsx`
-- `src/components/modules/clients/ClientDetailsDialog.tsx`
+Nenhuma alteração de código é necessária — a lógica de filtragem por `role = 'podologo'` já está implementada corretamente.
 
