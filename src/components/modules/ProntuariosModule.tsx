@@ -563,6 +563,8 @@ function ViewRecordInline({ recordId, clinicId, onBack, onEdit }: {
 }) {
   const queryClient = useQueryClient();
   const [expandedEvent, setExpandedEvent] = useState<string | null>(null);
+  const [prescriptionForAppt, setPrescriptionForAppt] = useState<string | null>(null);
+  const [prescriptionData, setPrescriptionData] = useState({ prescription: "", orientations: "", observations: "" });
 
   const { data: record } = useQuery({
     queryKey: ["medical-record", recordId],
