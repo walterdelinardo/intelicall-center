@@ -1,24 +1,31 @@
 
 
-## Corrigir Layout do Módulo Conversas — 2 Colunas
+## Migrar funcionalidades WhatsApp para ConfiguracoesModule
 
 ### Problema
-O layout usa `lg:grid-cols-[...]` (breakpoint 1024px), mas a viewport do dashboard é ~888px, então cai no layout de 1 coluna e empilha o chat abaixo da lista.
+As funcionalidades de QR Code, status online/offline e monitor de quedas foram adicionadas ao `SettingsTab.tsx`, mas o dashboard usa `ConfiguracoesModule.tsx` na aba Integrações. Os recursos nunca aparecem para o usuário.
 
 ### Solução
 
-**Arquivo: `src/components/dashboard/ChatTab.tsx`** (linha 133)
+**Arquivo: `src/components/modules/ConfiguracoesModule.tsx`**
 
-Trocar `lg:grid-cols-[minmax(320px,420px)_1fr]` por `md:grid-cols-[minmax(300px,380px)_1fr]` para ativar 2 colunas a partir de 768px. Em mobile (<768px), mantém coluna única.
+1. **Adicionar imports**: `QrCode`, `Wifi`, `WifiOff`, `Activity` icons + `Dialog/DialogContent/DialogHeader/DialogTitle`
 
-Alterar de:
-```
-grid grid-cols-1 lg:grid-cols-[minmax(320px,420px)_1fr]
-```
-Para:
-```
-grid grid-cols-1 md:grid-cols-[minmax(300px,380px)_1fr]
-```
+2. **Adicionar estados**: `qrDialogOpen`, `qrData`, `qrLoading`, `qrInstanceLabel`, `statuses` (Record de status por inbox), `downtimeLogs`, `loadingLogs`
 
-Reduzir ligeiramente o tamanho máximo da lista (380px em vez de 420px) para dar mais espaço ao chat na viewport de ~888px.
+3. **Adicionar lógica**: `checkInstanceStatus`, `fetchDowntimeLogs`, `handleGenerateQR` — mesma lógica já presente no `SettingsTab.tsx`
+
+4. **Na tabela de instâncias** (linhas ~509-603):
+   - Adicionar coluna "Conexão" com badge Online/Offline baseado no status da Evolution API
+   - Adicionar botão de QR Code e botão de verificar status nas ações de cada instância
+
+5. **Após o card de instâncias** (após linha ~690):
+   - Adicionar card "Monitor de Disponibilidade" com tabela de downtime logs (instância, início da queda, retorno, tempo fora)
+
+6. **Adicionar Dialog de QR Code** ao final do componente
+
+7. **Polling**: verificar status a cada 30s e ao montar o componente
+
+### Observação
+O `SettingsTab.tsx` pode ser mantido como está ou limpo posteriormente — a prioridade é que as funcionalidades apareçam no módulo correto.
 
