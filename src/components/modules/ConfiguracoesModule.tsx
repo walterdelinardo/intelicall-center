@@ -653,12 +653,31 @@ const ConfiguracoesModule = () => {
                               </Select>
                             </TableCell>
                             <TableCell>
+                              {getStatusBadge(inbox.id, inbox.is_active)}
+                            </TableCell>
+                            <TableCell>
                               <Badge variant={inbox.is_active ? "default" : "secondary"}>
                                 {inbox.is_active ? "Ativo" : "Inativo"}
                               </Badge>
                             </TableCell>
                             <TableCell>
                               <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleGenerateQR(inbox.instance_name, inbox.label)}
+                                  title="Gerar QR Code"
+                                >
+                                  <QrCode className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => checkInstanceStatus(inbox.instance_name, inbox.id)}
+                                  title="Verificar status"
+                                >
+                                  <Activity className="w-4 h-4" />
+                                </Button>
                                 <Button
                                   variant="ghost"
                                   size="icon"
