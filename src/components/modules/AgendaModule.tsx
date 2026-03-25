@@ -114,6 +114,9 @@ const AgendaModule = () => {
     procedureName: "", procedureValue: "", procedure_id: "",
   });
   const [editLoading, setEditLoading] = useState(false);
+  const [isEditNewClient, setIsEditNewClient] = useState(false);
+  const [editClientSearchOpen, setEditClientSearchOpen] = useState(false);
+  const [editClientSearch, setEditClientSearch] = useState("");
 
   // Billing state
   const [isBillingOpen, setIsBillingOpen] = useState(false);
