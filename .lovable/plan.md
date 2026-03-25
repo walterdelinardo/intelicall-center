@@ -1,44 +1,34 @@
 
 
-## Corrigir nome do contato nas conversas do WhatsApp
+## Corrigir erro 401 na Edge Function send-evolution-message
 
 ### Problema
-Na Edge Function `evolution-webhook`, o campo `contact_name` da conversa é atualizado em **todas** as mensagens, inclusive as enviadas (`isFromMe=true`). Quando a clínica envia uma mensagem, o `pushName` do payload é o nome do próprio remetente (a clínica), sobrescrevendo o nome real do cliente com algo como "Você" ou o nome da empresa.
+A função usa `supabase.auth.getClaims(token)` que **não existe** no SDK `@supabase/supabase-js@2.39.3`. O método sempre falha, retornando erro, e a função responde 401.
 
 ### Solução
 
-**Arquivo: `supabase/functions/evolution-webhook/index.ts`**
+**Arquivo: `supabase/functions/send-evolution-message/index.ts`**
 
-1. **Só atualizar `contact_name` em mensagens recebidas** (linhas 551-554): Condicionar a inclusão de `contact_name` no update da conversa apenas quando `isFromMe === false` e `contactName` não estiver vazio.
+Substituir `getClaims` por `supabase.auth.getUser(token)`, que é o método correto do SDK v2 para validar um JWT passando o token como argumento:
 
-2. **Ao criar conversa nova com mensagem enviada**, usar `contactPhone` como fallback em vez do pushName da clínica.
-
-Lógica proposta:
 ```typescript
-const conversationUpdate: Record<string, any> = {
-  contact_phone: contactPhone,
-  is_group: isGroup,
-  last_message: lastMessagePreview,
-  last_message_at: new Date().toISOString(),
-  status: "active",
-};
+// ANTES (incorreto - método não existe)
+const token = authHeader.replace('Bearer ', '');
+const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+if (claimsError || !claimsData?.claims) { ... }
+const userId = claimsData.claims.sub as string;
 
-// Só atualizar contact_name com pushName de mensagens recebidas (do cliente)
-if (!isFromMe && contactName) {
-  conversationUpdate.contact_name = contactName;
-} else if (!isFromMe) {
-  conversationUpdate.contact_name = contactPhone;
+// DEPOIS (correto)
+const token = authHeader.replace('Bearer ', '');
+const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+if (userError || !user) {
+  console.error('Auth error:', userError);
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  });
 }
-
-const conv = await findOrCreateConversation(
-  supabase, clinicId, inboxId, remoteJid, conversationUpdate
-);
+const userId = user.id;
 ```
 
-3. **No `findOrCreateConversation`**, ao criar conversa nova (INSERT), garantir que `contact_name` tenha pelo menos o `contactPhone` como valor padrão, já que o campo precisa existir na criação.
-
-### Resultado
-- Mensagens enviadas pela clínica não sobrescrevem mais o nome do cliente
-- Novos contatos recebem o pushName do WhatsApp corretamente
-- Se a primeira interação for uma mensagem enviada, o contato aparece com o número até receber uma mensagem do cliente com pushName
+A diferença chave: `getUser(token)` aceita o token como parâmetro, validando-o diretamente sem depender da sessão do cliente.
 
