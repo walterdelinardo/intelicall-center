@@ -130,7 +130,7 @@ const ChatTab = () => {
 
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[minmax(320px,420px)_1fr] gap-4 h-[calc(100vh-120px)] min-w-0 min-h-0">
+    <div className="<div className="grid grid-cols-1 md:grid-cols-[minmax(300px,380px)_1fr] gap-4 h-[calc(100vh-120px)] min-w-0 min-h-0"> gap-4 h-[calc(100vh-120px)] min-w-0 min-h-0">
       <Card className="flex flex-col shadow-card min-w-0 min-h-0 overflow-hidden">
         <div className="p-3 border-b space-y-2">
           <div className="flex items-center justify-between">
