@@ -1148,6 +1148,44 @@ const ConfiguracoesModule = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* QR Code Dialog */}
+      <Dialog open={qrDialogOpen} onOpenChange={setQrDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <QrCode className="w-5 h-5" />
+              QR Code — {qrInstanceLabel}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col items-center justify-center py-4">
+            {qrLoading ? (
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                <p className="text-sm text-muted-foreground">Gerando QR Code...</p>
+              </div>
+            ) : qrData ? (
+              <div className="flex flex-col items-center gap-3">
+                <img
+                  src={qrData.startsWith("data:") ? qrData : `data:image/png;base64,${qrData}`}
+                  alt="QR Code"
+                  className="w-64 h-64 rounded-lg border"
+                />
+                <p className="text-sm text-muted-foreground text-center">
+                  Abra o WhatsApp no seu celular, vá em Aparelhos Conectados e escaneie este QR Code.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-3 py-6">
+                <Wifi className="w-10 h-10 text-emerald-500" />
+                <p className="text-sm text-muted-foreground text-center">
+                  A instância já está conectada ou não retornou um QR Code.
+                </p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
