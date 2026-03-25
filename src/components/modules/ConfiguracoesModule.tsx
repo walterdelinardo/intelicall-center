@@ -804,7 +804,48 @@ const ConfiguracoesModule = () => {
             </CardContent>
           </Card>
 
-          {/* Google Calendar Section */}
+          {/* Monitor de Disponibilidade */}
+          <Card className="shadow-card mt-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="w-5 h-5 text-primary" />
+                Monitor de Disponibilidade
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingLogs ? (
+                <p className="text-sm text-muted-foreground">Carregando...</p>
+              ) : downtimeLogs.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhuma queda registrada.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Instância</TableHead>
+                      <TableHead>Início da Queda</TableHead>
+                      <TableHead>Retorno</TableHead>
+                      <TableHead>Tempo Fora</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {downtimeLogs.map((log) => (
+                      <TableRow key={log.id}>
+                        <TableCell className="font-mono text-xs">{log.instance_name}</TableCell>
+                        <TableCell className="text-sm">{new Date(log.down_at).toLocaleString("pt-BR")}</TableCell>
+                        <TableCell className="text-sm">
+                          {log.up_at ? new Date(log.up_at).toLocaleString("pt-BR") : <Badge variant="destructive">Ainda fora</Badge>}
+                        </TableCell>
+                        <TableCell className="text-sm font-medium">
+                          {log.duration_seconds ? formatDuration(log.duration_seconds) : <span className="text-destructive">Em andamento</span>}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
           <Card className="shadow-card mt-6">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
