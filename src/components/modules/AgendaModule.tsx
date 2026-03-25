@@ -761,7 +761,7 @@ const AgendaModule = () => {
     setEditClientSearchOpen(false);
   };
 
-
+  const renderEventCard = (evt: MergedEvent) => {
     if (evt.type === 'google') {
       const ep = evt.extendedProperties;
       return (
