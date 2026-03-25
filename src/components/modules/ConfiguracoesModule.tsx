@@ -607,8 +607,9 @@ const ConfiguracoesModule = () => {
                           <TableHead>Instância</TableHead>
                           <TableHead>Telefone</TableHead>
                           <TableHead>Agenda</TableHead>
+                         <TableHead>Conexão</TableHead>
                           <TableHead>Status</TableHead>
-                          <TableHead className="w-[80px]">Ações</TableHead>
+                          <TableHead className="w-[120px]">Ações</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
