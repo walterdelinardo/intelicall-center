@@ -379,8 +379,14 @@ async function findOrCreateConversation(
     return updated;
   }
 
+  // Ensure contact_name has a fallback when creating a new conversation
+  const insertData = { clinic_id: clinicId, inbox_id: inboxId, remote_jid: remoteJid, ...updateData };
+  if (!insertData.contact_name) {
+    insertData.contact_name = insertData.contact_phone || remoteJid.replace("@s.whatsapp.net", "").replace("@g.us", "");
+  }
+
   const { data: created, error } = await supabase.from("whatsapp_conversations")
-    .insert({ clinic_id: clinicId, inbox_id: inboxId, remote_jid: remoteJid, ...updateData })
+    .insert(insertData)
     .select("id, unread_count").single();
   if (error) throw error;
   return created;
@@ -548,10 +554,23 @@ serve(async (req) => {
       };
       const lastMessagePreview = messageType === "text" ? content : (previewMap[messageType] || content || "[Sem conteúdo]");
 
-      const conv = await findOrCreateConversation(supabase, clinicId, inboxId, remoteJid, {
-        contact_name: displayName, contact_phone: contactPhone, is_group: isGroup,
-        last_message: lastMessagePreview, last_message_at: new Date().toISOString(), status: "active",
-      });
+      const conversationUpdate: Record<string, any> = {
+        contact_phone: contactPhone,
+        is_group: isGroup,
+        last_message: lastMessagePreview,
+        last_message_at: new Date().toISOString(),
+        status: "active",
+      };
+
+      // Only update contact_name from incoming messages (the client's pushName)
+      if (!isFromMe && contactName) {
+        conversationUpdate.contact_name = contactName;
+      } else if (!isFromMe) {
+        conversationUpdate.contact_name = contactPhone;
+      }
+      // When isFromMe, don't touch contact_name — preserve the client's real name
+
+      const conv = await findOrCreateConversation(supabase, clinicId, inboxId, remoteJid, conversationUpdate);
 
       const timestamp = messageTimestamp ? new Date(messageTimestamp * 1000).toISOString() : new Date().toISOString();
 
