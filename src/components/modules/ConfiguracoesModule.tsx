@@ -67,6 +67,100 @@ const ConfiguracoesModule = () => {
   const [editLabelValue, setEditLabelValue] = useState("");
   const [showGoogleConfig, setShowGoogleConfig] = useState(false);
   const [showMapsConfig, setShowMapsConfig] = useState(false);
+
+  // Instance status & QR Code states
+  const [qrDialogOpen, setQrDialogOpen] = useState(false);
+  const [qrData, setQrData] = useState<string | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrInstanceLabel, setQrInstanceLabel] = useState("");
+  const [statuses, setStatuses] = useState<Record<string, { state: string; loading: boolean }>>({});
+  const [downtimeLogs, setDowntimeLogs] = useState<Array<{ id: string; instance_name: string; down_at: string; up_at: string | null; duration_seconds: number | null }>>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+
+  const checkInstanceStatus = useCallback(async (instanceName: string, inboxId: string) => {
+    setStatuses(prev => ({ ...prev, [inboxId]: { state: prev[inboxId]?.state || "unknown", loading: true } }));
+    try {
+      const { data, error } = await supabase.functions.invoke("evolution-instance-status", {
+        body: { action: "status", instanceName },
+      });
+      if (error) throw error;
+      setStatuses(prev => ({ ...prev, [inboxId]: { state: data?.state || "unknown", loading: false } }));
+    } catch {
+      setStatuses(prev => ({ ...prev, [inboxId]: { state: "error", loading: false } }));
+    }
+  }, []);
+
+  const fetchDowntimeLogs = useCallback(async () => {
+    if (!profile?.clinic_id) return;
+    setLoadingLogs(true);
+    try {
+      const { data } = await supabase
+        .from("instance_downtime_logs" as any)
+        .select("*")
+        .eq("clinic_id", profile.clinic_id)
+        .order("down_at", { ascending: false })
+        .limit(20);
+      setDowntimeLogs((data as any) || []);
+    } catch { /* ignore */ } finally {
+      setLoadingLogs(false);
+    }
+  }, [profile?.clinic_id]);
+
+  const handleGenerateQR = async (instanceName: string, label: string) => {
+    setQrInstanceLabel(label);
+    setQrDialogOpen(true);
+    setQrLoading(true);
+    setQrData(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("evolution-instance-status", {
+        body: { action: "qrcode", instanceName },
+      });
+      if (error) throw error;
+      const base64 = data?.base64 || data?.qrcode?.base64 || null;
+      setQrData(base64);
+      if (!base64) toast.info("A instância já está conectada ou não retornou QR Code.");
+    } catch (err: any) {
+      toast.error("Erro ao gerar QR Code: " + err.message);
+    } finally {
+      setQrLoading(false);
+    }
+  };
+
+  const getStatusBadge = (inboxId: string, isActive: boolean) => {
+    if (!isActive) return <Badge variant="secondary">Inativo</Badge>;
+    const status = statuses[inboxId];
+    if (!status || status.loading) return <Badge variant="outline" className="animate-pulse">Verificando...</Badge>;
+    if (status.state === "open") return <Badge className="bg-emerald-500/15 text-emerald-600 border-emerald-200"><Wifi className="w-3 h-3 mr-1" />Online</Badge>;
+    if (status.state === "close" || status.state === "connecting") return <Badge variant="destructive"><WifiOff className="w-3 h-3 mr-1" />Offline</Badge>;
+    return <Badge variant="secondary">Desconhecido</Badge>;
+  };
+
+  const formatDuration = (seconds: number) => {
+    if (seconds < 60) return `${seconds}s`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}min ${seconds % 60}s`;
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    return `${h}h ${m}min`;
+  };
+
+  // Check statuses on mount & poll every 30s
+  useEffect(() => {
+    if (inboxes.length > 0) {
+      inboxes.forEach(inbox => checkInstanceStatus(inbox.instance_name, inbox.id));
+    }
+  }, [inboxes.length]);
+
+  useEffect(() => {
+    fetchDowntimeLogs();
+  }, [fetchDowntimeLogs]);
+
+  useEffect(() => {
+    if (inboxes.length === 0) return;
+    const interval = setInterval(() => {
+      inboxes.forEach(inbox => checkInstanceStatus(inbox.instance_name, inbox.id));
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [inboxes]);
   const { data: clinic, isLoading } = useQuery({
     queryKey: ["clinic", profile?.clinic_id],
     queryFn: async () => {
