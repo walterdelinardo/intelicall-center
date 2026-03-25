@@ -379,8 +379,14 @@ async function findOrCreateConversation(
     return updated;
   }
 
+  // Ensure contact_name has a fallback when creating a new conversation
+  const insertData = { clinic_id: clinicId, inbox_id: inboxId, remote_jid: remoteJid, ...updateData };
+  if (!insertData.contact_name) {
+    insertData.contact_name = insertData.contact_phone || remoteJid.replace("@s.whatsapp.net", "").replace("@g.us", "");
+  }
+
   const { data: created, error } = await supabase.from("whatsapp_conversations")
-    .insert({ clinic_id: clinicId, inbox_id: inboxId, remote_jid: remoteJid, ...updateData })
+    .insert(insertData)
     .select("id, unread_count").single();
   if (error) throw error;
   return created;
