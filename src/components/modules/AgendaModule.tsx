@@ -1439,40 +1439,156 @@ const AgendaModule = () => {
                     </Select>
                   </div>
 
-                  {/* Client fields — no origin field in edit */}
-                  <div className="space-y-2 p-3 border rounded-lg bg-muted/30">
-                    <p className="text-xs font-medium text-muted-foreground mb-2">Dados do Cliente</p>
-                    <div className="space-y-1">
-                      <Label className="text-xs flex items-center gap-1"><User className="w-3 h-3" /> Nome</Label>
-                      <Input
-                        value={editForm.clientName}
-                        onChange={(e) => setEditForm({ ...editForm, clientName: e.target.value })}
-                        className="h-8 text-sm"
-                        placeholder="Nome do cliente"
-                        disabled={isDisabled}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs flex items-center gap-1"><Phone className="w-3 h-3" /> WhatsApp</Label>
-                      <Input
-                        value={editForm.clientWhatsapp}
-                        onChange={(e) => setEditForm({ ...editForm, clientWhatsapp: e.target.value })}
-                        className="h-8 text-sm"
-                        placeholder="5511999999999"
-                        disabled={isDisabled}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs flex items-center gap-1"><Mail className="w-3 h-3" /> Email</Label>
-                      <Input
-                        value={editForm.clientEmail}
-                        onChange={(e) => setEditForm({ ...editForm, clientEmail: e.target.value })}
-                        className="h-8 text-sm"
-                        placeholder="email@exemplo.com"
-                        type="email"
-                        disabled={isDisabled}
-                      />
-                    </div>
+                  {/* Cliente — with search toggle like create form */}
+                  <div className="space-y-2">
+                    <Label className="flex items-center justify-between">
+                      <span>Cliente</span>
+                      {!isDisabled && (
+                        <span className="inline-flex">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-auto py-0.5 px-2 text-xs gap-1"
+                            onClick={() => {
+                              setIsEditNewClient(!isEditNewClient);
+                              if (!isEditNewClient) setEditForm({ ...editForm, clientName: '', clientWhatsapp: '', clientEmail: '', clientOrigin: '' });
+                            }}
+                          >
+                            {isEditNewClient ? <><Search className="w-3 h-3" /> Buscar existente</> : <><UserPlus className="w-3 h-3" /> Novo cliente</>}
+                          </Button>
+                        </span>
+                      )}
+                    </Label>
+
+                    {isEditNewClient && !isDisabled ? (
+                      <div className="space-y-2 p-3 border rounded-lg bg-muted/30">
+                        <div className="space-y-1">
+                          <Label className="text-xs flex items-center gap-1"><User className="w-3 h-3" /> Nome *</Label>
+                          <Input
+                            value={editForm.clientName}
+                            onChange={(e) => setEditForm({ ...editForm, clientName: e.target.value })}
+                            placeholder="Nome do cliente"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs flex items-center gap-1"><Phone className="w-3 h-3" /> WhatsApp</Label>
+                          <Input
+                            value={editForm.clientWhatsapp}
+                            onChange={(e) => setEditForm({ ...editForm, clientWhatsapp: e.target.value })}
+                            placeholder="5511999999999"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs flex items-center gap-1"><Mail className="w-3 h-3" /> Email</Label>
+                          <Input
+                            value={editForm.clientEmail}
+                            onChange={(e) => setEditForm({ ...editForm, clientEmail: e.target.value })}
+                            placeholder="email@exemplo.com"
+                            type="email"
+                          />
+                        </div>
+                      </div>
+                    ) : !isEditNewClient && !isDisabled ? (
+                      <>
+                        <Popover open={editClientSearchOpen} onOpenChange={setEditClientSearchOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="w-full justify-start text-left font-normal"
+                            >
+                              <Search className="w-4 h-4 mr-2 text-muted-foreground" />
+                              {editForm.clientName || "Buscar cliente..."}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[320px] p-0" align="start">
+                            <Command shouldFilter={false}>
+                              <CommandInput
+                                placeholder="Buscar por nome ou WhatsApp..."
+                                value={editClientSearch}
+                                onValueChange={setEditClientSearch}
+                              />
+                              <CommandList>
+                                <CommandEmpty>Nenhum cliente encontrado</CommandEmpty>
+                                <CommandGroup heading="Clientes">
+                                  {filteredEditSearchClients.map((c, i) => (
+                                    <CommandItem
+                                      key={`edit-${c.type}-${c.id || c.whatsapp}-${i}`}
+                                      onSelect={() => {
+                                        if (c.type === 'local') {
+                                          const localClient = clients.find(cl => cl.id === c.id);
+                                          if (localClient) handleEditSelectLocalClient(localClient);
+                                        } else {
+                                          const extClient = externalClients.find(ec => ec.whatsapp === c.whatsapp);
+                                          if (extClient) handleEditSelectExternalClient(extClient);
+                                        }
+                                      }}
+                                      className="flex flex-col items-start"
+                                    >
+                                      <span className="font-medium">{c.name}</span>
+                                      <span className="text-xs text-muted-foreground">
+                                        {c.whatsapp}{c.email ? ` • ${c.email}` : ''}
+                                        {c.type === 'local' ? ' (cadastrado)' : ''}
+                                      </span>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+
+                        {/* Show selected client details (editable) */}
+                        {editForm.clientName && (
+                          <div className="space-y-2 p-3 border rounded-lg bg-muted/30">
+                            <div className="space-y-1">
+                              <Label className="text-xs flex items-center gap-1"><User className="w-3 h-3" /> Nome</Label>
+                              <Input
+                                value={editForm.clientName}
+                                onChange={(e) => setEditForm({ ...editForm, clientName: e.target.value })}
+                                className="h-8 text-sm"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs flex items-center gap-1"><Phone className="w-3 h-3" /> WhatsApp</Label>
+                              <Input
+                                value={editForm.clientWhatsapp}
+                                onChange={(e) => setEditForm({ ...editForm, clientWhatsapp: e.target.value })}
+                                className="h-8 text-sm"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs flex items-center gap-1"><Mail className="w-3 h-3" /> Email</Label>
+                              <Input
+                                value={editForm.clientEmail}
+                                onChange={(e) => setEditForm({ ...editForm, clientEmail: e.target.value })}
+                                className="h-8 text-sm"
+                                type="email"
+                                placeholder="email@exemplo.com"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      /* Read-only mode */
+                      <div className="space-y-2 p-3 border rounded-lg bg-muted/30">
+                        <p className="text-xs font-medium text-muted-foreground mb-2">Dados do Cliente</p>
+                        <div className="space-y-1">
+                          <Label className="text-xs flex items-center gap-1"><User className="w-3 h-3" /> Nome</Label>
+                          <Input value={editForm.clientName} className="h-8 text-sm" disabled />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs flex items-center gap-1"><Phone className="w-3 h-3" /> WhatsApp</Label>
+                          <Input value={editForm.clientWhatsapp} className="h-8 text-sm" disabled />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs flex items-center gap-1"><Mail className="w-3 h-3" /> Email</Label>
+                          <Input value={editForm.clientEmail} className="h-8 text-sm" disabled />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Título (auto) */}
