@@ -721,7 +721,47 @@ const AgendaModule = () => {
     return [...localResults.slice(0, 15), ...extResults];
   }, [clients, externalClients, clientSearch]);
 
-  const renderEventCard = (evt: MergedEvent) => {
+  // Filtered clients for edit search
+  const filteredEditSearchClients = useMemo(() => {
+    const q = (editClientSearch || '').toLowerCase();
+    const localResults = clients
+      .filter(c => !q || c.name.toLowerCase().includes(q) || c.whatsapp?.includes(q) || c.email?.toLowerCase().includes(q))
+      .map(c => ({ type: 'local' as const, id: c.id, name: c.name, whatsapp: c.whatsapp || c.phone || '', email: c.email || '' }));
+    const localWhatsapps = new Set(localResults.map(c => c.whatsapp).filter(Boolean));
+    const extResults = externalClients
+      .filter(c => {
+        const name = c.nome || c.nome_wpp || '';
+        return (!q || name.toLowerCase().includes(q) || c.whatsapp?.includes(q)) && !localWhatsapps.has(c.whatsapp || '');
+      })
+      .slice(0, 15)
+      .map(c => ({ type: 'external' as const, id: '', name: c.nome || c.nome_wpp || c.whatsapp || '', whatsapp: c.whatsapp || '', email: c.email || '' }));
+    return [...localResults.slice(0, 15), ...extResults];
+  }, [clients, externalClients, editClientSearch]);
+
+  const handleEditSelectLocalClient = (client: typeof clients[0]) => {
+    setEditForm({
+      ...editForm,
+      clientName: client.name,
+      clientWhatsapp: client.whatsapp || client.phone || '',
+      clientEmail: client.email || '',
+    });
+    setIsEditNewClient(false);
+    setEditClientSearchOpen(false);
+  };
+
+  const handleEditSelectExternalClient = (client: typeof externalClients[0]) => {
+    const displayName = client.nome || client.nome_wpp || client.whatsapp || '';
+    setEditForm({
+      ...editForm,
+      clientName: displayName,
+      clientWhatsapp: client.whatsapp || '',
+      clientEmail: client.email || '',
+    });
+    setIsEditNewClient(false);
+    setEditClientSearchOpen(false);
+  };
+
+
     if (evt.type === 'google') {
       const ep = evt.extendedProperties;
       return (
