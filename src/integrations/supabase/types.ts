@@ -911,6 +911,54 @@ export type Database = {
         }
         Relationships: []
       }
+      instance_downtime_logs: {
+        Row: {
+          clinic_id: string
+          created_at: string
+          down_at: string
+          duration_seconds: number | null
+          id: string
+          inbox_id: string
+          instance_name: string
+          up_at: string | null
+        }
+        Insert: {
+          clinic_id: string
+          created_at?: string
+          down_at?: string
+          duration_seconds?: number | null
+          id?: string
+          inbox_id: string
+          instance_name: string
+          up_at?: string | null
+        }
+        Update: {
+          clinic_id?: string
+          created_at?: string
+          down_at?: string
+          duration_seconds?: number | null
+          id?: string
+          inbox_id?: string
+          instance_name?: string
+          up_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instance_downtime_logs_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instance_downtime_logs_inbox_id_fkey"
+            columns: ["inbox_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_inboxes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leads: {
         Row: {
           assigned_to: string | null
