@@ -41,6 +41,7 @@ const TelegramNotificationsTab = () => {
   const [notifications, setNotifications] = useState<TelegramNotification[]>([]);
   const [bots, setBots] = useState<Record<string, TelegramBotInfo>>({});
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!profile?.clinic_id) return;
@@ -127,6 +128,39 @@ const TelegramNotificationsTab = () => {
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
     } catch {
       console.error("Error marking all as read");
+    }
+  };
+
+  const handleSyncGroup = async () => {
+    if (!profile?.clinic_id) return;
+    setSyncing(true);
+    try {
+      // Fetch bots with receive messages enabled
+      const { data: botsList } = await supabase
+        .from("telegram_bots" as any)
+        .select("id")
+        .eq("clinic_id", profile.clinic_id)
+        .eq("is_active", true);
+
+      if (!botsList || botsList.length === 0) {
+        toast.error("Nenhum bot ativo encontrado");
+        return;
+      }
+
+      let totalSynced = 0;
+      for (const bot of botsList as any[]) {
+        const { data } = await supabase.functions.invoke("telegram-sync", {
+          body: { botId: bot.id },
+        });
+        if (data?.ok) totalSynced += data.synced || 0;
+      }
+
+      toast.success(`Sincronizado! ${totalSynced} nova(s) mensagem(ns)`);
+      fetchData();
+    } catch (err: any) {
+      toast.error("Erro ao sincronizar: " + err.message);
+    } finally {
+      setSyncing(false);
     }
   };
 
