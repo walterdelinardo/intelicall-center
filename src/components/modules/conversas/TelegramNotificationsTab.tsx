@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Bot, Check, CheckCheck, MessageSquare, PackageCheck, BarChart3,
+  Bot, CheckCheck, MessageSquare, PackageCheck, BarChart3,
   RefreshCw, Download, Loader2, CircleCheck, CircleDashed,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
