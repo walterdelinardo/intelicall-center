@@ -138,10 +138,42 @@ const TelegramBotsSection = () => {
         .eq("id", id);
       if (error) throw error;
       toast.success("Webhook atualizado");
+      // Show cURL panel when enabling financial or stock webhook
+      if (!currentValue && (field === "webhook_financial_reports" || field === "webhook_stock_alerts")) {
+        setCurlBotId(id);
+      }
       fetchBots();
     } catch (err: any) {
       toast.error("Erro: " + err.message);
     }
+  };
+
+  const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+  const baseUrl = `https://${projectId}.supabase.co/functions/v1/telegram-webhook`;
+
+  const getFinancialCurl = () => `curl -X POST \\
+  ${baseUrl} \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "action": "financial_report",
+    "clinicId": "${profile?.clinic_id || "<clinic_id>"}",
+    "period": {
+      "startDate": "${curlStartDate}",
+      "endDate": "${curlEndDate}"
+    }
+  }'`;
+
+  const getStockCurl = () => `curl -X POST \\
+  ${baseUrl} \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "action": "stock_alert",
+    "clinicId": "${profile?.clinic_id || "<clinic_id>"}"
+  }'`;
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success("cURL copiado!");
   };
 
   return (
