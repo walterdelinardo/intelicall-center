@@ -5,12 +5,16 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const MAX_RUNTIME_MS = 55_000;
+const MIN_REMAINING_MS = 5_000;
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    const startTime = Date.now();
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -29,76 +33,105 @@ Deno.serve(async (req) => {
 
     let totalSynced = 0;
 
+    // Delete webhooks for all bots upfront
     for (const bot of bots) {
       try {
-        const offset = bot.last_update_offset || 0;
-
-        // Delete webhook first (getUpdates and webhooks are mutually exclusive)
         await fetch(`https://api.telegram.org/bot${bot.bot_token}/deleteWebhook`, { method: "POST" });
+      } catch (e) {
+        console.error(`Failed to delete webhook for bot ${bot.id}:`, e);
+      }
+    }
 
-        // Short poll (timeout=0 for cron-based polling)
-        const tgRes = await fetch(`https://api.telegram.org/bot${bot.bot_token}/getUpdates`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            offset: offset > 0 ? offset : undefined,
-            limit: 100,
-            timeout: 0,
-            allowed_updates: ["message"],
-          }),
-        });
+    // Long-polling loop
+    while (true) {
+      const elapsed = Date.now() - startTime;
+      const remainingMs = MAX_RUNTIME_MS - elapsed;
 
-        const tgData = await tgRes.json();
-        if (!tgData.ok || !tgData.result?.length) continue;
+      if (remainingMs < MIN_REMAINING_MS) break;
 
-        const updates = tgData.result;
-        const chatId = String(bot.chat_id);
-        const relevantUpdates = updates.filter(
-          (u: any) => u.message && String(u.message.chat.id) === chatId
-        );
+      // Dynamic timeout: up to 50s, but never exceed remaining time minus buffer
+      const timeout = Math.min(50, Math.floor(remainingMs / 1000) - 5);
+      if (timeout < 1) break;
 
-        for (const update of relevantUpdates) {
-          const msg = update.message;
-          const text = msg.text || msg.caption || "";
-          const fromUser = msg.from;
+      let anyUpdates = false;
 
-          // Check for duplicate by update_id
-          const { data: existing } = await supabase
-            .from("telegram_notifications")
-            .select("id")
-            .eq("bot_id", bot.id)
-            .contains("metadata", { update_id: update.update_id })
-            .limit(1);
+      for (const bot of bots) {
+        try {
+          const offset = bot.last_update_offset || 0;
 
-          if (existing && existing.length > 0) continue;
+          const tgRes = await fetch(`https://api.telegram.org/bot${bot.bot_token}/getUpdates`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              offset: offset > 0 ? offset : undefined,
+              limit: 100,
+              timeout: bots.length === 1 ? timeout : 0, // Only long-poll if single bot
+              allowed_updates: ["message"],
+            }),
+          });
 
-          const { error: insertError } = await supabase
-            .from("telegram_notifications")
-            .insert({
-              clinic_id: bot.clinic_id,
-              bot_id: bot.id,
-              message: text || "(sem texto)",
-              direction: "incoming",
-              notification_type: "message",
-              metadata: {
-                update_id: update.update_id,
-                from: fromUser,
-                chat_id: chatId,
-                date: msg.date,
-              },
-            });
+          const tgData = await tgRes.json();
+          if (!tgData.ok || !tgData.result?.length) continue;
 
-          if (!insertError) totalSynced++;
+          anyUpdates = true;
+          const updates = tgData.result;
+          const chatId = String(bot.chat_id);
+          const relevantUpdates = updates.filter(
+            (u: any) => u.message && String(u.message.chat.id) === chatId
+          );
+
+          for (const update of relevantUpdates) {
+            const msg = update.message;
+            const text = msg.text || msg.caption || "";
+            const fromUser = msg.from;
+
+            // Check for duplicate by update_id
+            const { data: existing } = await supabase
+              .from("telegram_notifications")
+              .select("id")
+              .eq("bot_id", bot.id)
+              .contains("metadata", { update_id: update.update_id })
+              .limit(1);
+
+            if (existing && existing.length > 0) continue;
+
+            const { error: insertError } = await supabase
+              .from("telegram_notifications")
+              .insert({
+                clinic_id: bot.clinic_id,
+                bot_id: bot.id,
+                message: text || "(sem texto)",
+                direction: "incoming",
+                notification_type: "message",
+                metadata: {
+                  update_id: update.update_id,
+                  from: fromUser,
+                  chat_id: chatId,
+                  date: msg.date,
+                },
+              });
+
+            if (!insertError) totalSynced++;
+          }
+
+          // Update offset
+          const maxUpdateId = Math.max(...updates.map((u: any) => u.update_id));
+          await supabase
+            .from("telegram_bots")
+            .update({ last_update_offset: maxUpdateId + 1 })
+            .eq("id", bot.id);
+
+          // Update in-memory offset for next iteration
+          bot.last_update_offset = maxUpdateId + 1;
+        } catch (err) {
+          console.error(`Error polling bot ${bot.id}:`, err);
         }
+      }
 
-        // Update offset
-        const maxUpdateId = Math.max(...updates.map((u: any) => u.update_id));
-        await supabase
-          .from("telegram_bots")
-          .update({ last_update_offset: maxUpdateId + 1 })
-          .eq("id", bot.id);
-      } catch (err) {
-        console.error(`Error polling bot ${bot.id}:`, err);
+      // For multiple bots (short poll), only loop if we got updates
+      if (bots.length > 1 && !anyUpdates) {
+        // Wait 2s before next round for multi-bot short poll
+        await new Promise((r) => setTimeout(r, 2000));
       }
     }
 

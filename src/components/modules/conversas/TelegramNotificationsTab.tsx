@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import {
   Bot, CheckCheck, MessageSquare, PackageCheck, BarChart3,
   RefreshCw, Download, Loader2, CircleCheck, CircleDashed,
+  Send,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -248,19 +249,29 @@ const TelegramNotificationsTab = () => {
         <div className="space-y-2">
           {notifications.map((notif) => {
             const notifLabels = getAssignedLabels(notif.id);
+            const isOutgoing = notif.direction === "outgoing";
             return (
               <Card
                 key={notif.id}
-                className={`transition-colors ${!notif.is_read ? "border-primary/30 bg-primary/5" : ""} ${notif.is_ok ? "opacity-60" : ""}`}
+                className={`transition-colors ${isOutgoing ? "border-accent/40 bg-accent/5" : ""} ${!notif.is_read && !isOutgoing ? "border-primary/30 bg-primary/5" : ""} ${notif.is_ok ? "opacity-60" : ""}`}
               >
                 <CardContent className="py-3 px-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3 flex-1 min-w-0">
                       <div className="mt-0.5">
-                        {typeIcons[notif.notification_type] || <Bot className="w-4 h-4 text-muted-foreground" />}
+                        {isOutgoing ? (
+                          <Send className="w-4 h-4 text-accent-foreground" />
+                        ) : (
+                          typeIcons[notif.notification_type] || <Bot className="w-4 h-4 text-muted-foreground" />
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                          {isOutgoing && (
+                            <Badge variant="secondary" className="text-xs">
+                              Enviado pelo Bot
+                            </Badge>
+                          )}
                           <Badge variant="outline" className="text-xs">
                             {typeLabels[notif.notification_type] || notif.notification_type}
                           </Badge>
