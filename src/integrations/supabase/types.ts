@@ -1537,6 +1537,107 @@ export type Database = {
           },
         ]
       }
+      telegram_bots: {
+        Row: {
+          bot_token: string
+          chat_id: string
+          clinic_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          label: string
+          updated_at: string
+          webhook_financial_reports: boolean
+          webhook_receive_messages: boolean
+          webhook_stock_alerts: boolean
+        }
+        Insert: {
+          bot_token: string
+          chat_id: string
+          clinic_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label: string
+          updated_at?: string
+          webhook_financial_reports?: boolean
+          webhook_receive_messages?: boolean
+          webhook_stock_alerts?: boolean
+        }
+        Update: {
+          bot_token?: string
+          chat_id?: string
+          clinic_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label?: string
+          updated_at?: string
+          webhook_financial_reports?: boolean
+          webhook_receive_messages?: boolean
+          webhook_stock_alerts?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_bots_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telegram_notifications: {
+        Row: {
+          bot_id: string
+          clinic_id: string
+          created_at: string
+          direction: string
+          id: string
+          is_read: boolean
+          message: string
+          metadata: Json | null
+          notification_type: string
+        }
+        Insert: {
+          bot_id: string
+          clinic_id: string
+          created_at?: string
+          direction?: string
+          id?: string
+          is_read?: boolean
+          message: string
+          metadata?: Json | null
+          notification_type?: string
+        }
+        Update: {
+          bot_id?: string
+          clinic_id?: string
+          created_at?: string
+          direction?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          metadata?: Json | null
+          notification_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_notifications_bot_id_fkey"
+            columns: ["bot_id"]
+            isOneToOne: false
+            referencedRelation: "telegram_bots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "telegram_notifications_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           clinic_id: string

@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Webhook, Calendar, Bell, Shield, Smartphone, Plus, Power, QrCode, Wifi, WifiOff, Activity } from "lucide-react";
+import TelegramBotsSection from "@/components/settings/TelegramBotsSection";
 import { toast } from "sonner";
 import { useWhatsAppInboxes } from "@/hooks/useWhatsApp";
 import { useAuth } from "@/contexts/AuthContext";
@@ -366,6 +367,9 @@ const SettingsTab = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Bots Telegram */}
+      <TelegramBotsSection />
 
       {/* Integração N8N */}
       <Card className="shadow-card">
