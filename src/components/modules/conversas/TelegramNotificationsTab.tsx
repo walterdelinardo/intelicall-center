@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Bot, Check, CheckCheck, MessageSquare, PackageCheck, BarChart3,
+  Bot, CheckCheck, MessageSquare, PackageCheck, BarChart3,
   RefreshCw, Download, Loader2, CircleCheck, CircleDashed,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -309,18 +309,7 @@ const TelegramNotificationsTab = () => {
                         onLabelsChanged={fetchData}
                       />
 
-                      {/* Mark as read */}
-                      {!notif.is_read && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => markAsRead(notif.id)}
-                          title="Marcar como lida"
-                        >
-                          <Check className="w-4 h-4" />
-                        </Button>
-                      )}
+                      {/* Removed mark as read button */}
                     </div>
                   </div>
                 </CardContent>
