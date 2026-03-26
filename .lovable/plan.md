@@ -1,34 +1,37 @@
 
 
-## Corrigir erro 401 na Edge Function send-evolution-message
+## Exibir cURL de integração ao ativar webhook Financeiro
 
-### Problema
-A função usa `supabase.auth.getClaims(token)` que **não existe** no SDK `@supabase/supabase-js@2.39.3`. O método sempre falha, retornando erro, e a função responde 401.
+### O que será feito
+Quando o usuário ativar o webhook "Relatórios Financeiros" em um bot (tanto na criação quanto ao clicar no badge na tabela), o sistema exibirá um bloco com o comando cURL pronto para uso, contendo o `clinicId` correto e campos editáveis de período (`startDate`/`endDate`).
 
-### Solução
+### Alterações
 
-**Arquivo: `supabase/functions/send-evolution-message/index.ts`**
+**Arquivo: `src/components/settings/TelegramBotsSection.tsx`**
 
-Substituir `getClaims` por `supabase.auth.getUser(token)`, que é o método correto do SDK v2 para validar um JWT passando o token como argumento:
+1. Adicionar estado `showCurlForBotId` para controlar qual bot está exibindo o cURL
+2. Quando o badge "Financeiro" for ativado (na tabela), setar esse estado para o bot correspondente
+3. Renderizar abaixo da linha do bot (ou em um Dialog) um bloco com:
+   - Dois inputs de data: `startDate` e `endDate` (padrão: primeiro e último dia do mês atual)
+   - Um bloco `<pre>` com o cURL montado dinamicamente:
+     ```
+     curl -X POST \
+       https://nlpnfkidnixphnlwhrux.supabase.co/functions/v1/telegram-webhook \
+       -H "Content-Type: application/json" \
+       -d '{
+         "action": "financial_report",
+         "clinicId": "<clinic_id>",
+         "period": {
+           "startDate": "2026-03-01",
+           "endDate": "2026-03-31"
+         }
+       }'
+     ```
+   - Botão "Copiar" que copia o cURL para a clipboard
+4. Também mostrar o cURL para o webhook de estoque (`stock_alert`) com exemplo correspondente
 
-```typescript
-// ANTES (incorreto - método não existe)
-const token = authHeader.replace('Bearer ', '');
-const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
-if (claimsError || !claimsData?.claims) { ... }
-const userId = claimsData.claims.sub as string;
-
-// DEPOIS (correto)
-const token = authHeader.replace('Bearer ', '');
-const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-if (userError || !user) {
-  console.error('Auth error:', userError);
-  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-    status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-  });
-}
-const userId = user.id;
-```
-
-A diferença chave: `getUser(token)` aceita o token como parâmetro, validando-o diretamente sem depender da sessão do cliente.
+### Detalhes técnicos
+- A URL da edge function será construída com `import.meta.env.VITE_SUPABASE_PROJECT_ID`
+- O `clinicId` vem de `profile.clinic_id`
+- Nenhuma alteração no backend necessária
 
