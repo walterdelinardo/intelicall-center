@@ -261,83 +261,102 @@ const TelegramNotificationsTab = () => {
             const notifLabels = getAssignedLabels(notif.id);
             const isOutgoing = notif.direction === "outgoing";
             return (
-              <Card
-                key={notif.id}
-                className={`transition-colors ${isOutgoing ? "border-purple-400/50 bg-purple-500/15" : "border-amber-400/50 bg-amber-500/10"} ${notif.is_ok ? "opacity-60" : ""}`}
-              >
-                <CardContent className="py-3 px-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3 flex-1 min-w-0">
-                      <div className="mt-0.5">
-                        {isOutgoing ? (
-                          <Send className="w-4 h-4 text-accent-foreground" />
-                        ) : (
-                          typeIcons[notif.notification_type] || <Bot className="w-4 h-4 text-muted-foreground" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-                          {isOutgoing && (
-                            <Badge variant="secondary" className="text-xs">
-                              Enviado pelo Bot
+              (() => {
+                const isExpanded = expandedIds.has(notif.id);
+                return (
+                  <Card
+                    key={notif.id}
+                    className={`transition-colors ${isOutgoing ? "border-purple-400/50 bg-purple-500/15" : "border-amber-400/50 bg-amber-500/10"} ${notif.is_ok ? "opacity-60" : ""}`}
+                  >
+                    <CardContent className="py-2 px-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <div className="shrink-0">
+                            {isOutgoing ? (
+                              <Send className="w-3.5 h-3.5 text-accent-foreground" />
+                            ) : (
+                              typeIcons[notif.notification_type] || <Bot className="w-3.5 h-3.5 text-muted-foreground" />
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-wrap flex-1 min-w-0">
+                            {isOutgoing && (
+                              <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
+                                Bot
+                              </Badge>
+                            )}
+                            <Badge variant="outline" className="text-[10px] h-4 px-1.5">
+                              {typeLabels[notif.notification_type] || notif.notification_type}
                             </Badge>
-                          )}
-                          <Badge variant="outline" className="text-xs">
-                            {typeLabels[notif.notification_type] || notif.notification_type}
-                          </Badge>
-                          {bots[notif.bot_id] && (
-                            <span className="text-xs text-muted-foreground">via {bots[notif.bot_id].label}</span>
-                          )}
-                          {notifLabels.map((l) => (
-                            <Badge
-                              key={l.id}
-                              className="text-[10px] h-4 px-1.5 text-white border-0"
-                              style={{ backgroundColor: l.color }}
-                            >
-                              {l.name}
-                            </Badge>
-                          ))}
+                            {bots[notif.bot_id] && (
+                              <span className="text-[10px] text-muted-foreground">via {bots[notif.bot_id].label}</span>
+                            )}
+                            {notifLabels.map((l) => (
+                              <Badge
+                                key={l.id}
+                                className="text-[10px] h-4 px-1.5 text-white border-0"
+                                style={{ backgroundColor: l.color }}
+                              >
+                                {l.name}
+                              </Badge>
+                            ))}
+                            {!isExpanded && (
+                              <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+                                {notif.message}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-muted-foreground whitespace-nowrap shrink-0">
+                            {new Date(notif.created_at).toLocaleString("pt-BR")}
+                          </span>
                         </div>
-                        <p className="text-sm whitespace-pre-wrap break-words">{notif.message}</p>
-                        {notif.metadata?.from && (
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            De: {notif.metadata.from.first_name} {notif.metadata.from.last_name || ""}
-                          </p>
-                        )}
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {new Date(notif.created_at).toLocaleString("pt-BR")}
-                        </p>
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => toggleExpand(notif.id)}
+                          >
+                            {isExpanded ? (
+                              <ChevronUp className="w-3.5 h-3.5" />
+                            ) : (
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => toggleOk(notif.id, notif.is_ok)}
+                            title={notif.is_ok ? "Desmarcar Ok" : "Marcar como Ok"}
+                          >
+                            {notif.is_ok ? (
+                              <CircleCheck className="w-3.5 h-3.5 text-green-500" />
+                            ) : (
+                              <CircleDashed className="w-3.5 h-3.5 text-muted-foreground" />
+                            )}
+                          </Button>
+                          <TelegramLabelPicker
+                            notificationId={notif.id}
+                            assignedLabelIds={getAssignedLabelIds(notif.id)}
+                            allLabels={labels}
+                            onLabelsChanged={fetchData}
+                          />
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-0.5 shrink-0">
-                      {/* Ok toggle */}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => toggleOk(notif.id, notif.is_ok)}
-                        title={notif.is_ok ? "Desmarcar Ok" : "Marcar como Ok"}
-                      >
-                        {notif.is_ok ? (
-                          <CircleCheck className="w-4 h-4 text-green-500" />
-                        ) : (
-                          <CircleDashed className="w-4 h-4 text-muted-foreground" />
-                        )}
-                      </Button>
-
-                      {/* Label picker */}
-                      <TelegramLabelPicker
-                        notificationId={notif.id}
-                        assignedLabelIds={getAssignedLabelIds(notif.id)}
-                        allLabels={labels}
-                        onLabelsChanged={fetchData}
-                      />
-
-                      {/* Removed mark as read button */}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                      {isExpanded && (
+                        <div className="mt-2 pl-6">
+                          <p className="text-sm whitespace-pre-wrap break-words">{notif.message}</p>
+                          {notif.metadata?.from && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              De: {notif.metadata.from.first_name} {notif.metadata.from.last_name || ""}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })()
             );
           })}
         </div>
