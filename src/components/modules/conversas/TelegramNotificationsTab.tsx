@@ -187,6 +187,10 @@ const TelegramNotificationsTab = () => {
           )}
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleSyncGroup} disabled={syncing} title="Sincronizar mensagens do grupo Telegram">
+            {syncing ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Download className="w-4 h-4 mr-1" />}
+            Sincronizar
+          </Button>
           <Button variant="ghost" size="sm" onClick={fetchData} title="Atualizar">
             <RefreshCw className="w-4 h-4" />
           </Button>
