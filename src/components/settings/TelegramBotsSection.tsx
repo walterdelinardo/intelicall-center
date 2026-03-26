@@ -193,6 +193,15 @@ const TelegramBotsSection = () => {
     "clinicId": "${profile?.clinic_id || "<clinic_id>"}"
   }'`;
 
+  const getN8nCurl = () => `curl -X POST \\
+  ${baseUrl} \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "action": "n8n_telegram_log",
+    "clinicId": "${profile?.clinic_id || "<clinic_id>"}",
+    "payload": {{ $json }}
+  }'`;
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast.success("cURL copiado!");

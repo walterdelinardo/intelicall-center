@@ -126,6 +126,61 @@ Deno.serve(async (req) => {
       });
     }
 
+    // --- n8n Telegram log (register bot-sent messages from n8n) ---
+    if (action === "n8n_telegram_log") {
+      const { payload } = body;
+      if (!clinicId || !payload) {
+        return new Response(JSON.stringify({ error: "Missing clinicId or payload" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Support both single object and array (n8n may send array)
+      const item = Array.isArray(payload) ? payload[0] : payload;
+      const result = item?.result || item;
+      const chatId = String(result?.chat?.id || "");
+      const messageText = result?.text || "";
+      const botUsername = result?.from?.username || result?.from?.first_name || "bot";
+
+      if (!chatId) {
+        return new Response(JSON.stringify({ error: "Could not extract chat.id from payload" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Find the bot by clinic + chat_id
+      const { data: bot } = await supabase
+        .from("telegram_bots")
+        .select("id, label")
+        .eq("clinic_id", clinicId)
+        .eq("chat_id", chatId)
+        .eq("is_active", true)
+        .limit(1)
+        .single();
+
+      if (!bot) {
+        return new Response(JSON.stringify({ error: "No active bot found for chat_id " + chatId }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      await supabase.from("telegram_notifications").insert({
+        clinic_id: clinicId,
+        bot_id: bot.id,
+        message: messageText || "(mensagem sem texto)",
+        direction: "outgoing",
+        notification_type: "n8n_message",
+        metadata: { source: "n8n", botUsername, payload: item },
+      });
+
+      return new Response(JSON.stringify({ ok: true, bot_label: bot.label }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // --- Stock alert ---
     if (action === "stock_alert") {
       const { itemName, currentQty, minQty } = body;
