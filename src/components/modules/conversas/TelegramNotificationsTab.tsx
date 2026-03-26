@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Bot, Check, CheckCheck, MessageSquare, PackageCheck, BarChart3, RefreshCw } from "lucide-react";
+import { Bot, Check, CheckCheck, MessageSquare, PackageCheck, BarChart3, RefreshCw, Download, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface TelegramNotification {
   id: string;
@@ -40,6 +41,7 @@ const TelegramNotificationsTab = () => {
   const [notifications, setNotifications] = useState<TelegramNotification[]>([]);
   const [bots, setBots] = useState<Record<string, TelegramBotInfo>>({});
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!profile?.clinic_id) return;
@@ -129,6 +131,39 @@ const TelegramNotificationsTab = () => {
     }
   };
 
+  const handleSyncGroup = async () => {
+    if (!profile?.clinic_id) return;
+    setSyncing(true);
+    try {
+      // Fetch bots with receive messages enabled
+      const { data: botsList } = await supabase
+        .from("telegram_bots" as any)
+        .select("id")
+        .eq("clinic_id", profile.clinic_id)
+        .eq("is_active", true);
+
+      if (!botsList || botsList.length === 0) {
+        toast.error("Nenhum bot ativo encontrado");
+        return;
+      }
+
+      let totalSynced = 0;
+      for (const bot of botsList as any[]) {
+        const { data } = await supabase.functions.invoke("telegram-sync", {
+          body: { botId: bot.id },
+        });
+        if (data?.ok) totalSynced += data.synced || 0;
+      }
+
+      toast.success(`Sincronizado! ${totalSynced} nova(s) mensagem(ns)`);
+      fetchData();
+    } catch (err: any) {
+      toast.error("Erro ao sincronizar: " + err.message);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   if (loading) {
@@ -152,6 +187,10 @@ const TelegramNotificationsTab = () => {
           )}
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleSyncGroup} disabled={syncing} title="Sincronizar mensagens do grupo Telegram">
+            {syncing ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Download className="w-4 h-4 mr-1" />}
+            Sincronizar
+          </Button>
           <Button variant="ghost" size="sm" onClick={fetchData} title="Atualizar">
             <RefreshCw className="w-4 h-4" />
           </Button>

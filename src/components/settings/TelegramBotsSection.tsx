@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Bot, Plus, Power, Trash2, MessageSquare, PackageCheck, BarChart3, Copy, Terminal, Webhook, Loader2 } from "lucide-react";
+import { Bot, Plus, Power, Trash2, MessageSquare, PackageCheck, BarChart3, Copy, Terminal, Webhook, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,6 +35,7 @@ const TelegramBotsSection = () => {
   const [curlStartDate, setCurlStartDate] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd"));
   const [curlEndDate, setCurlEndDate] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
   const [webhookLoading, setWebhookLoading] = useState<string | null>(null);
+  const [syncLoading, setSyncLoading] = useState<string | null>(null);
 
   const [newLabel, setNewLabel] = useState("");
   const [newToken, setNewToken] = useState("");
@@ -171,6 +172,25 @@ const TelegramBotsSection = () => {
     }
   };
 
+  const handleSync = async (bot: TelegramBot) => {
+    setSyncLoading(bot.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("telegram-sync", {
+        body: { botId: bot.id },
+      });
+      if (error) throw error;
+      if (data?.ok) {
+        toast.success(`Sincronizado! ${data.synced} nova(s) mensagem(ns)`);
+      } else {
+        toast.error("Falha na sincronização: " + JSON.stringify(data));
+      }
+    } catch (err: any) {
+      toast.error("Erro: " + err.message);
+    } finally {
+      setSyncLoading(null);
+    }
+  };
+
   const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
   const baseUrl = `https://${projectId}.supabase.co/functions/v1/telegram-webhook`;
 
@@ -268,22 +288,19 @@ const TelegramBotsSection = () => {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          {bot.webhook_receive_messages && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleSetWebhook(bot)}
-                              disabled={webhookLoading === bot.id}
-                              title="Registrar Webhook no Telegram"
-                              className="text-blue-500 hover:text-blue-600"
-                            >
-                              {webhookLoading === bot.id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <Webhook className="w-4 h-4" />
-                              )}
-                            </Button>
-                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleSync(bot)}
+                            disabled={syncLoading === bot.id}
+                            title="Sincronizar mensagens do grupo"
+                          >
+                            {syncLoading === bot.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <RefreshCw className="w-4 h-4" />
+                            )}
+                          </Button>
                           {(bot.webhook_financial_reports || bot.webhook_stock_alerts) && (
                             <Button
                               variant="ghost"
