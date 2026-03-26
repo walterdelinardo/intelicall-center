@@ -288,22 +288,19 @@ const TelegramBotsSection = () => {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          {bot.webhook_receive_messages && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleSetWebhook(bot)}
-                              disabled={webhookLoading === bot.id}
-                              title="Registrar Webhook no Telegram"
-                              className="text-blue-500 hover:text-blue-600"
-                            >
-                              {webhookLoading === bot.id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <Webhook className="w-4 h-4" />
-                              )}
-                            </Button>
-                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleSync(bot)}
+                            disabled={syncLoading === bot.id}
+                            title="Sincronizar mensagens do grupo"
+                          >
+                            {syncLoading === bot.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <RefreshCw className="w-4 h-4" />
+                            )}
+                          </Button>
                           {(bot.webhook_financial_reports || bot.webhook_stock_alerts) && (
                             <Button
                               variant="ghost"
