@@ -1590,6 +1590,74 @@ export type Database = {
           },
         ]
       }
+      telegram_labels: {
+        Row: {
+          clinic_id: string
+          color: string
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          clinic_id: string
+          color?: string
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          clinic_id?: string
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_labels_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telegram_notification_labels: {
+        Row: {
+          created_at: string
+          id: string
+          label_id: string
+          notification_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label_id: string
+          notification_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label_id?: string
+          notification_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_notification_labels_label_id_fkey"
+            columns: ["label_id"]
+            isOneToOne: false
+            referencedRelation: "telegram_labels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "telegram_notification_labels_notification_id_fkey"
+            columns: ["notification_id"]
+            isOneToOne: false
+            referencedRelation: "telegram_notifications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       telegram_notifications: {
         Row: {
           bot_id: string
@@ -1597,6 +1665,7 @@ export type Database = {
           created_at: string
           direction: string
           id: string
+          is_ok: boolean
           is_read: boolean
           message: string
           metadata: Json | null
@@ -1608,6 +1677,7 @@ export type Database = {
           created_at?: string
           direction?: string
           id?: string
+          is_ok?: boolean
           is_read?: boolean
           message: string
           metadata?: Json | null
@@ -1619,6 +1689,7 @@ export type Database = {
           created_at?: string
           direction?: string
           id?: string
+          is_ok?: boolean
           is_read?: boolean
           message?: string
           metadata?: Json | null
