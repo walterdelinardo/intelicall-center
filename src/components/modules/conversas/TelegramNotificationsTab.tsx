@@ -55,6 +55,7 @@ const typeLabels: Record<string, string> = {
 };
 
 const TelegramNotificationsTab = () => {
+  const queryClient = useQueryClient();
   const { profile } = useAuth();
   const [notifications, setNotifications] = useState<TelegramNotification[]>([]);
   const [bots, setBots] = useState<Record<string, TelegramBotInfo>>({});
