@@ -142,8 +142,11 @@ const TelegramNotificationsTab = () => {
   };
 
   const toggleOk = async (id: string, currentOk: boolean) => {
-    await supabase.from("telegram_notifications" as any).update({ is_ok: !currentOk } as any).eq("id", id);
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_ok: !currentOk } : n)));
+    const newOk = !currentOk;
+    const updates: any = { is_ok: newOk };
+    if (newOk) updates.is_read = true;
+    await supabase.from("telegram_notifications" as any).update(updates).eq("id", id);
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_ok: newOk, ...(newOk ? { is_read: true } : {}) } : n)));
   };
 
   const handleForceSync = async () => {
