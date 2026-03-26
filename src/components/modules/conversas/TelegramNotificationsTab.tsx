@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import {
   Bot, CheckCheck, MessageSquare, PackageCheck, BarChart3,
   RefreshCw, Download, Loader2, CircleCheck, CircleDashed,
-  Send,
+  Send, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
