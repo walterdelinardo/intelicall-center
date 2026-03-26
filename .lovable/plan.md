@@ -1,33 +1,38 @@
 
 
-## Mostrar mensagens do bot como notificações
+## Registrar alertas do bot enviados pelo n8n como notificações
 
 ### Contexto
-A API `getUpdates` do Telegram **não retorna** mensagens enviadas pelo próprio bot — é uma limitação da plataforma. Porém, as mensagens enviadas pelo sistema (via `telegram-webhook`: send_message, stock_alert, financial_report) **já são gravadas** como notificações "outgoing" na tabela `telegram_notifications`.
+O n8n envia mensagens via node Telegram e retorna um JSON com o resultado (`ok`, `result.message_id`, `result.chat`, `result.text`, etc.). O objetivo é criar uma action `n8n_telegram_log` no `telegram-webhook` que receba esse JSON e registre como notificação outgoing, e adicionar um cURL copiável na UI de configuração dos bots.
 
-O problema pode estar em duas frentes:
+### Alterações
 
-### 1. Melhorar o polling para captar mensagens em tempo real
-O `telegram-poll` atual faz um poll curto (timeout=0) a cada minuto. Vou atualizar para usar **long polling com loop de 55s**, reduzindo a latência de mensagens recebidas de ~60s para ~0-5s.
+**1. Edge Function `supabase/functions/telegram-webhook/index.ts`**
+- Adicionar nova action `n8n_telegram_log` que aceita o JSON exato do output do node Telegram do n8n
+- Extrai `result.chat.id` para encontrar o bot correspondente (pelo `chat_id`)
+- Extrai `result.text` como mensagem
+- Registra na `telegram_notifications` como `direction: "outgoing"`, `notification_type: "n8n_message"`
+- Armazena o JSON completo no campo `metadata`
 
-### 2. Diferenciar visualmente mensagens do bot (outgoing) na UI
-Adicionar estilo visual distinto para mensagens "outgoing" (enviadas pelo bot) vs "incoming" (recebidas de usuários) no `TelegramNotificationsTab`:
-- Mensagens outgoing: ícone de envio, badge "Enviado", fundo levemente diferente
-- Mensagens incoming: visual atual
+**2. Frontend `src/components/settings/TelegramBotsSection.tsx`**
+- Adicionar um novo bloco de cURL na seção de integração (sempre visível, não depende de webhook toggle)
+- O cURL envia um POST com o body `{ "action": "n8n_telegram_log", "clinicId": "...", "payload": {{ $json }} }` - formato que o n8n entende para injetar o output do node anterior
+- Mostrar o Terminal button para todos os bots (não apenas os que têm webhook_financial ou stock ativo)
 
-### Arquivos a alterar
+### Formato do cURL para n8n
+```
+curl -X POST \
+  <webhook-url> \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "n8n_telegram_log",
+    "clinicId": "<clinic_id>",
+    "payload": {{ $json }}
+  }'
+```
+O `{{ $json }}` é a sintaxe do n8n para injetar o output do node anterior (o node Telegram).
 
-**`supabase/functions/telegram-poll/index.ts`**
-- Implementar loop de polling contínuo por ~55s com timeout dinâmico
-- Cada iteração usa long poll (até 50s) para resposta quase instantânea
-- Evita sobreposição com o cron de 1 minuto
-
-**`src/components/modules/conversas/TelegramNotificationsTab.tsx`**
-- Adicionar visual distinto para notificações com `direction === "outgoing"` (ícone de envio, badge "Enviado pelo Bot", cor de fundo diferenciada)
-- Garantir que ambas as direções sejam exibidas claramente
-
-### Resultado
-- Mensagens de usuários no grupo: captadas automaticamente em tempo real via long polling
-- Mensagens do bot (alertas, relatórios, mensagens enviadas pelo sistema): já gravadas e agora exibidas com visual distinto
-- Mensagens enviadas diretamente pelo Telegram (fora do sistema): limitação da API, não é possível captar
+### Arquivos
+- `supabase/functions/telegram-webhook/index.ts` — nova action
+- `src/components/settings/TelegramBotsSection.tsx` — novo cURL + mostrar botão Terminal para todos os bots
 
