@@ -5,6 +5,14 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Helper: get the first clinic_id from telegram_bots (single-clinic system)
+async function getClinicId(supabase: any, chatId?: string) {
+  const query = supabase.from("telegram_bots").select("clinic_id").eq("is_active", true).limit(1);
+  if (chatId) query.eq("chat_id", chatId);
+  const { data } = await query.single();
+  return data?.clinic_id || null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -23,7 +31,6 @@ Deno.serve(async (req) => {
       const text = body.message.text || "";
       const fromUser = body.message.from;
 
-      // Find bot by chat_id (no clinicId needed)
       const { data: bot } = await supabase
         .from("telegram_bots")
         .select("id, clinic_id")
@@ -53,15 +60,14 @@ Deno.serve(async (req) => {
       });
     }
 
-    // --- Action-based requests ---
-    const { action, clinicId, botId, period } = body;
+    // --- Action-based requests (clinicId is optional — auto-resolved) ---
+    const { action, botId, period } = body;
 
     // --- Set Webhook ---
     if (action === "set_webhook") {
       if (!botId) {
         return new Response(JSON.stringify({ error: "Missing botId" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
@@ -73,20 +79,16 @@ Deno.serve(async (req) => {
 
       if (!bot) {
         return new Response(JSON.stringify({ error: "Bot not found" }), {
-          status: 404,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
       const webhookUrl = `${supabaseUrl}/functions/v1/telegram-webhook`;
-      const res = await fetch(
-        `https://api.telegram.org/bot${bot.bot_token}/setWebhook`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: webhookUrl }),
-        }
-      );
+      const res = await fetch(`https://api.telegram.org/bot${bot.bot_token}/setWebhook`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: webhookUrl }),
+      });
       const result = await res.json();
 
       return new Response(JSON.stringify({ ok: result.ok, result }), {
@@ -98,8 +100,7 @@ Deno.serve(async (req) => {
     if (action === "remove_webhook") {
       if (!botId) {
         return new Response(JSON.stringify({ error: "Missing botId" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
@@ -111,15 +112,11 @@ Deno.serve(async (req) => {
 
       if (!bot) {
         return new Response(JSON.stringify({ error: "Bot not found" }), {
-          status: 404,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      const res = await fetch(
-        `https://api.telegram.org/bot${bot.bot_token}/deleteWebhook`,
-        { method: "POST" }
-      );
+      const res = await fetch(`https://api.telegram.org/bot${bot.bot_token}/deleteWebhook`, { method: "POST" });
       const result = await res.json();
 
       return new Response(JSON.stringify({ ok: result.ok, result }), {
@@ -130,30 +127,24 @@ Deno.serve(async (req) => {
     // --- Send message (for n8n / external integrations) ---
     if (action === "send_message") {
       const { message, chatId, notificationType } = body;
-      if (!clinicId || !message) {
-        return new Response(JSON.stringify({ error: "Missing clinicId or message" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+      if (!message) {
+        return new Response(JSON.stringify({ error: "Missing message" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      // Find bot(s) for this clinic with the given chat_id (or all active bots)
       const query = supabase
         .from("telegram_bots")
-        .select("id, bot_token, chat_id, label")
-        .eq("clinic_id", clinicId)
+        .select("id, bot_token, chat_id, label, clinic_id")
         .eq("is_active", true);
 
-      if (chatId) {
-        query.eq("chat_id", String(chatId));
-      }
+      if (chatId) query.eq("chat_id", String(chatId));
 
       const { data: bots } = await query;
 
       if (!bots || bots.length === 0) {
         return new Response(JSON.stringify({ error: "No active bot found" }), {
-          status: 404,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
@@ -164,17 +155,13 @@ Deno.serve(async (req) => {
           const res = await fetch(`https://api.telegram.org/bot${bot.bot_token}/sendMessage`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              chat_id: targetChatId,
-              text: message,
-              parse_mode: "Markdown",
-            }),
+            body: JSON.stringify({ chat_id: targetChatId, text: message, parse_mode: "Markdown" }),
           });
 
           if (res.ok) {
             sent++;
             await supabase.from("telegram_notifications").insert({
-              clinic_id: clinicId,
+              clinic_id: bot.clinic_id,
               bot_id: bot.id,
               message,
               direction: "outgoing",
@@ -195,17 +182,15 @@ Deno.serve(async (req) => {
     // --- Receive message (manual call) ---
     if (action === "receive_message") {
       const { message, chatId } = body;
-      if (!message || !clinicId) {
-        return new Response(JSON.stringify({ error: "Missing message or clinicId" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+      if (!message) {
+        return new Response(JSON.stringify({ error: "Missing message" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
       const { data: bot } = await supabase
         .from("telegram_bots")
-        .select("id")
-        .eq("clinic_id", clinicId)
+        .select("id, clinic_id")
         .eq("chat_id", String(chatId))
         .eq("webhook_receive_messages", true)
         .eq("is_active", true)
@@ -214,13 +199,12 @@ Deno.serve(async (req) => {
 
       if (!bot) {
         return new Response(JSON.stringify({ error: "No active bot found for this chat" }), {
-          status: 404,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
       await supabase.from("telegram_notifications").insert({
-        clinic_id: clinicId,
+        clinic_id: bot.clinic_id,
         bot_id: bot.id,
         message,
         direction: "incoming",
@@ -236,17 +220,15 @@ Deno.serve(async (req) => {
     // --- Stock alert ---
     if (action === "stock_alert") {
       const { itemName, currentQty, minQty } = body;
-      if (!clinicId || !itemName) {
-        return new Response(JSON.stringify({ error: "Missing clinicId or itemName" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+      if (!itemName) {
+        return new Response(JSON.stringify({ error: "Missing itemName" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
       const { data: bots } = await supabase
         .from("telegram_bots")
-        .select("id, bot_token, chat_id, label")
-        .eq("clinic_id", clinicId)
+        .select("id, bot_token, chat_id, label, clinic_id")
         .eq("webhook_stock_alerts", true)
         .eq("is_active", true);
 
@@ -264,17 +246,13 @@ Deno.serve(async (req) => {
           const res = await fetch(`https://api.telegram.org/bot${bot.bot_token}/sendMessage`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              chat_id: bot.chat_id,
-              text: alertMsg,
-              parse_mode: "Markdown",
-            }),
+            body: JSON.stringify({ chat_id: bot.chat_id, text: alertMsg, parse_mode: "Markdown" }),
           });
 
           if (res.ok) {
             sent++;
             await supabase.from("telegram_notifications").insert({
-              clinic_id: clinicId,
+              clinic_id: bot.clinic_id,
               bot_id: bot.id,
               message: `Alerta de estoque baixo: ${itemName} (Atual: ${currentQty}, Mínimo: ${minQty})`,
               direction: "outgoing",
@@ -295,17 +273,24 @@ Deno.serve(async (req) => {
     // --- Financial report ---
     if (action === "financial_report") {
       const { startDate, endDate } = period || {};
-      if (!clinicId || !startDate || !endDate) {
-        return new Response(JSON.stringify({ error: "Missing clinicId or period" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+      if (!startDate || !endDate) {
+        return new Response(JSON.stringify({ error: "Missing period (startDate/endDate)" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Get clinic_id from any active bot
+      const resolvedClinicId = await getClinicId(supabase);
+      if (!resolvedClinicId) {
+        return new Response(JSON.stringify({ error: "No active bot/clinic found" }), {
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
       const { data: transactions } = await supabase
         .from("financial_transactions")
         .select("*")
-        .eq("clinic_id", clinicId)
+        .eq("clinic_id", resolvedClinicId)
         .gte("date", startDate)
         .lte("date", endDate)
         .order("date", { ascending: true });
@@ -335,8 +320,8 @@ Deno.serve(async (req) => {
 
       const { data: bots } = await supabase
         .from("telegram_bots")
-        .select("id, bot_token, chat_id, label")
-        .eq("clinic_id", clinicId)
+        .select("id, bot_token, chat_id, label, clinic_id")
+        .eq("clinic_id", resolvedClinicId)
         .eq("webhook_financial_reports", true)
         .eq("is_active", true);
 
@@ -347,16 +332,12 @@ Deno.serve(async (req) => {
             const res = await fetch(`https://api.telegram.org/bot${bot.bot_token}/sendMessage`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                chat_id: bot.chat_id,
-                text: reportMsg,
-                parse_mode: "Markdown",
-              }),
+              body: JSON.stringify({ chat_id: bot.chat_id, text: reportMsg, parse_mode: "Markdown" }),
             });
             if (res.ok) {
               sent++;
               await supabase.from("telegram_notifications").insert({
-                clinic_id: clinicId,
+                clinic_id: bot.clinic_id,
                 bot_id: bot.id,
                 message: `Relatório financeiro de ${startDate} a ${endDate}: Receitas R$ ${totalReceitas.toFixed(2)}, Despesas R$ ${totalDespesas.toFixed(2)}, Saldo R$ ${saldo.toFixed(2)}`,
                 direction: "outgoing",
@@ -371,8 +352,7 @@ Deno.serve(async (req) => {
       }
 
       return new Response(JSON.stringify({
-        ok: true,
-        sent,
+        ok: true, sent,
         summary: { totalReceitas, totalDespesas, saldo, count: txs.length },
         transactions: txs,
       }), {
@@ -381,14 +361,12 @@ Deno.serve(async (req) => {
     }
 
     return new Response(JSON.stringify({ error: "Invalid action" }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
     console.error("Error in telegram-webhook:", err);
     return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
