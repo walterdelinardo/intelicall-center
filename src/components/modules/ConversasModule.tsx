@@ -1,12 +1,23 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MessageSquare, Bot } from "lucide-react";
 import ChatTab from "@/components/dashboard/ChatTab";
 import TelegramNotificationsTab from "@/components/modules/conversas/TelegramNotificationsTab";
+import { useDashboard } from "@/contexts/DashboardContext";
 
 const ConversasModule = () => {
+  const { pendingConversasTab, clearPendingConversasTab } = useDashboard();
+  const [activeTab, setActiveTab] = useState("whatsapp");
+
+  useEffect(() => {
+    if (pendingConversasTab) {
+      setActiveTab(pendingConversasTab);
+      clearPendingConversasTab();
+    }
+  }, [pendingConversasTab, clearPendingConversasTab]);
+
   return (
-    <Tabs defaultValue="whatsapp" className="h-full flex flex-col">
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
       <TabsList className="w-fit">
         <TabsTrigger value="whatsapp" className="flex items-center gap-1.5">
           <MessageSquare className="w-4 h-4" />

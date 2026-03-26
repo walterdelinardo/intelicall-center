@@ -30,7 +30,7 @@ const DashboardHeader = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { profile, roles, signOut } = useAuth();
-  const { setActiveModule } = useDashboard();
+  const { setActiveModule, openConversasTab } = useDashboard();
 
   const { data: clinic } = useQuery({
     queryKey: ["clinic-header", profile?.clinic_id],
@@ -254,7 +254,7 @@ const DashboardHeader = () => {
             size="icon"
             className="relative"
             title="Notificações Telegram não lidas"
-            onClick={() => setActiveModule("conversas")}
+            onClick={() => openConversasTab("telegram")}
           >
             <Bot className="w-5 h-5" />
             <NotifBadge count={telegramUnread} />
