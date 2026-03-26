@@ -179,6 +179,7 @@ const TelegramBotsSection = () => {
   -H "Content-Type: application/json" \\
   -d '{
     "action": "financial_report",
+    "clinicId": "${profile?.clinic_id || "<clinic_id>"}",
     "period": {
       "startDate": "${curlStartDate}",
       "endDate": "${curlEndDate}"
@@ -190,9 +191,7 @@ const TelegramBotsSection = () => {
   -H "Content-Type: application/json" \\
   -d '{
     "action": "stock_alert",
-    "itemName": "<nome_do_produto>",
-    "currentQty": 2,
-    "minQty": 5
+    "clinicId": "${profile?.clinic_id || "<clinic_id>"}"
   }'`;
 
   const copyToClipboard = (text: string) => {
