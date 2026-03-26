@@ -1,43 +1,18 @@
 
 
-## Sincronizar chat do grupo Telegram via polling
+## Simplificar: remover webhook, manter apenas sync por polling
 
-### Problema
-O webhook do Telegram não está funcionando (provavelmente por restrições de rede/certificado). Vamos simplificar: em vez de depender de webhook, criar uma edge function que busca as mensagens do grupo via `getUpdates` do Telegram e insere na tabela `telegram_notifications`.
+### O que mudar
 
-### Abordagem
-Criar uma nova edge function `telegram-sync` que:
-1. Busca o bot pelo `botId`
-2. Chama `getUpdates` na API do Telegram para pegar mensagens recentes
-3. Insere mensagens novas na `telegram_notifications` (evitando duplicatas pelo `update_id` no metadata)
+**`src/components/settings/TelegramBotsSection.tsx`**
+- Remover o botão de Webhook (ícone Webhook/link) da coluna de ações
+- Remover a função `handleSetWebhook` e o state `webhookLoading`
+- Manter apenas o botão Sincronizar (RefreshCw), Ativar/Desativar (Power) e Excluir (Trash2)
 
-No frontend, adicionar um botão **"Sincronizar"** na tabela de bots (TelegramBotsSection) e também na aba de notificações (TelegramNotificationsTab).
+**`supabase/functions/telegram-webhook/index.ts`**
+- Remover as actions `set_webhook` e `remove_webhook`
+- Remover o handler de updates nativos do Telegram (bloco que detecta `body.update_id && body.message`)
+- Manter apenas as actions existentes: `receive_message`, `financial_report`, `stock_alert`, `send_message`
 
-### Alterações
-
-**Nova edge function: `supabase/functions/telegram-sync/index.ts`**
-- Recebe `botId` no body
-- Busca o bot na tabela `telegram_bots` (token, chat_id, clinic_id)
-- Chama `https://api.telegram.org/bot{token}/getUpdates` com offset salvo
-- Filtra mensagens do `chat_id` configurado
-- Insere cada mensagem nova em `telegram_notifications` (verifica duplicata por `update_id` no metadata)
-- Salva o último offset no campo metadata ou numa coluna auxiliar
-
-**Migração: adicionar coluna `last_update_offset` na tabela `telegram_bots`**
-- `ALTER TABLE telegram_bots ADD COLUMN last_update_offset bigint DEFAULT 0;`
-
-**Arquivo: `src/components/settings/TelegramBotsSection.tsx`**
-- Adicionar botão "Sincronizar" (ícone RefreshCw) na coluna de ações de cada bot
-- Ao clicar, chama `supabase.functions.invoke("telegram-sync", { body: { botId } })`
-- Exibe toast com quantidade de mensagens sincronizadas
-
-**Arquivo: `src/components/modules/conversas/TelegramNotificationsTab.tsx`**
-- Adicionar botão "Sincronizar Grupo" no header ao lado do botão Atualizar
-- Busca os bots da clínica e chama a sync para cada um com `webhook_receive_messages = true`
-
-### Detalhes técnicos
-- A edge function usa `SUPABASE_SERVICE_ROLE_KEY` para bypass de RLS
-- O `getUpdates` retorna todas as mensagens pendentes; filtramos pelo `chat_id` do bot
-- O `last_update_offset` garante que não processamos mensagens já sincronizadas
-- Realtime já está configurado na `telegram_notifications`, então novas mensagens aparecem automaticamente na UI
+O fluxo fica simples: o usuário clica "Sincronizar" no bot ou na aba de notificações → chama `telegram-sync` → busca mensagens via `getUpdates` → insere na `telegram_notifications` → aparece na aba Conversas.
 
