@@ -1546,6 +1546,7 @@ export type Database = {
           id: string
           is_active: boolean
           label: string
+          last_update_offset: number | null
           updated_at: string
           webhook_financial_reports: boolean
           webhook_receive_messages: boolean
@@ -1559,6 +1560,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           label: string
+          last_update_offset?: number | null
           updated_at?: string
           webhook_financial_reports?: boolean
           webhook_receive_messages?: boolean
@@ -1572,6 +1574,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           label?: string
+          last_update_offset?: number | null
           updated_at?: string
           webhook_financial_reports?: boolean
           webhook_receive_messages?: boolean

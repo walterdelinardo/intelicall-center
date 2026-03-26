@@ -1,0 +1,1 @@
+ALTER TABLE public.telegram_bots ADD COLUMN IF NOT EXISTS last_update_offset bigint DEFAULT 0;
