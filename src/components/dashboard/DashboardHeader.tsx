@@ -1,9 +1,10 @@
-import { Bell, LogOut, Building2, Check, CircleCheck, AlertCircle } from "lucide-react";
+import { Bell, LogOut, Building2, Check, CircleCheck, AlertCircle, MessageSquare, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDashboard } from "@/contexts/DashboardContext";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -29,6 +30,7 @@ const DashboardHeader = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { profile, roles, signOut } = useAuth();
+  const { setActiveModule } = useDashboard();
 
   const { data: clinic } = useQuery({
     queryKey: ["clinic-header", profile?.clinic_id],
@@ -44,6 +46,7 @@ const DashboardHeader = () => {
     enabled: !!profile?.clinic_id,
   });
 
+  // Agenda notifications
   const { data: notifications = [], refetch: refetchNotifications } = useQuery({
     queryKey: ["header-notifications", profile?.clinic_id],
     queryFn: async () => {
@@ -60,7 +63,39 @@ const DashboardHeader = () => {
     refetchInterval: 30000,
   });
 
-  const unreadCount = notifications.filter((n: any) => !n.is_read).length;
+  // WhatsApp unread count
+  const { data: whatsappUnread = 0 } = useQuery({
+    queryKey: ["header-whatsapp-unread", profile?.clinic_id],
+    queryFn: async () => {
+      if (!profile?.clinic_id) return 0;
+      const { data } = await supabase
+        .from("whatsapp_conversations")
+        .select("unread_count")
+        .eq("clinic_id", profile.clinic_id)
+        .gt("unread_count", 0);
+      return (data || []).reduce((sum: number, c: any) => sum + (c.unread_count || 0), 0);
+    },
+    enabled: !!profile?.clinic_id,
+    refetchInterval: 15000,
+  });
+
+  // Telegram unread count
+  const { data: telegramUnread = 0 } = useQuery({
+    queryKey: ["header-telegram-unread", profile?.clinic_id],
+    queryFn: async () => {
+      if (!profile?.clinic_id) return 0;
+      const { count } = await supabase
+        .from("telegram_notifications" as any)
+        .select("id", { count: "exact", head: true })
+        .eq("clinic_id", profile.clinic_id)
+        .eq("is_read", false);
+      return count || 0;
+    },
+    enabled: !!profile?.clinic_id,
+    refetchInterval: 15000,
+  });
+
+  const agendaUnread = notifications.filter((n: any) => !n.is_read).length;
 
   const toggleRead = async (id: string, currentRead: boolean) => {
     await supabase.from("calendar_notifications").update({ is_read: !currentRead } as any).eq("id", id);
@@ -89,6 +124,13 @@ const DashboardHeader = () => {
     navigate("/");
   };
 
+  const NotifBadge = ({ count }: { count: number }) =>
+    count > 0 ? (
+      <span className="absolute -top-0.5 -right-0.5 h-4 min-w-[16px] px-0.5 rounded-full bg-destructive text-destructive-foreground text-[10px] flex items-center justify-center">
+        {count > 99 ? "99+" : count}
+      </span>
+    ) : null;
+
   return (
     <header className="border-b bg-card shadow-sm sticky top-0 z-50">
       <div className="px-4 py-3 flex items-center justify-between gap-4">
@@ -115,10 +157,10 @@ const DashboardHeader = () => {
           </div>
         </div>
 
-        {/* Right: User info + notifications + logout */}
-        <div className="flex items-center gap-3 shrink-0">
+        {/* Right */}
+        <div className="flex items-center gap-2 shrink-0">
           {/* User info */}
-          <div className="hidden sm:flex flex-col items-end">
+          <div className="hidden sm:flex flex-col items-end mr-1">
             <span className="text-sm font-medium">{profile?.full_name || "Usuário"}</span>
             <div className="flex gap-1">
               {roles.map((r) => (
@@ -129,26 +171,18 @@ const DashboardHeader = () => {
             </div>
           </div>
 
-          {/* Notifications */}
+          {/* 1. Agenda notifications */}
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="ghost" size="icon" className="relative">
+              <Button variant="ghost" size="icon" className="relative" title="Notificações da Agenda">
                 <Bell className="w-5 h-5" />
-                {unreadCount > 0 ? (
-                  <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-destructive text-destructive-foreground text-[10px] flex items-center justify-center">
-                    {unreadCount}
-                  </span>
-                ) : (
-                  <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-green-500 text-white text-[10px] flex items-center justify-center">
-                    <Check className="w-3 h-3" />
-                  </span>
-                )}
+                <NotifBadge count={agendaUnread} />
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-96 p-0" align="end">
               <div className="px-3 py-2 border-b border-border flex items-center justify-between">
                 <p className="text-sm font-semibold">Notificações da Agenda</p>
-                {unreadCount > 0 && (
+                {agendaUnread > 0 && (
                   <Button variant="ghost" size="sm" className="text-xs h-6 px-2" onClick={markAllRead}>
                     Marcar todas como lidas
                   </Button>
@@ -160,7 +194,10 @@ const DashboardHeader = () => {
                 ) : (
                   <div className="divide-y divide-border">
                     {notifications.map((n: any) => (
-                      <div key={n.id} className={`px-3 py-2.5 transition-colors ${n.is_read ? "opacity-60" : "bg-primary/5"} ${n.is_important ? "border-l-2 border-l-yellow-500" : ""}`}>
+                      <div
+                        key={n.id}
+                        className={`px-3 py-2.5 transition-colors ${n.is_read ? "opacity-60" : "bg-primary/5"} ${n.is_important ? "border-l-2 border-l-yellow-500" : ""}`}
+                      >
                         <div className="flex items-start gap-2">
                           <span className="text-sm mt-0.5">{notifIcons[n.action] || "📋"}</span>
                           <div className="flex-1 min-w-0">
@@ -198,6 +235,30 @@ const DashboardHeader = () => {
               </ScrollArea>
             </PopoverContent>
           </Popover>
+
+          {/* 2. WhatsApp unread */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="relative"
+            title="Mensagens WhatsApp não lidas"
+            onClick={() => setActiveModule("conversas")}
+          >
+            <MessageSquare className="w-5 h-5" />
+            <NotifBadge count={whatsappUnread} />
+          </Button>
+
+          {/* 3. Telegram unread */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="relative"
+            title="Notificações Telegram não lidas"
+            onClick={() => setActiveModule("conversas")}
+          >
+            <Bot className="w-5 h-5" />
+            <NotifBadge count={telegramUnread} />
+          </Button>
 
           {/* Logout */}
           <Button variant="ghost" size="icon" onClick={handleLogout} title="Sair">
