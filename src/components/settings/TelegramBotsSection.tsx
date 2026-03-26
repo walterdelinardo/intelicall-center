@@ -289,17 +289,15 @@ const TelegramBotsSection = () => {
                               <RefreshCw className="w-4 h-4" />
                             )}
                           </Button>
-                          {(bot.webhook_financial_reports || bot.webhook_stock_alerts) && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setCurlBotId(curlBotId === bot.id ? null : bot.id)}
-                              title="Ver cURL de integração"
-                              className={curlBotId === bot.id ? "text-primary" : ""}
-                            >
-                              <Terminal className="w-4 h-4" />
-                            </Button>
-                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setCurlBotId(curlBotId === bot.id ? null : bot.id)}
+                            title="Ver cURL de integração"
+                            className={curlBotId === bot.id ? "text-primary" : ""}
+                          >
+                            <Terminal className="w-4 h-4" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="icon"
