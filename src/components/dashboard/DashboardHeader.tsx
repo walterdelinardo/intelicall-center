@@ -79,7 +79,7 @@ const DashboardHeader = () => {
     refetchInterval: 15000,
   });
 
-  // Telegram unread count
+  // Telegram pending (not OK) count
   const { data: telegramUnread = 0 } = useQuery({
     queryKey: ["header-telegram-unread", profile?.clinic_id],
     queryFn: async () => {
@@ -88,7 +88,7 @@ const DashboardHeader = () => {
         .from("telegram_notifications" as any)
         .select("id", { count: "exact", head: true })
         .eq("clinic_id", profile.clinic_id)
-        .eq("is_read", false);
+        .eq("is_ok", false);
       return count || 0;
     },
     enabled: !!profile?.clinic_id,
