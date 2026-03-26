@@ -1,37 +1,33 @@
 
 
-## Exibir cURL de integração ao ativar webhook Financeiro
+## Problema
 
-### O que será feito
-Quando o usuário ativar o webhook "Relatórios Financeiros" em um bot (tanto na criação quanto ao clicar no badge na tabela), o sistema exibirá um bloco com o comando cURL pronto para uso, contendo o `clinicId` correto e campos editáveis de período (`startDate`/`endDate`).
+A edge function `telegram-webhook` atual só aceita chamadas manuais com `action: "receive_message"` e `clinicId` no body. Ela **não** está registrada como webhook no Telegram, então quando você envia uma mensagem ao bot, o Telegram não sabe para onde encaminhar — a mensagem simplesmente se perde.
+
+## Solução
+
+### 1. Atualizar a edge function `telegram-webhook` para aceitar o formato nativo do Telegram
+
+Quando o Telegram envia um update via webhook, o body tem o formato `{ update_id, message: { chat: { id }, text, from } }` — sem `action` nem `clinicId`. A function precisa detectar esse formato e:
+- Extrair o `chat_id` do update
+- Buscar na tabela `telegram_bots` qual bot tem aquele `chat_id` (independente de `clinicId`)
+- Inserir a notificação na `telegram_notifications`
+
+A lógica existente (actions `stock_alert`, `financial_report`, `receive_message`) continua funcionando normalmente.
+
+### 2. Adicionar botão "Registrar Webhook" na seção de bots
+
+No `TelegramBotsSection.tsx`, adicionar um botão por bot que chama a API do Telegram `setWebhook` apontando para a URL da edge function. Isso é feito via uma nova action `set_webhook` na própria edge function.
 
 ### Alterações
 
-**Arquivo: `src/components/settings/TelegramBotsSection.tsx`**
+**`supabase/functions/telegram-webhook/index.ts`**:
+- No início do handler, antes de checar `action`, verificar se o body contém `message.chat.id` (formato nativo Telegram)
+- Se sim: buscar bot pelo `chat_id`, inserir notificação, retornar `{ ok: true }`
+- Adicionar action `set_webhook` que chama `https://api.telegram.org/bot{token}/setWebhook` com a URL da function
+- Adicionar action `remove_webhook` para desregistrar
 
-1. Adicionar estado `showCurlForBotId` para controlar qual bot está exibindo o cURL
-2. Quando o badge "Financeiro" for ativado (na tabela), setar esse estado para o bot correspondente
-3. Renderizar abaixo da linha do bot (ou em um Dialog) um bloco com:
-   - Dois inputs de data: `startDate` e `endDate` (padrão: primeiro e último dia do mês atual)
-   - Um bloco `<pre>` com o cURL montado dinamicamente:
-     ```
-     curl -X POST \
-       https://nlpnfkidnixphnlwhrux.supabase.co/functions/v1/telegram-webhook \
-       -H "Content-Type: application/json" \
-       -d '{
-         "action": "financial_report",
-         "clinicId": "<clinic_id>",
-         "period": {
-           "startDate": "2026-03-01",
-           "endDate": "2026-03-31"
-         }
-       }'
-     ```
-   - Botão "Copiar" que copia o cURL para a clipboard
-4. Também mostrar o cURL para o webhook de estoque (`stock_alert`) com exemplo correspondente
-
-### Detalhes técnicos
-- A URL da edge function será construída com `import.meta.env.VITE_SUPABASE_PROJECT_ID`
-- O `clinicId` vem de `profile.clinic_id`
-- Nenhuma alteração no backend necessária
+**`src/components/settings/TelegramBotsSection.tsx`**:
+- Adicionar botão "Ativar Webhook" / "Desativar Webhook" na tabela de bots
+- Ao clicar, chamar a edge function com `action: "set_webhook"` passando `botId` e `clinicId`
 
