@@ -1,33 +1,43 @@
 
 
-## Problema
+## Sincronizar chat do grupo Telegram via polling
 
-A edge function `telegram-webhook` atual só aceita chamadas manuais com `action: "receive_message"` e `clinicId` no body. Ela **não** está registrada como webhook no Telegram, então quando você envia uma mensagem ao bot, o Telegram não sabe para onde encaminhar — a mensagem simplesmente se perde.
+### Problema
+O webhook do Telegram não está funcionando (provavelmente por restrições de rede/certificado). Vamos simplificar: em vez de depender de webhook, criar uma edge function que busca as mensagens do grupo via `getUpdates` do Telegram e insere na tabela `telegram_notifications`.
 
-## Solução
+### Abordagem
+Criar uma nova edge function `telegram-sync` que:
+1. Busca o bot pelo `botId`
+2. Chama `getUpdates` na API do Telegram para pegar mensagens recentes
+3. Insere mensagens novas na `telegram_notifications` (evitando duplicatas pelo `update_id` no metadata)
 
-### 1. Atualizar a edge function `telegram-webhook` para aceitar o formato nativo do Telegram
-
-Quando o Telegram envia um update via webhook, o body tem o formato `{ update_id, message: { chat: { id }, text, from } }` — sem `action` nem `clinicId`. A function precisa detectar esse formato e:
-- Extrair o `chat_id` do update
-- Buscar na tabela `telegram_bots` qual bot tem aquele `chat_id` (independente de `clinicId`)
-- Inserir a notificação na `telegram_notifications`
-
-A lógica existente (actions `stock_alert`, `financial_report`, `receive_message`) continua funcionando normalmente.
-
-### 2. Adicionar botão "Registrar Webhook" na seção de bots
-
-No `TelegramBotsSection.tsx`, adicionar um botão por bot que chama a API do Telegram `setWebhook` apontando para a URL da edge function. Isso é feito via uma nova action `set_webhook` na própria edge function.
+No frontend, adicionar um botão **"Sincronizar"** na tabela de bots (TelegramBotsSection) e também na aba de notificações (TelegramNotificationsTab).
 
 ### Alterações
 
-**`supabase/functions/telegram-webhook/index.ts`**:
-- No início do handler, antes de checar `action`, verificar se o body contém `message.chat.id` (formato nativo Telegram)
-- Se sim: buscar bot pelo `chat_id`, inserir notificação, retornar `{ ok: true }`
-- Adicionar action `set_webhook` que chama `https://api.telegram.org/bot{token}/setWebhook` com a URL da function
-- Adicionar action `remove_webhook` para desregistrar
+**Nova edge function: `supabase/functions/telegram-sync/index.ts`**
+- Recebe `botId` no body
+- Busca o bot na tabela `telegram_bots` (token, chat_id, clinic_id)
+- Chama `https://api.telegram.org/bot{token}/getUpdates` com offset salvo
+- Filtra mensagens do `chat_id` configurado
+- Insere cada mensagem nova em `telegram_notifications` (verifica duplicata por `update_id` no metadata)
+- Salva o último offset no campo metadata ou numa coluna auxiliar
 
-**`src/components/settings/TelegramBotsSection.tsx`**:
-- Adicionar botão "Ativar Webhook" / "Desativar Webhook" na tabela de bots
-- Ao clicar, chamar a edge function com `action: "set_webhook"` passando `botId` e `clinicId`
+**Migração: adicionar coluna `last_update_offset` na tabela `telegram_bots`**
+- `ALTER TABLE telegram_bots ADD COLUMN last_update_offset bigint DEFAULT 0;`
+
+**Arquivo: `src/components/settings/TelegramBotsSection.tsx`**
+- Adicionar botão "Sincronizar" (ícone RefreshCw) na coluna de ações de cada bot
+- Ao clicar, chama `supabase.functions.invoke("telegram-sync", { body: { botId } })`
+- Exibe toast com quantidade de mensagens sincronizadas
+
+**Arquivo: `src/components/modules/conversas/TelegramNotificationsTab.tsx`**
+- Adicionar botão "Sincronizar Grupo" no header ao lado do botão Atualizar
+- Busca os bots da clínica e chama a sync para cada um com `webhook_receive_messages = true`
+
+### Detalhes técnicos
+- A edge function usa `SUPABASE_SERVICE_ROLE_KEY` para bypass de RLS
+- O `getUpdates` retorna todas as mensagens pendentes; filtramos pelo `chat_id` do bot
+- O `last_update_offset` garante que não processamos mensagens já sincronizadas
+- Realtime já está configurado na `telegram_notifications`, então novas mensagens aparecem automaticamente na UI
 
