@@ -14,6 +14,9 @@ interface DashboardContextType {
   pendingProntuarioClientId: string | null;
   openProntuario: (clientId: string) => void;
   clearPendingProntuario: () => void;
+  pendingConversasTab: string | null;
+  openConversasTab: (tab: string) => void;
+  clearPendingConversasTab: () => void;
 }
 
 const DashboardContext = createContext<DashboardContextType | null>(null);
