@@ -253,7 +253,7 @@ const TelegramNotificationsTab = () => {
             return (
               <Card
                 key={notif.id}
-                className={`transition-colors ${isOutgoing ? "border-accent/40 bg-accent/5" : ""} ${!notif.is_read && !isOutgoing ? "border-primary/30 bg-primary/5" : ""} ${notif.is_ok ? "opacity-60" : ""}`}
+                className={`transition-colors ${isOutgoing ? "border-accent/40 bg-accent/20" : ""} ${!notif.is_read && !isOutgoing ? "border-primary/30 bg-primary/5" : ""} ${notif.is_ok ? "opacity-60" : ""}`}
               >
                 <CardContent className="py-3 px-4">
                   <div className="flex items-start justify-between gap-3">
