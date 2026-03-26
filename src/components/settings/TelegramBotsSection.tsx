@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Bot, Plus, Power, Trash2, MessageSquare, PackageCheck, BarChart3, Copy, Terminal, Webhook, Loader2 } from "lucide-react";
+import { Bot, Plus, Power, Trash2, MessageSquare, PackageCheck, BarChart3, Copy, Terminal, Webhook, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,6 +35,7 @@ const TelegramBotsSection = () => {
   const [curlStartDate, setCurlStartDate] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd"));
   const [curlEndDate, setCurlEndDate] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
   const [webhookLoading, setWebhookLoading] = useState<string | null>(null);
+  const [syncLoading, setSyncLoading] = useState<string | null>(null);
 
   const [newLabel, setNewLabel] = useState("");
   const [newToken, setNewToken] = useState("");
@@ -168,6 +169,25 @@ const TelegramBotsSection = () => {
       toast.error("Erro: " + err.message);
     } finally {
       setWebhookLoading(null);
+    }
+  };
+
+  const handleSync = async (bot: TelegramBot) => {
+    setSyncLoading(bot.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("telegram-sync", {
+        body: { botId: bot.id },
+      });
+      if (error) throw error;
+      if (data?.ok) {
+        toast.success(`Sincronizado! ${data.synced} nova(s) mensagem(ns)`);
+      } else {
+        toast.error("Falha na sincronização: " + JSON.stringify(data));
+      }
+    } catch (err: any) {
+      toast.error("Erro: " + err.message);
+    } finally {
+      setSyncLoading(null);
     }
   };
 
