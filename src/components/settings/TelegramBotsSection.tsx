@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Bot, Plus, Power, Trash2, MessageSquare, PackageCheck, BarChart3 } from "lucide-react";
+import { Bot, Plus, Power, Trash2, MessageSquare, PackageCheck, BarChart3, Copy, Terminal } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { format, startOfMonth, endOfMonth } from "date-fns";
 
 interface TelegramBot {
   id: string;
