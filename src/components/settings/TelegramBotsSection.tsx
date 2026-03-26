@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Bot, Plus, Power, Trash2, MessageSquare, PackageCheck, BarChart3 } from "lucide-react";
+import { Bot, Plus, Power, Trash2, MessageSquare, PackageCheck, BarChart3, Copy, Terminal } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { format, startOfMonth, endOfMonth } from "date-fns";
 
 interface TelegramBot {
   id: string;
@@ -30,6 +31,9 @@ const TelegramBotsSection = () => {
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [curlBotId, setCurlBotId] = useState<string | null>(null);
+  const [curlStartDate, setCurlStartDate] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd"));
+  const [curlEndDate, setCurlEndDate] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
 
   const [newLabel, setNewLabel] = useState("");
   const [newToken, setNewToken] = useState("");
@@ -134,10 +138,42 @@ const TelegramBotsSection = () => {
         .eq("id", id);
       if (error) throw error;
       toast.success("Webhook atualizado");
+      // Show cURL panel when enabling financial or stock webhook
+      if (!currentValue && (field === "webhook_financial_reports" || field === "webhook_stock_alerts")) {
+        setCurlBotId(id);
+      }
       fetchBots();
     } catch (err: any) {
       toast.error("Erro: " + err.message);
     }
+  };
+
+  const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+  const baseUrl = `https://${projectId}.supabase.co/functions/v1/telegram-webhook`;
+
+  const getFinancialCurl = () => `curl -X POST \\
+  ${baseUrl} \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "action": "financial_report",
+    "clinicId": "${profile?.clinic_id || "<clinic_id>"}",
+    "period": {
+      "startDate": "${curlStartDate}",
+      "endDate": "${curlEndDate}"
+    }
+  }'`;
+
+  const getStockCurl = () => `curl -X POST \\
+  ${baseUrl} \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "action": "stock_alert",
+    "clinicId": "${profile?.clinic_id || "<clinic_id>"}"
+  }'`;
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success("cURL copiado!");
   };
 
   return (
@@ -209,6 +245,17 @@ const TelegramBotsSection = () => {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
+                          {(bot.webhook_financial_reports || bot.webhook_stock_alerts) && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setCurlBotId(curlBotId === bot.id ? null : bot.id)}
+                              title="Ver cURL de integração"
+                              className={curlBotId === bot.id ? "text-primary" : ""}
+                            >
+                              <Terminal className="w-4 h-4" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"
@@ -232,6 +279,89 @@ const TelegramBotsSection = () => {
                   ))}
                 </TableBody>
               </Table>
+            )}
+
+            {curlBotId && bots.find(b => b.id === curlBotId) && (
+              <Card className="border-dashed">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Terminal className="w-4 h-4" />
+                    Comandos de Integração — {bots.find(b => b.id === curlBotId)?.label}
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Use estes comandos cURL para integrar com sistemas externos (n8n, Make, etc.)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {bots.find(b => b.id === curlBotId)?.webhook_financial_reports && (
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold flex items-center gap-1.5">
+                        <BarChart3 className="w-3.5 h-3.5 text-emerald-500" />
+                        Relatório Financeiro
+                      </Label>
+                      <div className="flex gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Data início</Label>
+                          <Input
+                            type="date"
+                            value={curlStartDate}
+                            onChange={e => setCurlStartDate(e.target.value)}
+                            className="h-8 text-xs w-36"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Data fim</Label>
+                          <Input
+                            type="date"
+                            value={curlEndDate}
+                            onChange={e => setCurlEndDate(e.target.value)}
+                            className="h-8 text-xs w-36"
+                          />
+                        </div>
+                      </div>
+                      <div className="relative">
+                        <pre className="bg-muted text-foreground text-xs p-3 rounded-md overflow-x-auto whitespace-pre-wrap break-all">
+                          {getFinancialCurl()}
+                        </pre>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute top-1 right-1 h-7 w-7"
+                          onClick={() => copyToClipboard(getFinancialCurl())}
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {bots.find(b => b.id === curlBotId)?.webhook_stock_alerts && (
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold flex items-center gap-1.5">
+                        <PackageCheck className="w-3.5 h-3.5 text-amber-500" />
+                        Alerta de Estoque Baixo
+                      </Label>
+                      <div className="relative">
+                        <pre className="bg-muted text-foreground text-xs p-3 rounded-md overflow-x-auto whitespace-pre-wrap break-all">
+                          {getStockCurl()}
+                        </pre>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute top-1 right-1 h-7 w-7"
+                          onClick={() => copyToClipboard(getStockCurl())}
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  <Button variant="outline" size="sm" onClick={() => setCurlBotId(null)}>
+                    Fechar
+                  </Button>
+                </CardContent>
+              </Card>
             )}
 
             {bots.length === 0 && !showAdd && (
