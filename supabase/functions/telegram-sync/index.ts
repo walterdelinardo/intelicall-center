@@ -41,6 +41,9 @@ Deno.serve(async (req) => {
 
     const offset = bot.last_update_offset || 0;
 
+    // Delete any active webhook first (getUpdates and webhooks are mutually exclusive)
+    await fetch(`https://api.telegram.org/bot${bot.bot_token}/deleteWebhook`, { method: "POST" });
+
     // Call Telegram getUpdates
     const tgRes = await fetch(
       `https://api.telegram.org/bot${bot.bot_token}/getUpdates`,
