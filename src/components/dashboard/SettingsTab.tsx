@@ -368,6 +368,9 @@ const SettingsTab = () => {
         </CardContent>
       </Card>
 
+      {/* Bots Telegram */}
+      <TelegramBotsSection />
+
       {/* Integração N8N */}
       <Card className="shadow-card">
         <CardHeader>
