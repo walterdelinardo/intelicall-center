@@ -127,6 +127,71 @@ Deno.serve(async (req) => {
       });
     }
 
+    // --- Send message (for n8n / external integrations) ---
+    if (action === "send_message") {
+      const { message, chatId, notificationType } = body;
+      if (!clinicId || !message) {
+        return new Response(JSON.stringify({ error: "Missing clinicId or message" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Find bot(s) for this clinic with the given chat_id (or all active bots)
+      const query = supabase
+        .from("telegram_bots")
+        .select("id, bot_token, chat_id, label")
+        .eq("clinic_id", clinicId)
+        .eq("is_active", true);
+
+      if (chatId) {
+        query.eq("chat_id", String(chatId));
+      }
+
+      const { data: bots } = await query;
+
+      if (!bots || bots.length === 0) {
+        return new Response(JSON.stringify({ error: "No active bot found" }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      let sent = 0;
+      for (const bot of bots) {
+        try {
+          const targetChatId = chatId || bot.chat_id;
+          const res = await fetch(`https://api.telegram.org/bot${bot.bot_token}/sendMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: targetChatId,
+              text: message,
+              parse_mode: "Markdown",
+            }),
+          });
+
+          if (res.ok) {
+            sent++;
+            await supabase.from("telegram_notifications").insert({
+              clinic_id: clinicId,
+              bot_id: bot.id,
+              message,
+              direction: "outgoing",
+              notification_type: notificationType || "message",
+              metadata: body.metadata || null,
+            });
+          }
+        } catch (err) {
+          console.error(`Error sending to bot ${bot.label}:`, err);
+        }
+      }
+
+      return new Response(JSON.stringify({ ok: true, sent }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // --- Receive message (manual call) ---
     if (action === "receive_message") {
       const { message, chatId } = body;
