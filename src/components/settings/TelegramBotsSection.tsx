@@ -399,6 +399,30 @@ const TelegramBotsSection = () => {
                     </div>
                   )}
 
+                  {/* n8n Telegram Log — always visible */}
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold flex items-center gap-1.5">
+                      <Bot className="w-3.5 h-3.5 text-purple-500" />
+                      Registrar mensagens do n8n
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Cole no node HTTP Request do n8n, após o node Telegram que envia a mensagem. O <code className="bg-muted px-1 rounded">{"{{ $json }}"}</code> injeta o output automaticamente.
+                    </p>
+                    <div className="relative">
+                      <pre className="bg-muted text-foreground text-xs p-3 rounded-md overflow-x-auto whitespace-pre-wrap break-all">
+                        {getN8nCurl()}
+                      </pre>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute top-1 right-1 h-7 w-7"
+                        onClick={() => copyToClipboard(getN8nCurl())}
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+
                   <Button variant="outline" size="sm" onClick={() => setCurlBotId(null)}>
                     Fechar
                   </Button>
