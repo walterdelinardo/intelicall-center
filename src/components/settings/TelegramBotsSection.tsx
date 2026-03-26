@@ -31,6 +31,9 @@ const TelegramBotsSection = () => {
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [curlBotId, setCurlBotId] = useState<string | null>(null);
+  const [curlStartDate, setCurlStartDate] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd"));
+  const [curlEndDate, setCurlEndDate] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
 
   const [newLabel, setNewLabel] = useState("");
   const [newToken, setNewToken] = useState("");
