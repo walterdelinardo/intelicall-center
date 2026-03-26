@@ -10,6 +10,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import TelegramLabelPicker from "./TelegramLabelPicker";
 
 interface TelegramNotification {
@@ -54,6 +55,7 @@ const typeLabels: Record<string, string> = {
 };
 
 const TelegramNotificationsTab = () => {
+  const queryClient = useQueryClient();
   const { profile } = useAuth();
   const [notifications, setNotifications] = useState<TelegramNotification[]>([]);
   const [bots, setBots] = useState<Record<string, TelegramBotInfo>>({});
@@ -158,6 +160,7 @@ const TelegramNotificationsTab = () => {
     if (newOk) updates.is_read = true;
     await supabase.from("telegram_notifications" as any).update(updates).eq("id", id);
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_ok: newOk, ...(newOk ? { is_read: true } : {}) } : n)));
+    queryClient.invalidateQueries({ queryKey: ["header-telegram-unread"] });
   };
 
   const handleForceSync = async () => {
