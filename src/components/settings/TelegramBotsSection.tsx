@@ -149,6 +149,28 @@ const TelegramBotsSection = () => {
     }
   };
 
+  const handleSetWebhook = async (bot: TelegramBot, remove = false) => {
+    setWebhookLoading(bot.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("telegram-webhook", {
+        body: {
+          action: remove ? "remove_webhook" : "set_webhook",
+          botId: bot.id,
+        },
+      });
+      if (error) throw error;
+      if (data?.ok) {
+        toast.success(remove ? "Webhook removido do Telegram" : "Webhook registrado no Telegram!");
+      } else {
+        toast.error("Falha: " + JSON.stringify(data?.result?.description || data));
+      }
+    } catch (err: any) {
+      toast.error("Erro: " + err.message);
+    } finally {
+      setWebhookLoading(null);
+    }
+  };
+
   const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
   const baseUrl = `https://${projectId}.supabase.co/functions/v1/telegram-webhook`;
 
