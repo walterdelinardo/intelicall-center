@@ -14,6 +14,9 @@ interface DashboardContextType {
   pendingProntuarioClientId: string | null;
   openProntuario: (clientId: string) => void;
   clearPendingProntuario: () => void;
+  pendingConversasTab: string | null;
+  openConversasTab: (tab: string) => void;
+  clearPendingConversasTab: () => void;
 }
 
 const DashboardContext = createContext<DashboardContextType | null>(null);
@@ -33,6 +36,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   const [pickerPhone, setPickerPhone] = useState<string | null>(null);
   const [pickerContactName, setPickerContactName] = useState<string | null>(null);
   const [pendingProntuarioClientId, setPendingProntuarioClientId] = useState<string | null>(null);
+  const [pendingConversasTab, setPendingConversasTab] = useState<string | null>(null);
 
   const openChatWithPhone = useCallback((phone: string, contactName?: string) => {
     setPickerPhone(phone.replace(/\D/g, ""));
@@ -71,6 +75,15 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     setPendingProntuarioClientId(null);
   }, []);
 
+  const openConversasTab = useCallback((tab: string) => {
+    setPendingConversasTab(tab);
+    setActiveModule("conversas");
+  }, []);
+
+  const clearPendingConversasTab = useCallback(() => {
+    setPendingConversasTab(null);
+  }, []);
+
   return (
     <DashboardContext.Provider value={{
       activeModule, setActiveModule,
@@ -78,6 +91,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
       clearPendingChat, openChatWithPhone,
       showInboxPicker, confirmChatWithInbox, cancelInboxPicker,
       pendingProntuarioClientId, openProntuario, clearPendingProntuario,
+      pendingConversasTab, openConversasTab, clearPendingConversasTab,
     }}>
       {children}
     </DashboardContext.Provider>
