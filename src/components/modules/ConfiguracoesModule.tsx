@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import TelegramBotsSection from "@/components/settings/TelegramBotsSection";
 import { fetchViaCep } from "@/lib/viaCep";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -1146,6 +1147,11 @@ const ConfiguracoesModule = () => {
               />
             </CardContent>
           </Card>
+
+          {/* Bots Telegram */}
+          <div className="mt-6">
+            <TelegramBotsSection />
+          </div>
         </TabsContent>
       </Tabs>
 
