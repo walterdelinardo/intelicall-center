@@ -1,33 +1,64 @@
 
 
-## Plano: Permitir múltiplos papéis por usuário
+## Plano: Migrar do sistema legado `user_roles` para o sistema dinâmico `role_definitions` + `user_role_assignments`
 
-### Situação atual
+### Problema
 
-- O `UsuariosModule` usa um `Select` simples (single) para atribuir papel — ao trocar, deleta todos os assignments e insere apenas um
-- O `AuthContext.fetchDynamicPermissions` já busca múltiplos assignments e faz merge com lógica OR (prevalece o maior acesso) — **já funciona para múltiplos papéis**
-- O filtro de super admin já verifica se **algum** dos papéis é super admin
+O sistema atualmente tem **duas tabelas de papéis coexistindo**:
+- **Legada**: `user_roles` (com enum `app_role`: admin, recepcao, podologo, financeiro)
+- **Nova**: `role_definitions` + `role_permissions` + `user_role_assignments` (dinâmica, com permissões granulares)
+
+O cabeçalho e sidebar ainda leem da tabela legada (`roles` no AuthContext), por isso mostra "Recepção" mesmo após alterar o papel no novo sistema.
+
+### Impacto da tabela legada no sistema
+
+| Local | O que usa | Problema |
+|---|---|---|
+| `DashboardHeader.tsx` | `roles` → exibe badges "Recepção", "Admin" etc | Mostra papel errado |
+| `AppSidebar.tsx` | `roles[0]` no rodapé | Mostra papel errado |
+| `AuthContext.tsx` | `fetchRoles()` lê `user_roles` | Alimenta dados desatualizados |
+| `AuthContext.tsx` | `hasRole()` checa tabela legada | Usado em ConfiguracoesModule e UsuariosModule |
+| `ConfiguracoesModule.tsx` | `hasRole("admin")` para checar admin | Pode bloquear acesso indevidamente |
+| `ClientesModule.tsx` | Query direta em `user_roles` para listar podólogos | Pode não encontrar profissionais |
+| **RLS policies** (6 tabelas) | `has_role(auth.uid(), 'admin')` | Bloqueia operações se não tiver registro na tabela legada |
+
+### Decisão recomendada
+
+**Abandonar a tabela legada** e migrar tudo para o sistema dinâmico. A tabela `user_roles` continuará existindo no banco (não deletar para segurança), mas o código não a usará mais.
 
 ### Alterações necessárias
 
-#### 1. `src/components/modules/UsuariosModule.tsx`
+#### 1. `src/contexts/AuthContext.tsx`
+- **Remover** `fetchRoles()` e o state `roles`
+- **Substituir** `roles` por `assignedRoles` (que já existe e vem da tabela nova)
+- **Substituir** `hasRole()` → usar `isSuperAdmin` ou `hasModuleAccess()` conforme o caso
+- Expor `assignedRoles` (já expõe) para exibição de badges no header/sidebar
 
-- **`getUserAssignedRole`** → renomear para `getUserAssignedRoles`, retornar array de `role_definition_id`
-- **Filtro super admin**: verificar se algum dos papéis atribuídos é super admin (ao invés de apenas um)
-- **UI da coluna Papel**: trocar o `Select` simples por um sistema multi-select com checkboxes (Popover + lista de checkboxes com os papéis disponíveis)
-  - Exibir os papéis atribuídos como Badges coloridos
-  - Ao marcar/desmarcar, inserir ou deletar individualmente na tabela `user_role_assignments`
-- **`assignRoleMutation`**: refatorar para receber `{ userId, roleDefId, action: 'add' | 'remove' }` — inserir ou deletar um assignment individual ao invés de substituir todos
+#### 2. `src/components/dashboard/DashboardHeader.tsx`
+- Trocar `roles.map(r => roleLabels[r])` por `assignedRoles.map(r => r.name)` com a cor `r.color`
+- Usar badges coloridos com os nomes dos papéis dinâmicos
 
-#### 2. Nenhuma alteração de banco
+#### 3. `src/components/dashboard/AppSidebar.tsx`
+- Trocar `roles[0]` por `assignedRoles.map(r => r.name).join(", ")` ou exibir o primeiro papel dinâmico
 
-A tabela `user_role_assignments` já suporta múltiplos registros por `user_id` (não tem constraint unique em user_id+clinic_id, apenas em user_id+role_definition_id se houver). Não precisa de migração.
+#### 4. `src/components/modules/ConfiguracoesModule.tsx`
+- Trocar `hasRole("admin")` por `isSuperAdmin || hasModuleAccess("configuracoes", "edit")`
 
-#### 3. Nenhuma alteração no AuthContext
+#### 5. `src/components/modules/ClientesModule.tsx`
+- Substituir query em `user_roles` (buscando podólogos) por query em `user_role_assignments` + `role_definitions` para encontrar profissionais com o papel adequado
 
-O `fetchDynamicPermissions` já faz merge OR de múltiplos papéis corretamente.
+#### 6. RLS Policies (migração SQL)
+- Criar função `has_dynamic_role()` ou atualizar `has_role()` para consultar `user_role_assignments` + `role_definitions` ao invés de `user_roles`
+- Isso corrige as 6 tabelas que usam `has_role()` nas policies: `clinics`, `user_roles`, `whatsapp_inboxes`, `telegram_bots`, `role_permissions`, `role_definitions`, `user_role_assignments`
+- A abordagem mais segura: **atualizar a função `has_role()`** para checar ambas as tabelas (legada OR nova), garantindo retrocompatibilidade
+
+#### 7. Nenhuma tabela deletada
+A tabela `user_roles` permanece no banco por segurança, mas o código front-end não a consultará mais.
 
 ### Resultado
 
-Um usuário poderá ter, por exemplo, os papéis "Podólogo" e "Financeiro" simultaneamente. As permissões serão a **união** (OR) de ambos — sempre prevalece o maior acesso.
+- Header e sidebar mostrarão os papéis corretos do sistema dinâmico
+- `hasRole("admin")` será substituído por checagens no sistema dinâmico
+- RLS policies funcionarão com ambos os sistemas durante a transição
+- Listagem de profissionais (podólogos) usará a tabela nova
 
