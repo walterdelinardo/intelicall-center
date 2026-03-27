@@ -181,14 +181,41 @@ Deno.serve(async (req) => {
       });
     }
 
-    // --- Stock alert ---
+    // --- Stock alert (low stock report) ---
     if (action === "stock_alert") {
-      const { itemName, currentQty, minQty } = body;
-      if (!clinicId || !itemName) {
-        return new Response(JSON.stringify({ error: "Missing clinicId or itemName" }), {
+      if (!clinicId) {
+        return new Response(JSON.stringify({ error: "Missing clinicId" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
+      }
+
+      // Fetch all active stock items for the clinic
+      const { data: allItems } = await supabase
+        .from("stock_items")
+        .select("name, category, quantity, min_quantity, cost_price, sale_price, supplier, is_active")
+        .eq("clinic_id", clinicId)
+        .eq("is_active", true)
+        .order("name", { ascending: true });
+
+      // Filter only low stock items (quantity <= min_quantity)
+      const lowItems = (allItems || []).filter((item: any) => Number(item.quantity) <= Number(item.min_quantity));
+
+      const fmt = (v: any) => v != null ? Number(v).toFixed(2).replace(".", ",") : "0,00";
+
+      let reportMsg: string;
+      if (lowItems.length === 0) {
+        reportMsg = "✅ *Nenhum produto com estoque baixo*\n\nTodos os itens estão com estoque acima do mínimo.";
+      } else {
+        reportMsg = "⚠️ *Relatório de Estoque Baixo*\n\n";
+        lowItems.forEach((item: any, i: number) => {
+          reportMsg += `${i + 1}. *${item.name}*\n`;
+          reportMsg += `   📁 Categoria: ${item.category || "—"}\n`;
+          reportMsg += `   📊 Qtd: ${Number(item.quantity)} | Mín: ${Number(item.min_quantity)}\n`;
+          reportMsg += `   💰 Custo: R$ ${fmt(item.cost_price)} | Venda: R$ ${fmt(item.sale_price)}\n`;
+          reportMsg += `   🏭 Fornecedor: ${item.supplier || "—"}\n\n`;
+        });
+        reportMsg += `📦 Total: ${lowItems.length} produto${lowItems.length > 1 ? "s" : ""} com estoque baixo`;
       }
 
       const { data: bots } = await supabase
@@ -199,35 +226,58 @@ Deno.serve(async (req) => {
         .eq("is_active", true);
 
       if (!bots || bots.length === 0) {
-        return new Response(JSON.stringify({ ok: true, sent: 0 }), {
+        return new Response(JSON.stringify({ ok: true, sent: 0, lowStockCount: lowItems.length }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      const alertMsg = `⚠️ *Alerta de Estoque Baixo*\n\n📦 Produto: ${itemName}\n📊 Qtd Atual: ${currentQty}\n📉 Qtd Mínima: ${minQty}\n\n_Reponha o estoque o mais rápido possível._`;
+      // Split message into chunks of max 4096 chars for Telegram
+      const chunks: string[] = [];
+      if (reportMsg.length <= 4096) {
+        chunks.push(reportMsg);
+      } else {
+        let remaining = reportMsg;
+        while (remaining.length > 0) {
+          if (remaining.length <= 4096) {
+            chunks.push(remaining);
+            break;
+          }
+          let splitAt = remaining.lastIndexOf("\n\n", 4096);
+          if (splitAt <= 0) splitAt = remaining.lastIndexOf("\n", 4096);
+          if (splitAt <= 0) splitAt = 4096;
+          chunks.push(remaining.substring(0, splitAt));
+          remaining = remaining.substring(splitAt).trimStart();
+        }
+      }
 
       let sent = 0;
       for (const bot of bots) {
         try {
-          const res = await fetch(`https://api.telegram.org/bot${bot.bot_token}/sendMessage`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              chat_id: bot.chat_id,
-              text: alertMsg,
-              parse_mode: "Markdown",
-            }),
-          });
+          let allOk = true;
+          for (const chunk of chunks) {
+            const res = await fetch(`https://api.telegram.org/bot${bot.bot_token}/sendMessage`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                chat_id: bot.chat_id,
+                text: chunk,
+                parse_mode: "Markdown",
+              }),
+            });
+            if (!res.ok) allOk = false;
+          }
 
-          if (res.ok) {
+          if (allOk) {
             sent++;
             await supabase.from("telegram_notifications").insert({
               clinic_id: clinicId,
               bot_id: bot.id,
-              message: `Alerta de estoque baixo: ${itemName} (Atual: ${currentQty}, Mínimo: ${minQty})`,
+              message: lowItems.length > 0
+                ? `Relatório de estoque baixo: ${lowItems.length} produto(s) com estoque baixo`
+                : "Nenhum produto com estoque baixo",
               direction: "outgoing",
-              notification_type: "stock_alert",
-              metadata: { itemName, currentQty, minQty },
+              notification_type: "stock_report",
+              metadata: { lowStockCount: lowItems.length, items: lowItems.map((i: any) => i.name) },
             });
           }
         } catch (err) {
@@ -235,7 +285,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      return new Response(JSON.stringify({ ok: true, sent }), {
+      return new Response(JSON.stringify({ ok: true, sent, lowStockCount: lowItems.length }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
