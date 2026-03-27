@@ -256,13 +256,31 @@ const RoleFormDialog = ({ open, onOpenChange, role, allModules, existingPermissi
                   <tr className="bg-muted/50">
                     <th className="text-left p-2 font-medium">Módulo</th>
                     <th className="text-center p-2 font-medium w-20">
-                      <button onClick={toggleAllRead} className="hover:underline">Ler</button>
+                      <div className="flex flex-col items-center gap-1">
+                        <span className="text-xs">Ler</span>
+                        <Checkbox
+                          checked={allModules.every((m) => perms[m.key]?.can_read)}
+                          onCheckedChange={toggleAllRead}
+                        />
+                      </div>
                     </th>
                     <th className="text-center p-2 font-medium w-20">
-                      <button onClick={toggleAllEdit} className="hover:underline">Editar</button>
+                      <div className="flex flex-col items-center gap-1">
+                        <span className="text-xs">Editar</span>
+                        <Checkbox
+                          checked={allModules.every((m) => perms[m.key]?.can_edit)}
+                          onCheckedChange={toggleAllEdit}
+                        />
+                      </div>
                     </th>
                     <th className="text-center p-2 font-medium w-20">
-                      <button onClick={toggleAllDelete} className="hover:underline">Excluir</button>
+                      <div className="flex flex-col items-center gap-1">
+                        <span className="text-xs">Excluir</span>
+                        <Checkbox
+                          checked={allModules.every((m) => perms[m.key]?.can_delete)}
+                          onCheckedChange={toggleAllDelete}
+                        />
+                      </div>
                     </th>
                   </tr>
                 </thead>
