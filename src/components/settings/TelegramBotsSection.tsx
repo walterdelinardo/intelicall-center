@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Bot, Plus, Power, Trash2, MessageSquare, PackageCheck, BarChart3, Copy, Terminal, Loader2, RefreshCw } from "lucide-react";
+import { Bot, Plus, Power, Trash2, MessageSquare, PackageCheck, BarChart3, Copy, Terminal, Loader2, RefreshCw, Database } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,6 +37,7 @@ const TelegramBotsSection = () => {
   const [curlEndDate, setCurlEndDate] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
   
   const [syncLoading, setSyncLoading] = useState<string | null>(null);
+  const [getTable, setGetTable] = useState("stock_items");
 
   const [newLabel, setNewLabel] = useState("");
   const [newToken, setNewToken] = useState("");
@@ -172,6 +174,21 @@ const TelegramBotsSection = () => {
 
   const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
   const baseUrl = `https://${projectId}.supabase.co/functions/v1/telegram-webhook`;
+  const n8nQueryUrl = `https://${projectId}.supabase.co/functions/v1/n8n-query`;
+
+  const clinicId = profile?.clinic_id || "<clinic_id>";
+
+  const getTableOptions: Record<string, { label: string; params: string }> = {
+    stock_items: { label: "Estoque", params: `table=stock_items&clinic_id=${clinicId}&is_active=true` },
+    financial_transactions: { label: "Financeiro", params: `table=financial_transactions&clinic_id=${clinicId}&order=date&ascending=false&limit=50` },
+    clients: { label: "Clientes", params: `table=clients&clinic_id=${clinicId}&limit=100` },
+    appointments: { label: "Agendamentos", params: `table=appointments&clinic_id=${clinicId}&order=date&ascending=false&limit=50` },
+    telegram_notifications: { label: "Notificações Telegram", params: `table=telegram_notifications&clinic_id=${clinicId}&order=created_at&ascending=false&limit=50` },
+  };
+
+  const getQueryCurl = (table: string) => `curl -X GET \\
+  "${n8nQueryUrl}?${getTableOptions[table]?.params || ""}" \\
+  -H "x-api-secret: <N8N_API_SECRET>"`;
 
   const getFinancialCurl = () => `curl -X POST \\
   ${baseUrl} \\
@@ -417,6 +434,43 @@ const TelegramBotsSection = () => {
                         size="icon"
                         className="absolute top-1 right-1 h-7 w-7"
                         onClick={() => copyToClipboard(getN8nCurl())}
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Consultar Dados via GET — always visible */}
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold flex items-center gap-1.5">
+                      <Database className="w-3.5 h-3.5 text-cyan-500" />
+                      Consultar Dados via GET
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Use no n8n (node HTTP Request) para buscar dados do sistema. Substitua <code className="bg-muted px-1 rounded">{"<N8N_API_SECRET>"}</code> pelo secret configurado.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs text-muted-foreground whitespace-nowrap">Tabela:</Label>
+                      <Select value={getTable} onValueChange={setGetTable}>
+                        <SelectTrigger className="h-8 text-xs w-52">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(getTableOptions).map(([key, opt]) => (
+                            <SelectItem key={key} value={key}>{opt.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="relative">
+                      <pre className="bg-muted text-foreground text-xs p-3 rounded-md overflow-x-auto whitespace-pre-wrap break-all">
+                        {getQueryCurl(getTable)}
+                      </pre>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute top-1 right-1 h-7 w-7"
+                        onClick={() => copyToClipboard(getQueryCurl(getTable))}
                       >
                         <Copy className="w-3.5 h-3.5" />
                       </Button>
