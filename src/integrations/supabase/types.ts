@@ -1478,6 +1478,82 @@ export type Database = {
           },
         ]
       }
+      role_definitions: {
+        Row: {
+          clinic_id: string
+          color: string
+          created_at: string
+          id: string
+          is_super_admin: boolean
+          is_system: boolean
+          name: string
+          slug: string
+        }
+        Insert: {
+          clinic_id: string
+          color?: string
+          created_at?: string
+          id?: string
+          is_super_admin?: boolean
+          is_system?: boolean
+          name: string
+          slug: string
+        }
+        Update: {
+          clinic_id?: string
+          color?: string
+          created_at?: string
+          id?: string
+          is_super_admin?: boolean
+          is_system?: boolean
+          name?: string
+          slug?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_definitions_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      role_permissions: {
+        Row: {
+          can_delete: boolean
+          can_edit: boolean
+          can_read: boolean
+          id: string
+          module_key: string
+          role_definition_id: string
+        }
+        Insert: {
+          can_delete?: boolean
+          can_edit?: boolean
+          can_read?: boolean
+          id?: string
+          module_key: string
+          role_definition_id: string
+        }
+        Update: {
+          can_delete?: boolean
+          can_edit?: boolean
+          can_read?: boolean
+          id?: string
+          module_key?: string
+          role_definition_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_permissions_role_definition_id_fkey"
+            columns: ["role_definition_id"]
+            isOneToOne: false
+            referencedRelation: "role_definitions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock_items: {
         Row: {
           category: string | null
@@ -1708,6 +1784,45 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_role_assignments: {
+        Row: {
+          clinic_id: string
+          created_at: string
+          id: string
+          role_definition_id: string
+          user_id: string
+        }
+        Insert: {
+          clinic_id: string
+          created_at?: string
+          id?: string
+          role_definition_id: string
+          user_id: string
+        }
+        Update: {
+          clinic_id?: string
+          created_at?: string
+          id?: string
+          role_definition_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_role_assignments_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_role_assignments_role_definition_id_fkey"
+            columns: ["role_definition_id"]
+            isOneToOne: false
+            referencedRelation: "role_definitions"
             referencedColumns: ["id"]
           },
         ]
@@ -2182,6 +2297,10 @@ export type Database = {
     }
     Functions: {
       get_user_clinic_id: { Args: { _user_id: string }; Returns: string }
+      has_module_access: {
+        Args: { _action?: string; _module_key: string; _user_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
