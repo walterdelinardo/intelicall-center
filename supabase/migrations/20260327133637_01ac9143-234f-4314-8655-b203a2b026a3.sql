@@ -1,0 +1,1 @@
+ALTER TABLE public.role_permissions ADD COLUMN allowed_tabs text[] DEFAULT NULL;

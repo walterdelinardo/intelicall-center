@@ -13,9 +13,10 @@ import { toast } from "sonner";
 import RolesTab from "./usuarios/RolesTab";
 
 const UsuariosModule = () => {
-  const { profile, hasRole, user, isSuperAdmin } = useAuth();
+  const { profile, hasRole, user, isSuperAdmin, hasTabAccess } = useAuth();
   const queryClient = useQueryClient();
   const isAdmin = hasRole("admin") || isSuperAdmin;
+  const availableTabs = ["usuarios", "papeis"].filter(t => hasTabAccess("usuarios", t));
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ["clinic-users", profile?.clinic_id],
@@ -116,10 +117,10 @@ const UsuariosModule = () => {
   }
 
   return (
-    <Tabs defaultValue="usuarios" className="space-y-6">
+    <Tabs defaultValue={availableTabs[0] || "usuarios"} className="space-y-6">
       <TabsList>
-        <TabsTrigger value="usuarios">Usuários</TabsTrigger>
-        <TabsTrigger value="papeis">Papéis</TabsTrigger>
+        {hasTabAccess("usuarios", "usuarios") && <TabsTrigger value="usuarios">Usuários</TabsTrigger>}
+        {hasTabAccess("usuarios", "papeis") && <TabsTrigger value="papeis">Papéis</TabsTrigger>}
       </TabsList>
 
       <TabsContent value="usuarios">

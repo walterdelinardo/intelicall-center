@@ -18,6 +18,7 @@ interface ModulePermission {
   can_read: boolean;
   can_edit: boolean;
   can_delete: boolean;
+  allowed_tabs: string[] | null;
 }
 
 interface RoleDefinition {
@@ -43,6 +44,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   hasRole: (role: AppRole) => boolean;
   hasModuleAccess: (moduleKey: string, action?: "read" | "edit" | "delete") => boolean;
+  hasTabAccess: (moduleKey: string, tabKey: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -125,7 +127,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           can_read: false,
           can_edit: false,
           can_delete: false,
+          allowed_tabs: p.allowed_tabs || null,
         };
+      } else {
+        // Merge allowed_tabs: if either is null (full access), result is null
+        const existing = permMap[p.module_key].allowed_tabs;
+        const incoming = p.allowed_tabs as string[] | null;
+        if (existing === null || incoming === null) {
+          permMap[p.module_key].allowed_tabs = null;
+        } else {
+          // Union of tabs
+          const merged = Array.from(new Set([...existing, ...incoming]));
+          permMap[p.module_key].allowed_tabs = merged;
+        }
       }
       if (p.can_read) permMap[p.module_key].can_read = true;
       if (p.can_edit) permMap[p.module_key].can_edit = true;
@@ -204,10 +218,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const hasRole = (role: AppRole) => roles.includes(role);
 
   const hasModuleAccess = (moduleKey: string, action: "read" | "edit" | "delete" = "read") => {
-    // Super admin bypasses everything
     if (isSuperAdmin) return true;
-    
-    // If user has no dynamic role assignments, fall back to old system
     if (assignedRoles.length === 0) return true;
 
     const perm = modulePermissions.find((p) => p.module_key === moduleKey);
@@ -221,11 +232,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const hasTabAccess = (moduleKey: string, tabKey: string) => {
+    if (isSuperAdmin) return true;
+    if (assignedRoles.length === 0) return true;
+
+    const perm = modulePermissions.find((p) => p.module_key === moduleKey);
+    if (!perm) return true;
+    if (!perm.allowed_tabs || perm.allowed_tabs.length === 0) return true;
+    return perm.allowed_tabs.includes(tabKey);
+  };
+
   return (
     <AuthContext.Provider value={{
       user, session, profile, roles, loading,
       isSuperAdmin, assignedRoles, modulePermissions,
-      signIn, signUp, signOut, hasRole, hasModuleAccess,
+      signIn, signUp, signOut, hasRole, hasModuleAccess, hasTabAccess,
     }}>
       {children}
     </AuthContext.Provider>

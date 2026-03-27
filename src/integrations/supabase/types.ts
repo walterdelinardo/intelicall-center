@@ -1521,6 +1521,7 @@ export type Database = {
       }
       role_permissions: {
         Row: {
+          allowed_tabs: string[] | null
           can_delete: boolean
           can_edit: boolean
           can_read: boolean
@@ -1529,6 +1530,7 @@ export type Database = {
           role_definition_id: string
         }
         Insert: {
+          allowed_tabs?: string[] | null
           can_delete?: boolean
           can_edit?: boolean
           can_read?: boolean
@@ -1537,6 +1539,7 @@ export type Database = {
           role_definition_id: string
         }
         Update: {
+          allowed_tabs?: string[] | null
           can_delete?: boolean
           can_edit?: boolean
           can_read?: boolean

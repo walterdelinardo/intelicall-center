@@ -85,7 +85,7 @@ interface MergedEvent {
 
 const AgendaModule = () => {
   const { openProntuario } = useDashboard();
-  const { profile } = useAuth();
+  const { profile, hasTabAccess } = useAuth();
   const queryClient = useQueryClient();
   const { events: googleEvents, loading: googleLoading, fetchEvents: fetchGoogleEvents, createEvent: createGoogleEvent, updateEvent: updateGoogleEvent, deleteEvent: deleteGoogleEvent, syncChanges } = useGoogleCalendar();
   const { accounts, isConnected } = useGoogleOAuth();
@@ -96,7 +96,8 @@ const AgendaModule = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
   const [filterAccount, setFilterAccount] = useState<string>("all");
-  const [agendaTab, setAgendaTab] = useState<"calendario" | "notificacoes">("calendario");
+  const availableAgendaTabs = (["calendario", "notificacoes"] as const).filter(t => hasTabAccess("agenda", t));
+  const [agendaTab, setAgendaTab] = useState<"calendario" | "notificacoes">(availableAgendaTabs[0] || "calendario");
 
   // Edit/Delete state for Google events
   const [editingEvent, setEditingEvent] = useState<MergedEvent | null>(null);
@@ -1131,18 +1132,22 @@ const AgendaModule = () => {
   return (
     <Tabs value={agendaTab} onValueChange={(v) => setAgendaTab(v as any)} className="space-y-4">
       <TabsList>
-        <TabsTrigger value="calendario" className="gap-2">
-          <Calendar className="w-4 h-4" /> Calendário
-        </TabsTrigger>
-        <TabsTrigger value="notificacoes" className="gap-2">
-          <Bell className="w-4 h-4" /> Notificações
-          {(() => {
+        {hasTabAccess("agenda", "calendario") && (
+          <TabsTrigger value="calendario" className="gap-2">
+            <Calendar className="w-4 h-4" /> Calendário
+          </TabsTrigger>
+        )}
+        {hasTabAccess("agenda", "notificacoes") && (
+          <TabsTrigger value="notificacoes" className="gap-2">
+            <Bell className="w-4 h-4" /> Notificações
+            {(() => {
             const unreadCount = notifications.filter((n: any) => !n.is_read).length;
             return unreadCount > 0 ? (
               <Badge variant="destructive" className="ml-1 h-5 min-w-5 px-1 text-[10px]">{unreadCount}</Badge>
             ) : null;
           })()}
-        </TabsTrigger>
+          </TabsTrigger>
+        )}
       </TabsList>
 
       <TabsContent value="notificacoes" className="space-y-4">
