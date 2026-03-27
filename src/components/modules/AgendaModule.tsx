@@ -155,6 +155,14 @@ const AgendaModule = () => {
     }
   }, [agendaTab]);
 
+  // Deep link from header notification icon
+  useEffect(() => {
+    if (pendingAgendaTab) {
+      setAgendaTab(pendingAgendaTab as any);
+      clearPendingAgendaTab();
+    }
+  }, [pendingAgendaTab, clearPendingAgendaTab]);
+
   useEffect(() => {
     if (activeAccounts.length === 1 && !selectedAccountId) {
       setSelectedAccountId(activeAccounts[0].id);
