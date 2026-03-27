@@ -31,20 +31,97 @@ const WelcomeScreen = ({ userName, logoUrl }: { userName: string; logoUrl: strin
 
   return (
     <div
-      className="min-h-screen flex flex-col items-center justify-center bg-background gap-6"
+      className="min-h-screen flex flex-col items-center justify-center bg-background gap-8 relative overflow-hidden"
       style={{ opacity, transition: "opacity 0.6s ease-in-out" }}
     >
-      {logoUrl ? (
-        <img src={logoUrl} alt="Logo" className="w-24 h-24 rounded-2xl object-cover shadow-lg" />
-      ) : (
-        <div className="w-24 h-24 bg-primary/10 rounded-2xl flex items-center justify-center shadow-lg">
-          <Building2 className="w-12 h-12 text-primary" />
-        </div>
-      )}
-      <div className="text-center space-y-2">
-        <h1 className="text-2xl font-bold text-foreground">Bem-vindo(a)!</h1>
-        <p className="text-lg text-muted-foreground">{userName}</p>
+      {/* Animated background circles */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div
+          className="absolute rounded-full bg-primary/5"
+          style={{
+            width: "600px", height: "600px",
+            top: "-120px", right: "-180px",
+            animation: "welcomePulse 4s ease-in-out infinite",
+          }}
+        />
+        <div
+          className="absolute rounded-full bg-primary/[0.03]"
+          style={{
+            width: "500px", height: "500px",
+            bottom: "-100px", left: "-150px",
+            animation: "welcomePulse 5s ease-in-out infinite 0.5s",
+          }}
+        />
+        <div
+          className="absolute rounded-full bg-accent/30"
+          style={{
+            width: "300px", height: "300px",
+            top: "50%", left: "50%",
+            transform: "translate(-50%, -50%)",
+            animation: "welcomePulse 6s ease-in-out infinite 1s",
+          }}
+        />
+        {/* Subtle moving dots */}
+        {[...Array(6)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute rounded-full bg-primary/10"
+            style={{
+              width: `${4 + i * 2}px`,
+              height: `${4 + i * 2}px`,
+              top: `${15 + i * 14}%`,
+              left: `${10 + i * 15}%`,
+              animation: `welcomeFloat ${3 + i * 0.5}s ease-in-out infinite ${i * 0.3}s`,
+            }}
+          />
+        ))}
       </div>
+
+      {/* Content */}
+      <div className="relative z-10 flex flex-col items-center gap-8"
+        style={{ animation: "welcomeFadeUp 0.8s ease-out forwards" }}
+      >
+        {logoUrl ? (
+          <img src={logoUrl} alt="Logo" className="w-32 h-32 rounded-2xl object-cover shadow-xl ring-4 ring-primary/10" />
+        ) : (
+          <div className="w-32 h-32 bg-primary/10 rounded-2xl flex items-center justify-center shadow-xl ring-4 ring-primary/10">
+            <Building2 className="w-16 h-16 text-primary" />
+          </div>
+        )}
+        <div className="text-center space-y-3">
+          <h1 className="text-4xl font-bold text-foreground tracking-tight">Bem-vindo(a)!</h1>
+          <p className="text-2xl text-muted-foreground font-medium">{userName}</p>
+        </div>
+        {/* Subtle loading indicator */}
+        <div className="flex gap-1.5 mt-4">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="w-2 h-2 rounded-full bg-primary/40"
+              style={{ animation: `welcomeBounce 1.2s ease-in-out infinite ${i * 0.15}s` }}
+            />
+          ))}
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes welcomePulse {
+          0%, 100% { transform: scale(1); opacity: 0.6; }
+          50% { transform: scale(1.08); opacity: 1; }
+        }
+        @keyframes welcomeFloat {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-12px); }
+        }
+        @keyframes welcomeFadeUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes welcomeBounce {
+          0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+          40% { transform: scale(1); opacity: 1; }
+        }
+      `}</style>
     </div>
   );
 };
