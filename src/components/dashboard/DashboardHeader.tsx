@@ -24,7 +24,7 @@ const notifIcons: Record<string, string> = {
 
 const DashboardHeader = () => {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
+  
   const { profile, roles, signOut } = useAuth();
   const { setActiveModule, openConversasTab, openAgendaTab } = useDashboard();
 
