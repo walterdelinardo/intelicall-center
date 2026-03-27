@@ -16,36 +16,31 @@ interface AppSidebarProps {
 }
 
 const mainMenuItems = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, roles: [] },
-  { id: "agenda", label: "Agenda", icon: Calendar, roles: [] },
-  { id: "clientes", label: "Clientes", icon: Users, roles: [] },
-  { id: "conversas", label: "Conversas", icon: MessageSquare, roles: [] },
-  { id: "prontuarios", label: "Prontuários", icon: FileText, roles: ["admin", "podologo"] },
-  { id: "procedimentos", label: "Procedimentos", icon: ClipboardList, roles: [] },
-  { id: "lista-espera", label: "Lista de Espera", icon: Clock, roles: [] },
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "agenda", label: "Agenda", icon: Calendar },
+  { id: "clientes", label: "Clientes", icon: Users },
+  { id: "conversas", label: "Conversas", icon: MessageSquare },
+  { id: "prontuarios", label: "Prontuários", icon: FileText },
+  { id: "procedimentos", label: "Procedimentos", icon: ClipboardList },
+  { id: "lista-espera", label: "Lista de Espera", icon: Clock },
 ];
 
 const financeMenuItems = [
-  { id: "financeiro", label: "Financeiro", icon: DollarSign, roles: ["admin", "financeiro"] },
-  { id: "estoque", label: "Estoque", icon: Package, roles: ["admin", "financeiro"] },
-  { id: "leads", label: "Leads & Funil", icon: TrendingUp, roles: ["admin", "recepcao"] },
+  { id: "financeiro", label: "Financeiro", icon: DollarSign },
+  { id: "estoque", label: "Estoque", icon: Package },
+  { id: "leads", label: "Leads & Funil", icon: TrendingUp },
 ];
 
 const adminMenuItems = [
-  { id: "usuarios", label: "Usuários", icon: UserCog, roles: ["admin"] },
-  { id: "configuracoes", label: "Configurações", icon: Settings, roles: ["admin"] },
+  { id: "usuarios", label: "Usuários", icon: UserCog },
+  { id: "configuracoes", label: "Configurações", icon: Settings },
 ];
 
 const AppSidebar = ({ activeModule, onModuleChange }: AppSidebarProps) => {
-  const { profile, roles, signOut, hasRole } = useAuth();
-
-  const canSee = (itemRoles: string[]) => {
-    if (itemRoles.length === 0) return true;
-    return itemRoles.some((r) => hasRole(r as any));
-  };
+  const { profile, roles, signOut, hasModuleAccess } = useAuth();
 
   const renderMenuItems = (items: typeof mainMenuItems) =>
-    items.filter((item) => canSee(item.roles)).map((item) => (
+    items.filter((item) => hasModuleAccess(item.id, "read")).map((item) => (
       <SidebarMenuItem key={item.id}>
         <SidebarMenuButton
           isActive={activeModule === item.id}
