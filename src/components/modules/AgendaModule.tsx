@@ -2191,6 +2191,7 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
           category: "produto",
           description: `Venda: ${item.name} (x${item.qty})`,
           amount: item.qty * item.price,
+          quantity: item.qty,
           payment_method: form.payment_method,
           status: form.status,
           date: form.date,
