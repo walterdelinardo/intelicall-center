@@ -349,6 +349,9 @@ const FinanceiroModule = () => {
                     <span className="text-xs text-muted-foreground">({group.txs.length} transações)</span>
                   </div>
                 </TableCell>
+                <TableCell className="text-center text-xs font-medium">
+                  {group.txs.reduce((sum, t) => sum + (Number(t.quantity) || 1), 0)}
+                </TableCell>
                 <TableCell className={`font-bold ${group.total >= 0 ? "text-success" : "text-destructive"}`}>
                   R$ {Math.abs(group.total).toFixed(2)}
                 </TableCell>
