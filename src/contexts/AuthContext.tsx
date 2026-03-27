@@ -2,8 +2,6 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
-type AppRole = "admin" | "recepcao" | "podologo" | "financeiro";
-
 interface Profile {
   id: string;
   clinic_id: string | null;
@@ -34,7 +32,6 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   profile: Profile | null;
-  roles: AppRole[];
   loading: boolean;
   isSuperAdmin: boolean;
   assignedRoles: RoleDefinition[];
@@ -42,7 +39,6 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, fullName: string) => Promise<void>;
   signOut: () => Promise<void>;
-  hasRole: (role: AppRole) => boolean;
   hasModuleAccess: (moduleKey: string, action?: "read" | "edit" | "delete") => boolean;
   hasTabAccess: (moduleKey: string, tabKey: string) => boolean;
 }
@@ -55,7 +51,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [roles, setRoles] = useState<AppRole[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [assignedRoles, setAssignedRoles] = useState<RoleDefinition[]>([]);
@@ -158,13 +153,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (session?.user) {
           setTimeout(async () => {
             await fetchProfile(session.user.id);
-            await fetchRoles(session.user.id);
             await fetchDynamicPermissions(session.user.id);
             setLoading(false);
           }, 0);
         } else {
           setProfile(null);
-          setRoles([]);
           setIsSuperAdmin(false);
           setAssignedRoles([]);
           setModulePermissions([]);
@@ -179,7 +172,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (session?.user) {
         Promise.all([
           fetchProfile(session.user.id),
-          fetchRoles(session.user.id),
           fetchDynamicPermissions(session.user.id),
         ]).then(() => setLoading(false));
       } else {
@@ -209,7 +201,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
     setSession(null);
     setProfile(null);
-    setRoles([]);
     setIsSuperAdmin(false);
     setAssignedRoles([]);
     setModulePermissions([]);
@@ -244,9 +235,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <AuthContext.Provider value={{
-      user, session, profile, roles, loading,
+      user, session, profile, loading,
       isSuperAdmin, assignedRoles, modulePermissions,
-      signIn, signUp, signOut, hasRole, hasModuleAccess, hasTabAccess,
+      signIn, signUp, signOut, hasModuleAccess, hasTabAccess,
     }}>
       {children}
     </AuthContext.Provider>
