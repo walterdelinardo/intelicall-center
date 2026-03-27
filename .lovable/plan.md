@@ -1,27 +1,44 @@
 
 
-## Compactar cards de notificação com expansão por clique
+## Relatório de Estoque — enviar apenas itens com status Baixo
 
-### Alterações em `src/components/modules/conversas/TelegramNotificationsTab.tsx`
+### Alteração em `supabase/functions/telegram-webhook/index.ts`
 
-- Adicionar estado `expandedIds` (Set de IDs) para controlar quais notificações estão expandidas
-- Cada card mostra apenas: ícone, badges, remetente, data e botões de ação (Ok, labels)
-- A mensagem (`notif.message`) fica oculta por padrão
-- Adicionar um botão `ChevronDown`/`ChevronUp` que alterna a visibilidade da mensagem
-- Ao expandir, mostra o `<p>` com `notif.message` e o campo "De:" abaixo
-- Truncar a primeira linha da mensagem (1 linha com `line-clamp-1`) como preview quando fechado
+Na ação `stock_alert`:
 
-### Resultado visual (compacto)
-```text
-[ícone] [Enviado pelo Bot] [Mensagem] via Bot1  [etiquetas]  26/03/2026 14:30  [▼] [✓] [🏷]
+- Remover exigência de `itemName`, `currentQty`, `minQty` — basta `clinicId`
+- Consultar `stock_items` filtrado por `clinic_id` e `is_active = true`
+- Filtrar apenas itens com **estoque baixo**: `quantity <= min_quantity`
+- Montar mensagem Markdown com cabeçalho "⚠️ Relatório de Estoque Baixo" listando cada item com: Nome, Categoria, Quantidade, Custo Unit. (R$), Vl. Venda (R$), Fornecedor e Status
+- Se não houver itens com estoque baixo, enviar mensagem informando "✅ Nenhum produto com estoque baixo"
+- Dividir em múltiplas mensagens se ultrapassar 4096 caracteres (limite do Telegram)
+- Enviar para bots com `webhook_stock_alerts = true`
+- Registrar na `telegram_notifications` com `notification_type: "stock_report"`
+
+### Payload do n8n
+```json
+{
+  "action": "stock_alert",
+  "clinicId": "UUID"
+}
 ```
 
-### Resultado visual (expandido)
+### Formato da mensagem
 ```text
-[ícone] [Enviado pelo Bot] [Mensagem] via Bot1  [etiquetas]  26/03/2026 14:30  [▲] [✓] [🏷]
-  *Cliente aguardando resposta*
-  Nome: Teste
-  Whatsapp: ...
-  De: PodoClinicBot
+⚠️ *Relatório de Estoque Baixo*
+
+1. *Produto X*
+   📁 Categoria: Geral
+   📊 Qtd: 2 | Mín: 5
+   💰 Custo: R$ 10,00 | Venda: R$ 25,00
+   🏭 Fornecedor: ABC Ltda
+
+2. *Produto Y*
+   📁 Categoria: Produto
+   📊 Qtd: 0 | Mín: 3
+   💰 Custo: R$ 5,00 | Venda: R$ 12,00
+   🏭 Fornecedor: —
+
+📦 Total: 2 produtos com estoque baixo
 ```
 
