@@ -38,6 +38,8 @@ const TelegramBotsSection = () => {
   
   const [syncLoading, setSyncLoading] = useState<string | null>(null);
   const [getTable, setGetTable] = useState("stock_items");
+  const [getDateFrom, setGetDateFrom] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd"));
+  const [getDateTo, setGetDateTo] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
 
   const [newLabel, setNewLabel] = useState("");
   const [newToken, setNewToken] = useState("");
@@ -178,17 +180,32 @@ const TelegramBotsSection = () => {
 
   const clinicId = profile?.clinic_id || "<clinic_id>";
 
-  const getTableOptions: Record<string, { label: string; params: string }> = {
+  const getTableOptions: Record<string, { label: string; params: string; dateColumn?: string }> = {
     stock_items: { label: "Estoque", params: `table=stock_items&clinic_id=${clinicId}&is_active=true` },
-    financial_transactions: { label: "Financeiro", params: `table=financial_transactions&clinic_id=${clinicId}&order=date&ascending=false&limit=50` },
-    clients: { label: "Clientes", params: `table=clients&clinic_id=${clinicId}&limit=100` },
-    appointments: { label: "Agendamentos", params: `table=appointments&clinic_id=${clinicId}&order=date&ascending=false&limit=50` },
-    telegram_notifications: { label: "Notificações Telegram", params: `table=telegram_notifications&clinic_id=${clinicId}&order=created_at&ascending=false&limit=50` },
+    financial_transactions: { label: "Financeiro", params: `table=financial_transactions&clinic_id=${clinicId}&order=date&ascending=false&limit=50`, dateColumn: "date" },
+    clients: { label: "Clientes", params: `table=clients&clinic_id=${clinicId}&limit=100`, dateColumn: "created_at" },
+    appointments: { label: "Agendamentos", params: `table=appointments&clinic_id=${clinicId}&order=date&ascending=false&limit=50`, dateColumn: "date" },
+    telegram_notifications: { label: "Notificações Telegram", params: `table=telegram_notifications&clinic_id=${clinicId}&order=created_at&ascending=false&limit=50`, dateColumn: "created_at" },
   };
 
-  const getQueryCurl = (table: string) => `curl -X GET \\
-  "${n8nQueryUrl}?${getTableOptions[table]?.params || ""}" \\
+  const hasDateFilter = !!getTableOptions[getTable]?.dateColumn;
+
+  const getQueryCurl = (table: string) => {
+    const opt = getTableOptions[table];
+    let params = opt?.params || "";
+    if (hasDateFilter && getDateFrom) {
+      params += `&date_from=${getDateFrom}`;
+    }
+    if (hasDateFilter && getDateTo) {
+      params += `&date_to=${getDateTo}`;
+    }
+    if (hasDateFilter && opt?.dateColumn && opt.dateColumn !== "date") {
+      params += `&date_column=${opt.dateColumn}`;
+    }
+    return `curl -X GET \\
+  "${n8nQueryUrl}?${params}" \\
   -H "x-api-secret: <N8N_API_SECRET>"`;
+  };
 
   const getFinancialCurl = () => `curl -X POST \\
   ${baseUrl} \\
@@ -462,6 +479,28 @@ const TelegramBotsSection = () => {
                         </SelectContent>
                       </Select>
                     </div>
+                    {hasDateFilter && (
+                      <div className="flex gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">De:</Label>
+                          <Input
+                            type="date"
+                            value={getDateFrom}
+                            onChange={e => setGetDateFrom(e.target.value)}
+                            className="h-8 text-xs w-36"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Até:</Label>
+                          <Input
+                            type="date"
+                            value={getDateTo}
+                            onChange={e => setGetDateTo(e.target.value)}
+                            className="h-8 text-xs w-36"
+                          />
+                        </div>
+                      </div>
+                    )}
                     <div className="relative">
                       <pre className="bg-muted text-foreground text-xs p-3 rounded-md overflow-x-auto whitespace-pre-wrap break-all">
                         {getQueryCurl(getTable)}
