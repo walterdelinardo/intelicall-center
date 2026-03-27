@@ -15,9 +15,9 @@ import { toast } from "sonner";
 import RolesTab from "./usuarios/RolesTab";
 
 const UsuariosModule = () => {
-  const { profile, hasRole, user, isSuperAdmin, hasTabAccess, hasModuleAccess } = useAuth();
+  const { profile, user, isSuperAdmin, hasTabAccess, hasModuleAccess } = useAuth();
   const queryClient = useQueryClient();
-  const isAdmin = hasRole("admin") || isSuperAdmin || hasModuleAccess("usuarios", "edit");
+  const isAdmin = isSuperAdmin || hasModuleAccess("usuarios", "edit");
   const availableTabs = ["usuarios", "papeis"].filter(t => hasTabAccess("usuarios", t));
 
   const { data: users = [], isLoading } = useQuery({

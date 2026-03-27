@@ -37,7 +37,7 @@ const adminMenuItems = [
 ];
 
 const AppSidebar = ({ activeModule, onModuleChange }: AppSidebarProps) => {
-  const { profile, roles, signOut, hasModuleAccess } = useAuth();
+  const { profile, assignedRoles, signOut, hasModuleAccess } = useAuth();
 
   const renderMenuItems = (items: typeof mainMenuItems) =>
     items.filter((item) => hasModuleAccess(item.id, "read")).map((item) => (
@@ -104,7 +104,7 @@ const AppSidebar = ({ activeModule, onModuleChange }: AppSidebarProps) => {
           </Avatar>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate text-sidebar-foreground">{profile?.full_name}</p>
-            <p className="text-xs text-muted-foreground capitalize">{roles[0] || "Usuário"}</p>
+            <p className="text-xs text-muted-foreground truncate">{assignedRoles.map(r => r.name).join(", ") || "Usuário"}</p>
           </div>
           <button onClick={signOut} className="text-muted-foreground hover:text-destructive transition-colors">
             <LogOut className="w-4 h-4" />
