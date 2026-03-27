@@ -37,6 +37,7 @@ const TelegramBotsSection = () => {
   const [curlEndDate, setCurlEndDate] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
   
   const [syncLoading, setSyncLoading] = useState<string | null>(null);
+  const [getTable, setGetTable] = useState("stock_items");
 
   const [newLabel, setNewLabel] = useState("");
   const [newToken, setNewToken] = useState("");
