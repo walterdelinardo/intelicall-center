@@ -626,12 +626,14 @@ export type Database = {
         Row: {
           amount: number
           appointment_id: string | null
+          calendar_label: string | null
           category: string
           client_id: string | null
           clinic_id: string
           created_at: string
           date: string
           description: string
+          google_event_id: string | null
           id: string
           notes: string | null
           payment_method: string | null
@@ -643,12 +645,14 @@ export type Database = {
         Insert: {
           amount?: number
           appointment_id?: string | null
+          calendar_label?: string | null
           category?: string
           client_id?: string | null
           clinic_id: string
           created_at?: string
           date?: string
           description: string
+          google_event_id?: string | null
           id?: string
           notes?: string | null
           payment_method?: string | null
@@ -660,12 +664,14 @@ export type Database = {
         Update: {
           amount?: number
           appointment_id?: string | null
+          calendar_label?: string | null
           category?: string
           client_id?: string | null
           clinic_id?: string
           created_at?: string
           date?: string
           description?: string
+          google_event_id?: string | null
           id?: string
           notes?: string | null
           payment_method?: string | null

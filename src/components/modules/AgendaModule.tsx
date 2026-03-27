@@ -112,7 +112,7 @@ const AgendaModule = () => {
   const [editForm, setEditForm] = useState({
     title: "", description: "", date: "", startTime: "", endTime: "",
     clientName: "", clientWhatsapp: "", clientEmail: "", clientOrigin: "",
-    procedureName: "", procedureValue: "", procedure_id: "",
+    procedureName: "", procedureValue: "", procedure_id: "", editAccountId: "",
   });
   const [editLoading, setEditLoading] = useState(false);
   const [isEditNewClient, setIsEditNewClient] = useState(false);
@@ -530,6 +530,7 @@ const AgendaModule = () => {
       procedureName: ep.procedureName || '',
       procedureValue: ep.procedureValue || '',
       procedure_id: procedures.find(p => p.name === ep.procedureName)?.id || '',
+      editAccountId: evt.accountId || '',
     });
     setEditEnabled(false);
     setIsEditOpen(true);
@@ -571,7 +572,7 @@ const AgendaModule = () => {
       description: editForm.description,
       startDateTime: startDT.toISOString(),
       endDateTime: endDT.toISOString(),
-      account_id: editingEvent.accountId,
+      account_id: editForm.editAccountId || editingEvent.accountId,
       extendedProperties,
     });
 
