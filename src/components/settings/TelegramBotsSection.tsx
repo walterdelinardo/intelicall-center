@@ -501,6 +501,12 @@ const TelegramBotsSection = () => {
                         </div>
                       </div>
                     )}
+                    <div className="relative">
+                      <pre className="bg-muted text-foreground text-xs p-3 rounded-md overflow-x-auto whitespace-pre-wrap break-all">
+                        {getQueryCurl(getTable)}
+                      </pre>
+                      <Button
+                        variant="ghost"
                         size="icon"
                         className="absolute top-1 right-1 h-7 w-7"
                         onClick={() => copyToClipboard(getQueryCurl(getTable))}
