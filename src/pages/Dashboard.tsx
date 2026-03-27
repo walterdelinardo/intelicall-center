@@ -39,13 +39,13 @@ const DashboardContent = () => {
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
         <AppSidebar activeModule={activeModule} onModuleChange={setActiveModule} />
-        <div className="flex-1 flex flex-col overflow-auto min-w-0">
+        <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
           <DashboardHeader />
-          <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b border-border px-4 py-3 flex items-center gap-3">
+          <div className="bg-background/80 backdrop-blur-sm border-b border-border px-4 py-3 flex items-center gap-3 shrink-0">
             <SidebarTrigger />
             <h1 className="text-lg font-semibold text-foreground capitalize">{activeModule === "dashboard" ? "Painel" : activeModule}</h1>
           </div>
-          <main className="flex-1 p-6 animate-fade-in min-w-0">
+          <main className="flex-1 overflow-auto p-6 animate-fade-in min-w-0">
             <ActiveComponent />
           </main>
         </div>

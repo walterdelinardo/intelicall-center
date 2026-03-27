@@ -342,8 +342,8 @@ const ConfiguracoesModule = () => {
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue={["general", "hours", "integrations"].filter(t => hasTabAccess("configuracoes", t))[0] || "general"}>
-        <TabsList>
+      <Tabs defaultValue={["general", "hours", "whatsapp", "integrations"].filter(t => hasTabAccess("configuracoes", t))[0] || "general"}>
+        <TabsList className="flex-wrap">
           {hasTabAccess("configuracoes", "general") && (
             <TabsTrigger value="general" className="gap-2">
               <Building2 className="w-4 h-4" /> Dados Gerais
@@ -352,6 +352,11 @@ const ConfiguracoesModule = () => {
           {hasTabAccess("configuracoes", "hours") && (
             <TabsTrigger value="hours" className="gap-2">
               <Clock className="w-4 h-4" /> Horários
+            </TabsTrigger>
+          )}
+          {hasTabAccess("configuracoes", "whatsapp") && (
+            <TabsTrigger value="whatsapp" className="gap-2">
+              <Smartphone className="w-4 h-4" /> WhatsApp
             </TabsTrigger>
           )}
           {hasTabAccess("configuracoes", "integrations") && (

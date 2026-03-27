@@ -44,9 +44,9 @@ export const MonthView = ({ currentMonth, events, onDayClick }: MonthViewProps) 
     events.filter((e) => isSameDay(parseISO(e.date), day));
 
   return (
-    <div className="border rounded-lg bg-card overflow-hidden">
+    <div className="border rounded-lg bg-card overflow-auto">
       {/* Weekday headers */}
-      <div className="grid grid-cols-7 border-b bg-muted/30">
+      <div className="grid grid-cols-7 border-b bg-muted/30 sticky top-0 z-10">
         {["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].map((d) => (
           <div key={d} className="text-center text-xs font-medium text-muted-foreground py-2 border-r last:border-r-0 border-border/30">
             {d}
