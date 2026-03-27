@@ -2223,7 +2223,9 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
           date: form.date,
           client_id: clientId,
           appointment_id: extraApptId,
-        });
+          google_event_id: event?.id || null,
+          calendar_label: event?.accountLabel || null,
+        } as any);
       }
 
       // === 7. Deduct stock for procedure materials + persist in appointment_materials ===
