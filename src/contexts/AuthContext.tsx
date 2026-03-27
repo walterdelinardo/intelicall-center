@@ -13,16 +13,36 @@ interface Profile {
   is_active: boolean;
 }
 
+interface ModulePermission {
+  module_key: string;
+  can_read: boolean;
+  can_edit: boolean;
+  can_delete: boolean;
+}
+
+interface RoleDefinition {
+  id: string;
+  name: string;
+  slug: string;
+  color: string;
+  is_system: boolean;
+  is_super_admin: boolean;
+}
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   profile: Profile | null;
   roles: AppRole[];
   loading: boolean;
+  isSuperAdmin: boolean;
+  assignedRoles: RoleDefinition[];
+  modulePermissions: ModulePermission[];
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, fullName: string) => Promise<void>;
   signOut: () => Promise<void>;
   hasRole: (role: AppRole) => boolean;
+  hasModuleAccess: (moduleKey: string, action?: "read" | "edit" | "delete") => boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -35,6 +55,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [assignedRoles, setAssignedRoles] = useState<RoleDefinition[]>([]);
+  const [modulePermissions, setModulePermissions] = useState<ModulePermission[]>([]);
 
   const fetchProfile = async (userId: string) => {
     const { data } = await supabase
@@ -53,6 +76,65 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setRoles((data || []).map((r: any) => r.role as AppRole));
   };
 
+  const fetchDynamicPermissions = async (userId: string) => {
+    // Fetch user_role_assignments with role_definitions
+    const { data: assignments } = await supabase
+      .from("user_role_assignments")
+      .select("role_definition_id")
+      .eq("user_id", userId);
+
+    if (!assignments || assignments.length === 0) {
+      setIsSuperAdmin(false);
+      setAssignedRoles([]);
+      setModulePermissions([]);
+      return;
+    }
+
+    const roleDefIds = assignments.map((a: any) => a.role_definition_id);
+
+    // Fetch role definitions
+    const { data: roleDefs } = await supabase
+      .from("role_definitions")
+      .select("*")
+      .in("id", roleDefIds);
+
+    const defs = (roleDefs || []) as RoleDefinition[];
+    setAssignedRoles(defs);
+
+    const hasSuperAdmin = defs.some((rd) => rd.is_super_admin);
+    setIsSuperAdmin(hasSuperAdmin);
+
+    if (hasSuperAdmin) {
+      // Super admin has all permissions, no need to fetch
+      setModulePermissions([]);
+      return;
+    }
+
+    // Fetch permissions for all assigned roles
+    const { data: perms } = await supabase
+      .from("role_permissions")
+      .select("*")
+      .in("role_definition_id", roleDefIds);
+
+    // Merge permissions across roles (OR logic)
+    const permMap: Record<string, ModulePermission> = {};
+    (perms || []).forEach((p: any) => {
+      if (!permMap[p.module_key]) {
+        permMap[p.module_key] = {
+          module_key: p.module_key,
+          can_read: false,
+          can_edit: false,
+          can_delete: false,
+        };
+      }
+      if (p.can_read) permMap[p.module_key].can_read = true;
+      if (p.can_edit) permMap[p.module_key].can_edit = true;
+      if (p.can_delete) permMap[p.module_key].can_delete = true;
+    });
+
+    setModulePermissions(Object.values(permMap));
+  };
+
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
@@ -63,11 +145,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setTimeout(async () => {
             await fetchProfile(session.user.id);
             await fetchRoles(session.user.id);
+            await fetchDynamicPermissions(session.user.id);
             setLoading(false);
           }, 0);
         } else {
           setProfile(null);
           setRoles([]);
+          setIsSuperAdmin(false);
+          setAssignedRoles([]);
+          setModulePermissions([]);
           setLoading(false);
         }
       }
@@ -77,9 +163,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchProfile(session.user.id).then(() =>
-          fetchRoles(session.user.id).then(() => setLoading(false))
-        );
+        Promise.all([
+          fetchProfile(session.user.id),
+          fetchRoles(session.user.id),
+          fetchDynamicPermissions(session.user.id),
+        ]).then(() => setLoading(false));
       } else {
         setLoading(false);
       }
@@ -108,12 +196,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSession(null);
     setProfile(null);
     setRoles([]);
+    setIsSuperAdmin(false);
+    setAssignedRoles([]);
+    setModulePermissions([]);
   };
 
   const hasRole = (role: AppRole) => roles.includes(role);
 
+  const hasModuleAccess = (moduleKey: string, action: "read" | "edit" | "delete" = "read") => {
+    // Super admin bypasses everything
+    if (isSuperAdmin) return true;
+    
+    // If user has no dynamic role assignments, fall back to old system
+    if (assignedRoles.length === 0) return true;
+
+    const perm = modulePermissions.find((p) => p.module_key === moduleKey);
+    if (!perm) return false;
+
+    switch (action) {
+      case "read": return perm.can_read;
+      case "edit": return perm.can_edit;
+      case "delete": return perm.can_delete;
+      default: return false;
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, session, profile, roles, loading, signIn, signUp, signOut, hasRole }}>
+    <AuthContext.Provider value={{
+      user, session, profile, roles, loading,
+      isSuperAdmin, assignedRoles, modulePermissions,
+      signIn, signUp, signOut, hasRole, hasModuleAccess,
+    }}>
       {children}
     </AuthContext.Provider>
   );
