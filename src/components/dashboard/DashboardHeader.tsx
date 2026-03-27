@@ -1,8 +1,7 @@
-import { Bell, LogOut, Building2, Check, CircleCheck, AlertCircle, MessageSquare, Bot } from "lucide-react";
+import { Bell, LogOut, Building2, MessageSquare, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { useAuth } from "@/contexts/AuthContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDashboard } from "@/contexts/DashboardContext";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -30,7 +29,7 @@ const DashboardHeader = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { profile, roles, signOut } = useAuth();
-  const { setActiveModule, openConversasTab } = useDashboard();
+  const { setActiveModule, openConversasTab, openAgendaTab } = useDashboard();
 
   const { data: clinic } = useQuery({
     queryKey: ["clinic-header", profile?.clinic_id],
@@ -97,27 +96,6 @@ const DashboardHeader = () => {
 
   const agendaUnread = notifications.filter((n: any) => !n.is_read).length;
 
-  const toggleRead = async (id: string, currentRead: boolean) => {
-    await supabase.from("calendar_notifications").update({ is_read: !currentRead } as any).eq("id", id);
-    refetchNotifications();
-    queryClient.invalidateQueries({ queryKey: ["calendar-notifications"] });
-  };
-
-  const toggleImportant = async (id: string, currentImportant: boolean) => {
-    await supabase.from("calendar_notifications").update({ is_important: !currentImportant } as any).eq("id", id);
-    refetchNotifications();
-    queryClient.invalidateQueries({ queryKey: ["calendar-notifications"] });
-  };
-
-  const markAllRead = async () => {
-    const unread = notifications.filter((n: any) => !n.is_read);
-    for (const n of unread) {
-      await supabase.from("calendar_notifications").update({ is_read: true } as any).eq("id", (n as any).id);
-    }
-    refetchNotifications();
-    queryClient.invalidateQueries({ queryKey: ["calendar-notifications"] });
-  };
-
   const handleLogout = async () => {
     await signOut();
     toast.success("Logout realizado com sucesso!");
@@ -172,69 +150,16 @@ const DashboardHeader = () => {
           </div>
 
           {/* 1. Agenda notifications */}
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="ghost" size="icon" className="relative" title="Notificações da Agenda">
-                <Bell className="w-5 h-5" />
-                <NotifBadge count={agendaUnread} />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-96 p-0" align="end">
-              <div className="px-3 py-2 border-b border-border flex items-center justify-between">
-                <p className="text-sm font-semibold">Notificações da Agenda</p>
-                {agendaUnread > 0 && (
-                  <Button variant="ghost" size="sm" className="text-xs h-6 px-2" onClick={markAllRead}>
-                    Marcar todas como lidas
-                  </Button>
-                )}
-              </div>
-              <ScrollArea className="max-h-80">
-                {notifications.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-6">Nenhuma notificação</p>
-                ) : (
-                  <div className="divide-y divide-border">
-                    {notifications.map((n: any) => (
-                      <div
-                        key={n.id}
-                        className={`px-3 py-2.5 transition-colors ${n.is_read ? "opacity-60" : "bg-primary/5"} ${n.is_important ? "border-l-2 border-l-yellow-500" : ""}`}
-                      >
-                        <div className="flex items-start gap-2">
-                          <span className="text-sm mt-0.5">{notifIcons[n.action] || "📋"}</span>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-medium truncate">{n.event_title}</p>
-                            {n.details && <p className="text-[11px] text-muted-foreground truncate">{n.details}</p>}
-                            <p className="text-[10px] text-muted-foreground mt-0.5">
-                              {format(new Date(n.created_at), "dd/MM HH:mm", { locale: ptBR })} — {n.actor_name || "Sistema"}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-0.5 shrink-0">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              title={n.is_read ? "Marcar como não lida" : "Marcar como lida"}
-                              onClick={() => toggleRead(n.id, n.is_read)}
-                            >
-                              <CircleCheck className={`w-3.5 h-3.5 ${n.is_read ? "text-green-500" : "text-muted-foreground"}`} />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              title={n.is_important ? "Remover importância" : "Marcar como importante"}
-                              onClick={() => toggleImportant(n.id, n.is_important)}
-                            >
-                              <AlertCircle className={`w-3.5 h-3.5 ${n.is_important ? "text-yellow-500" : "text-muted-foreground"}`} />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </ScrollArea>
-            </PopoverContent>
-          </Popover>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="relative"
+            title="Notificações da Agenda"
+            onClick={() => openAgendaTab("notificacoes")}
+          >
+            <Bell className="w-5 h-5" />
+            <NotifBadge count={agendaUnread} />
+          </Button>
 
           {/* 2. WhatsApp unread */}
           <Button
