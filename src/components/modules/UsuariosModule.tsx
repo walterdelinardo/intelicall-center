@@ -6,9 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserCog, Shield, Loader2 } from "lucide-react";
+import { UserCog, Shield, Loader2, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import RolesTab from "./usuarios/RolesTab";
 
@@ -33,7 +35,6 @@ const UsuariosModule = () => {
     enabled: !!profile?.clinic_id,
   });
 
-  // Fetch dynamic role definitions
   const { data: roleDefs = [] } = useQuery({
     queryKey: ["role-definitions", profile?.clinic_id],
     queryFn: async () => {
@@ -49,7 +50,6 @@ const UsuariosModule = () => {
     enabled: !!profile?.clinic_id,
   });
 
-  // Fetch role assignments
   const { data: roleAssignments = [] } = useQuery({
     queryKey: ["role-assignments", profile?.clinic_id],
     queryFn: async () => {
@@ -64,34 +64,36 @@ const UsuariosModule = () => {
     enabled: !!profile?.clinic_id,
   });
 
-  const getUserAssignedRole = (userId: string) => {
-    const assignment = roleAssignments.find((a: any) => a.user_id === userId);
-    return assignment?.role_definition_id || "";
+  const getUserAssignedRoles = (userId: string): string[] => {
+    return roleAssignments
+      .filter((a: any) => a.user_id === userId)
+      .map((a: any) => a.role_definition_id);
   };
 
-  // Filter out users assigned to a Super Admin role
   const superAdminRoleIds = new Set(roleDefs.filter((r: any) => r.is_super_admin).map((r: any) => r.id));
+
   const filteredUsers = users.filter((u: any) => {
-    const roleId = getUserAssignedRole(u.id);
-    return !roleId || !superAdminRoleIds.has(roleId);
+    const roleIds = getUserAssignedRoles(u.id);
+    return !roleIds.some(id => superAdminRoleIds.has(id));
   });
 
-  const assignRoleMutation = useMutation({
-    mutationFn: async ({ userId, roleDefId }: { userId: string; roleDefId: string }) => {
+  const toggleRoleMutation = useMutation({
+    mutationFn: async ({ userId, roleDefId, action }: { userId: string; roleDefId: string; action: "add" | "remove" }) => {
       if (!profile?.clinic_id) throw new Error("Sem clínica");
-      // Remove existing assignments
-      await supabase
-        .from("user_role_assignments")
-        .delete()
-        .eq("user_id", userId)
-        .eq("clinic_id", profile.clinic_id);
-
-      if (roleDefId) {
+      if (action === "add") {
         const { error } = await supabase.from("user_role_assignments").insert({
           user_id: userId,
           role_definition_id: roleDefId,
           clinic_id: profile.clinic_id,
         });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("user_role_assignments")
+          .delete()
+          .eq("user_id", userId)
+          .eq("role_definition_id", roleDefId)
+          .eq("clinic_id", profile.clinic_id);
         if (error) throw error;
       }
     },
@@ -122,6 +124,8 @@ const UsuariosModule = () => {
       </Card>
     );
   }
+
+  const availableRolesForSelect = roleDefs.filter((r: any) => isSuperAdmin || !r.is_super_admin);
 
   return (
     <Tabs defaultValue={availableTabs[0] || "usuarios"} className="space-y-6">
@@ -156,16 +160,15 @@ const UsuariosModule = () => {
                     <TableRow>
                       <TableHead>Nome</TableHead>
                       <TableHead>Telefone</TableHead>
-                      <TableHead>Papel</TableHead>
+                      <TableHead>Papéis</TableHead>
                       <TableHead>Ativo</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredUsers.map((u: any) => {
                       const isSelf = u.id === user?.id;
-                      const currentRoleId = getUserAssignedRole(u.id);
-                      const currentRoleDef = roleDefs.find((r: any) => r.id === currentRoleId);
-                      const isSuperAdminUser = currentRoleDef?.is_super_admin;
+                      const userRoleIds = getUserAssignedRoles(u.id);
+                      const hasSuperAdminRole = userRoleIds.some(id => superAdminRoleIds.has(id));
 
                       return (
                         <TableRow key={u.id}>
@@ -177,35 +180,66 @@ const UsuariosModule = () => {
                           </TableCell>
                           <TableCell className="text-muted-foreground">{u.phone || "—"}</TableCell>
                           <TableCell>
-                            {isSuperAdminUser && !isSuperAdmin ? (
+                            {hasSuperAdminRole && !isSuperAdmin ? (
                               <Badge variant="destructive" className="text-xs">Super Admin</Badge>
                             ) : (
-                              <Select
-                                value={currentRoleId}
-                                onValueChange={(val) =>
-                                  assignRoleMutation.mutate({ userId: u.id, roleDefId: val })
-                                }
-                                disabled={isSuperAdminUser && !isSuperAdmin}
-                              >
-                                <SelectTrigger className="w-[180px] h-8 text-xs">
-                                  <SelectValue placeholder="Sem papel" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {roleDefs
-                                    .filter((r: any) => isSuperAdmin || !r.is_super_admin)
-                                    .map((r: any) => (
-                                      <SelectItem key={r.id} value={r.id}>
-                                        <div className="flex items-center gap-2">
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button variant="outline" size="sm" className="h-auto min-h-8 py-1 px-2 flex flex-wrap gap-1 items-center max-w-[260px]">
+                                    {userRoleIds.length === 0 ? (
+                                      <span className="text-xs text-muted-foreground">Sem papel</span>
+                                    ) : (
+                                      userRoleIds.map(roleId => {
+                                        const rd = roleDefs.find((r: any) => r.id === roleId);
+                                        if (!rd) return null;
+                                        return (
+                                          <Badge
+                                            key={roleId}
+                                            variant="secondary"
+                                            className="text-xs"
+                                            style={{ backgroundColor: rd.color + "22", color: rd.color, borderColor: rd.color }}
+                                          >
+                                            {rd.name}
+                                          </Badge>
+                                        );
+                                      })
+                                    )}
+                                    <ChevronDown className="w-3 h-3 ml-1 shrink-0 opacity-50" />
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-56 p-2" align="start">
+                                  <div className="space-y-1">
+                                    {availableRolesForSelect.map((r: any) => {
+                                      const checked = userRoleIds.includes(r.id);
+                                      return (
+                                        <label
+                                          key={r.id}
+                                          className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-accent cursor-pointer text-sm"
+                                        >
+                                          <Checkbox
+                                            checked={checked}
+                                            onCheckedChange={() =>
+                                              toggleRoleMutation.mutate({
+                                                userId: u.id,
+                                                roleDefId: r.id,
+                                                action: checked ? "remove" : "add",
+                                              })
+                                            }
+                                          />
                                           <div
-                                            className="w-2 h-2 rounded-full"
+                                            className="w-2 h-2 rounded-full shrink-0"
                                             style={{ backgroundColor: r.color }}
                                           />
                                           {r.name}
-                                        </div>
-                                      </SelectItem>
-                                    ))}
-                                </SelectContent>
-                              </Select>
+                                        </label>
+                                      );
+                                    })}
+                                    {availableRolesForSelect.length === 0 && (
+                                      <p className="text-xs text-muted-foreground p-2">Nenhum papel cadastrado.</p>
+                                    )}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
                             )}
                           </TableCell>
                           <TableCell>
