@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2 } from "lucide-react";
+import { Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
+import { MODULE_TABS } from "./RolesTab";
 
 interface RoleDefinition {
   id: string;
@@ -27,6 +28,7 @@ interface RolePermission {
   can_read: boolean;
   can_edit: boolean;
   can_delete: boolean;
+  allowed_tabs?: string[] | null;
 }
 
 interface ModuleDef {
@@ -62,6 +64,8 @@ const RoleFormDialog = ({ open, onOpenChange, role, allModules, existingPermissi
   const [slug, setSlug] = useState("");
   const [color, setColor] = useState("#3B82F6");
   const [perms, setPerms] = useState<Record<string, PermState>>({});
+  const [allowedTabs, setAllowedTabs] = useState<Record<string, string[]>>({});
+  const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -70,8 +74,8 @@ const RoleFormDialog = ({ open, onOpenChange, role, allModules, existingPermissi
         setName(role.name);
         setSlug(role.slug);
         setColor(role.color);
-        // Load existing permissions
         const permMap: Record<string, PermState> = {};
+        const tabsMap: Record<string, string[]> = {};
         allModules.forEach((m) => {
           const existing = existingPermissions.find(
             (p) => p.role_definition_id === role.id && p.module_key === m.key
@@ -81,18 +85,34 @@ const RoleFormDialog = ({ open, onOpenChange, role, allModules, existingPermissi
             can_edit: existing?.can_edit || false,
             can_delete: existing?.can_delete || false,
           };
+          // Load allowed_tabs
+          const tabs = MODULE_TABS[m.key];
+          if (tabs && existing?.allowed_tabs && existing.allowed_tabs.length > 0) {
+            tabsMap[m.key] = existing.allowed_tabs;
+          } else if (tabs) {
+            // null/empty = all tabs
+            tabsMap[m.key] = tabs.map(t => t.key);
+          }
         });
         setPerms(permMap);
+        setAllowedTabs(tabsMap);
       } else {
         setName("");
         setSlug("");
         setColor("#3B82F6");
         const permMap: Record<string, PermState> = {};
+        const tabsMap: Record<string, string[]> = {};
         allModules.forEach((m) => {
           permMap[m.key] = { can_read: false, can_edit: false, can_delete: false };
+          const tabs = MODULE_TABS[m.key];
+          if (tabs) {
+            tabsMap[m.key] = tabs.map(t => t.key);
+          }
         });
         setPerms(permMap);
+        setAllowedTabs(tabsMap);
       }
+      setExpandedModules(new Set());
     }
   }, [open, role, existingPermissions]);
 
@@ -110,9 +130,7 @@ const RoleFormDialog = ({ open, onOpenChange, role, allModules, existingPermissi
     const allChecked = allModules.every((m) => perms[m.key]?.can_read);
     setPerms((prev) => {
       const next = { ...prev };
-      allModules.forEach((m) => {
-        next[m.key] = { ...next[m.key], can_read: !allChecked };
-      });
+      allModules.forEach((m) => { next[m.key] = { ...next[m.key], can_read: !allChecked }; });
       return next;
     });
   };
@@ -121,9 +139,7 @@ const RoleFormDialog = ({ open, onOpenChange, role, allModules, existingPermissi
     const allChecked = allModules.every((m) => perms[m.key]?.can_edit);
     setPerms((prev) => {
       const next = { ...prev };
-      allModules.forEach((m) => {
-        next[m.key] = { ...next[m.key], can_edit: !allChecked };
-      });
+      allModules.forEach((m) => { next[m.key] = { ...next[m.key], can_edit: !allChecked }; });
       return next;
     });
   };
@@ -132,11 +148,39 @@ const RoleFormDialog = ({ open, onOpenChange, role, allModules, existingPermissi
     const allChecked = allModules.every((m) => perms[m.key]?.can_delete);
     setPerms((prev) => {
       const next = { ...prev };
-      allModules.forEach((m) => {
-        next[m.key] = { ...next[m.key], can_delete: !allChecked };
-      });
+      allModules.forEach((m) => { next[m.key] = { ...next[m.key], can_delete: !allChecked }; });
       return next;
     });
+  };
+
+  const toggleExpanded = (moduleKey: string) => {
+    setExpandedModules((prev) => {
+      const next = new Set(prev);
+      if (next.has(moduleKey)) next.delete(moduleKey); else next.add(moduleKey);
+      return next;
+    });
+  };
+
+  const toggleTab = (moduleKey: string, tabKey: string) => {
+    setAllowedTabs((prev) => {
+      const current = prev[moduleKey] || [];
+      if (current.includes(tabKey)) {
+        return { ...prev, [moduleKey]: current.filter(t => t !== tabKey) };
+      } else {
+        return { ...prev, [moduleKey]: [...current, tabKey] };
+      }
+    });
+  };
+
+  const toggleAllTabs = (moduleKey: string) => {
+    const tabs = MODULE_TABS[moduleKey];
+    if (!tabs) return;
+    const current = allowedTabs[moduleKey] || [];
+    const allSelected = tabs.every(t => current.includes(t.key));
+    setAllowedTabs((prev) => ({
+      ...prev,
+      [moduleKey]: allSelected ? [] : tabs.map(t => t.key),
+    }));
   };
 
   const handleSave = async () => {
@@ -154,8 +198,6 @@ const RoleFormDialog = ({ open, onOpenChange, role, allModules, existingPermissi
           .eq("id", role.id);
         if (error) throw error;
         roleId = role.id;
-
-        // Delete old permissions
         await supabase.from("role_permissions").delete().eq("role_definition_id", roleId);
       } else {
         const { data, error } = await supabase
@@ -177,16 +219,23 @@ const RoleFormDialog = ({ open, onOpenChange, role, allModules, existingPermissi
       // Insert permissions
       const permRows = allModules
         .filter((m) => perms[m.key]?.can_read || perms[m.key]?.can_edit || perms[m.key]?.can_delete)
-        .map((m) => ({
-          role_definition_id: roleId,
-          module_key: m.key,
-          can_read: perms[m.key].can_read,
-          can_edit: perms[m.key].can_edit,
-          can_delete: perms[m.key].can_delete,
-        }));
+        .map((m) => {
+          const tabs = MODULE_TABS[m.key];
+          const selectedTabs = allowedTabs[m.key] || [];
+          // If all tabs selected or no tabs defined, store null (full access)
+          const allTabsSelected = !tabs || tabs.every(t => selectedTabs.includes(t.key));
+          return {
+            role_definition_id: roleId,
+            module_key: m.key,
+            can_read: perms[m.key].can_read,
+            can_edit: perms[m.key].can_edit,
+            can_delete: perms[m.key].can_delete,
+            allowed_tabs: allTabsSelected ? null : selectedTabs.length > 0 ? selectedTabs : null,
+          };
+        });
 
       if (permRows.length > 0) {
-        const { error } = await supabase.from("role_permissions").insert(permRows);
+        const { error } = await supabase.from("role_permissions").insert(permRows as any);
         if (error) throw error;
       }
 
@@ -285,29 +334,86 @@ const RoleFormDialog = ({ open, onOpenChange, role, allModules, existingPermissi
                   </tr>
                 </thead>
                 <tbody>
-                  {allModules.map((m) => (
-                    <tr key={m.key} className="border-t border-border">
-                      <td className="p-2">{m.label}</td>
-                      <td className="text-center p-2">
-                        <Checkbox
-                          checked={perms[m.key]?.can_read || false}
-                          onCheckedChange={() => togglePerm(m.key, "can_read")}
-                        />
-                      </td>
-                      <td className="text-center p-2">
-                        <Checkbox
-                          checked={perms[m.key]?.can_edit || false}
-                          onCheckedChange={() => togglePerm(m.key, "can_edit")}
-                        />
-                      </td>
-                      <td className="text-center p-2">
-                        <Checkbox
-                          checked={perms[m.key]?.can_delete || false}
-                          onCheckedChange={() => togglePerm(m.key, "can_delete")}
-                        />
-                      </td>
-                    </tr>
-                  ))}
+                  {allModules.map((m) => {
+                    const tabs = MODULE_TABS[m.key];
+                    const hasTabs = !!tabs && tabs.length > 0;
+                    const isExpanded = expandedModules.has(m.key);
+                    const selectedTabs = allowedTabs[m.key] || [];
+
+                    return (
+                      <>
+                        <tr key={m.key} className="border-t border-border">
+                          <td className="p-2">
+                            <div className="flex items-center gap-1.5">
+                              {hasTabs ? (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleExpanded(m.key)}
+                                  className="p-0.5 hover:bg-muted rounded"
+                                >
+                                  {isExpanded ? (
+                                    <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+                                  ) : (
+                                    <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+                                  )}
+                                </button>
+                              ) : (
+                                <span className="w-4" />
+                              )}
+                              <span>{m.label}</span>
+                              {hasTabs && selectedTabs.length > 0 && selectedTabs.length < tabs.length && (
+                                <span className="text-[10px] text-muted-foreground ml-1">
+                                  ({selectedTabs.length}/{tabs.length} abas)
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="text-center p-2">
+                            <Checkbox
+                              checked={perms[m.key]?.can_read || false}
+                              onCheckedChange={() => togglePerm(m.key, "can_read")}
+                            />
+                          </td>
+                          <td className="text-center p-2">
+                            <Checkbox
+                              checked={perms[m.key]?.can_edit || false}
+                              onCheckedChange={() => togglePerm(m.key, "can_edit")}
+                            />
+                          </td>
+                          <td className="text-center p-2">
+                            <Checkbox
+                              checked={perms[m.key]?.can_delete || false}
+                              onCheckedChange={() => togglePerm(m.key, "can_delete")}
+                            />
+                          </td>
+                        </tr>
+                        {hasTabs && isExpanded && (
+                          <tr key={`${m.key}-tabs`} className="bg-muted/30">
+                            <td colSpan={4} className="p-2 pl-10">
+                              <div className="space-y-1.5">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Checkbox
+                                    checked={tabs.every(t => selectedTabs.includes(t.key))}
+                                    onCheckedChange={() => toggleAllTabs(m.key)}
+                                  />
+                                  <span className="text-xs font-medium text-muted-foreground">Todas as abas</span>
+                                </div>
+                                {tabs.map((tab) => (
+                                  <div key={tab.key} className="flex items-center gap-2">
+                                    <Checkbox
+                                      checked={selectedTabs.includes(tab.key)}
+                                      onCheckedChange={() => toggleTab(m.key, tab.key)}
+                                    />
+                                    <span className="text-xs">{tab.label}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

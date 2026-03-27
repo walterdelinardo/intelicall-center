@@ -25,7 +25,32 @@ const ALL_MODULES = [
   { key: "configuracoes", label: "Configurações" },
 ];
 
-export { ALL_MODULES };
+const MODULE_TABS: Record<string, { key: string; label: string }[]> = {
+  agenda: [
+    { key: "calendario", label: "Calendário" },
+    { key: "notificacoes", label: "Notificações" },
+  ],
+  conversas: [
+    { key: "whatsapp", label: "WhatsApp" },
+    { key: "telegram", label: "Notificações Telegram" },
+  ],
+  financeiro: [
+    { key: "daily", label: "Caixa Diário" },
+    { key: "monthly", label: "Caixa Mensal" },
+    { key: "commissions", label: "Comissões" },
+  ],
+  usuarios: [
+    { key: "usuarios", label: "Usuários" },
+    { key: "papeis", label: "Papéis" },
+  ],
+  configuracoes: [
+    { key: "general", label: "Dados Gerais" },
+    { key: "hours", label: "Horários" },
+    { key: "integrations", label: "Integrações" },
+  ],
+};
+
+export { ALL_MODULES, MODULE_TABS };
 
 interface RoleDefinition {
   id: string;
