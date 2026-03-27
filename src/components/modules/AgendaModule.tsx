@@ -1146,7 +1146,8 @@ const AgendaModule = () => {
               <Badge variant="destructive" className="ml-1 h-5 min-w-5 px-1 text-[10px]">{unreadCount}</Badge>
             ) : null;
           })()}
-        </TabsTrigger>
+          </TabsTrigger>
+        )}
       </TabsList>
 
       <TabsContent value="notificacoes" className="space-y-4">
