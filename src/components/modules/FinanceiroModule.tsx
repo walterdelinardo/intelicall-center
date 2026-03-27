@@ -270,6 +270,9 @@ const FinanceiroModule = () => {
             {tx.type === "receita" ? "Receita" : "Despesa"}
           </Badge>
         </TableCell>
+        <TableCell className="text-center text-xs">
+          {tx.quantity && Number(tx.quantity) > 1 ? tx.quantity : "—"}
+        </TableCell>
         <TableCell className={`font-semibold ${tx.type === "receita" ? "text-success" : "text-destructive"}`}>
           {tx.type === "receita" ? "+" : "-"} R$ {Number(tx.amount).toFixed(2)}
         </TableCell>
@@ -308,6 +311,7 @@ const FinanceiroModule = () => {
             {tab === "monthly" && <TableHead>Data</TableHead>}
             <TableHead>Descrição</TableHead>
             <TableHead>Tipo</TableHead>
+            <TableHead className="text-center">Qtd</TableHead>
             <TableHead>Valor</TableHead>
             <TableHead className="hidden md:table-cell">Pagamento</TableHead>
             <TableHead>Status</TableHead>
