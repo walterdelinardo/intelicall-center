@@ -624,6 +624,67 @@ const ConfiguracoesModule = () => {
           </Card>
         </TabsContent>
 
+        {/* WhatsApp QR Code Tab */}
+        <TabsContent value="whatsapp">
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Smartphone className="w-5 h-5 text-primary" />
+                Instâncias WhatsApp
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {inboxesLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Carregando...
+                </div>
+              ) : inboxes.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhuma instância cadastrada.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Label</TableHead>
+                      <TableHead>Instância</TableHead>
+                      <TableHead>Conexão</TableHead>
+                      <TableHead className="w-[100px]">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {inboxes.filter(i => i.is_active).map((inbox) => (
+                      <TableRow key={inbox.id}>
+                        <TableCell className="font-medium">{inbox.label}</TableCell>
+                        <TableCell className="font-mono text-xs">{inbox.instance_name}</TableCell>
+                        <TableCell>{getStatusBadge(inbox.id, inbox.is_active)}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleGenerateQR(inbox.instance_name, inbox.label)}
+                              title="Gerar QR Code"
+                            >
+                              <QrCode className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => checkInstanceStatus(inbox.instance_name, inbox.id)}
+                              title="Verificar status"
+                            >
+                              <Activity className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* Integrations Tab */}
         <TabsContent value="integrations">
           <Card className="shadow-card">
