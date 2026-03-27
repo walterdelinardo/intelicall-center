@@ -43,7 +43,7 @@ const DashboardHeader = () => {
   });
 
   // Agenda notifications
-  const { data: notifications = [], refetch: refetchNotifications } = useQuery({
+  const { data: notifications = [] } = useQuery({
     queryKey: ["header-notifications", profile?.clinic_id],
     queryFn: async () => {
       if (!profile?.clinic_id) return [];
