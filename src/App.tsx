@@ -51,12 +51,13 @@ const WelcomeScreen = ({ userName, logoUrl }: { userName: string; logoUrl: strin
 
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, profile, loading } = useAuth();
-  const [showWelcome, setShowWelcome] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(true);
   const [clinicLogo, setClinicLogo] = useState<string | null>(null);
+  const [minTimePassed, setMinTimePassed] = useState(false);
+  const [dataReady, setDataReady] = useState(false);
 
   useEffect(() => {
     if (user && profile?.clinic_id) {
-      // Fetch clinic logo for welcome screen & save to localStorage
       supabase
         .from("clinics")
         .select("logo_url, name")
@@ -68,25 +69,26 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
             localStorage.setItem("clinic_logo_url", data.logo_url);
           }
           if (data?.name) localStorage.setItem("clinic_name", data.name);
+          setDataReady(true);
         });
 
-      // Show welcome only once per session
-      if (!sessionStorage.getItem("welcomed")) {
-        sessionStorage.setItem("welcomed", "1");
-        setShowWelcome(true);
-        setTimeout(() => setShowWelcome(false), 2800);
-      }
+      // Minimum 2.5s welcome screen
+      const timer = setTimeout(() => setMinTimePassed(true), 2500);
+      return () => clearTimeout(timer);
     }
   }, [user, profile?.clinic_id]);
 
+  // Dismiss welcome when both minimum time passed AND data is ready
+  useEffect(() => {
+    if (minTimePassed && dataReady) {
+      const fadeTimer = setTimeout(() => setShowWelcome(false), 600);
+      return () => clearTimeout(fadeTimer);
+    }
+  }, [minTimePassed, dataReady]);
+
   if (loading) return <LoadingScreen />;
-
-  // Profile still loading (user exists but profile not fetched yet)
   if (user && profile === null) return <LoadingScreen />;
-
   if (!user) return <Navigate to="/" replace />;
-
-  // User exists, profile loaded, but no clinic
   if (!profile?.clinic_id) return <Navigate to="/onboarding" replace />;
 
   if (showWelcome) {
