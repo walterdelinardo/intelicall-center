@@ -69,6 +69,13 @@ const UsuariosModule = () => {
     return assignment?.role_definition_id || "";
   };
 
+  // Filter out users assigned to a Super Admin role
+  const superAdminRoleIds = new Set(roleDefs.filter((r: any) => r.is_super_admin).map((r: any) => r.id));
+  const filteredUsers = users.filter((u: any) => {
+    const roleId = getUserAssignedRole(u.id);
+    return !roleId || !superAdminRoleIds.has(roleId);
+  });
+
   const assignRoleMutation = useMutation({
     mutationFn: async ({ userId, roleDefId }: { userId: string; roleDefId: string }) => {
       if (!profile?.clinic_id) throw new Error("Sem clínica");
@@ -126,9 +133,9 @@ const UsuariosModule = () => {
       <TabsContent value="usuarios">
         <div className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Card className="shadow-card"><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total de Usuários</p><p className="text-2xl font-bold text-foreground">{users.length}</p></CardContent></Card>
-            <Card className="shadow-card"><CardContent className="p-4"><p className="text-sm text-muted-foreground">Ativos</p><p className="text-2xl font-bold text-green-600">{users.filter((u: any) => u.is_active).length}</p></CardContent></Card>
-            <Card className="shadow-card"><CardContent className="p-4"><p className="text-sm text-muted-foreground">Inativos</p><p className="text-2xl font-bold text-red-600">{users.filter((u: any) => !u.is_active).length}</p></CardContent></Card>
+            <Card className="shadow-card"><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total de Usuários</p><p className="text-2xl font-bold text-foreground">{filteredUsers.length}</p></CardContent></Card>
+            <Card className="shadow-card"><CardContent className="p-4"><p className="text-sm text-muted-foreground">Ativos</p><p className="text-2xl font-bold text-green-600">{filteredUsers.filter((u: any) => u.is_active).length}</p></CardContent></Card>
+            <Card className="shadow-card"><CardContent className="p-4"><p className="text-sm text-muted-foreground">Inativos</p><p className="text-2xl font-bold text-red-600">{filteredUsers.filter((u: any) => !u.is_active).length}</p></CardContent></Card>
           </div>
 
           <Card className="shadow-card">
@@ -141,7 +148,7 @@ const UsuariosModule = () => {
             <CardContent className="p-0">
               {isLoading ? (
                 <div className="p-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" /></div>
-              ) : users.length === 0 ? (
+              ) : filteredUsers.length === 0 ? (
                 <div className="p-8 text-center text-muted-foreground">Nenhum usuário encontrado.</div>
               ) : (
                 <Table>
@@ -154,7 +161,7 @@ const UsuariosModule = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {users.map((u: any) => {
+                    {filteredUsers.map((u: any) => {
                       const isSelf = u.id === user?.id;
                       const currentRoleId = getUserAssignedRole(u.id);
                       const currentRoleDef = roleDefs.find((r: any) => r.id === currentRoleId);
