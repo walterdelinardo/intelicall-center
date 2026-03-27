@@ -638,6 +638,7 @@ export type Database = {
           notes: string | null
           payment_method: string | null
           professional_id: string | null
+          quantity: number | null
           status: string
           type: string
           updated_at: string
@@ -657,6 +658,7 @@ export type Database = {
           notes?: string | null
           payment_method?: string | null
           professional_id?: string | null
+          quantity?: number | null
           status?: string
           type?: string
           updated_at?: string
@@ -676,6 +678,7 @@ export type Database = {
           notes?: string | null
           payment_method?: string | null
           professional_id?: string | null
+          quantity?: number | null
           status?: string
           type?: string
           updated_at?: string
