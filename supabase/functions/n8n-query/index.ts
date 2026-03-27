@@ -42,6 +42,9 @@ serve(async (req) => {
     let limit: number | null = null;
     let order: string | null = null;
     let ascending = true;
+    let dateFrom: string | null = null;
+    let dateTo: string | null = null;
+    let dateColumn: string | null = null;
 
     if (req.method === 'GET') {
       const url = new URL(req.url);
@@ -50,9 +53,12 @@ serve(async (req) => {
       limit = url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : null;
       order = url.searchParams.get('order');
       ascending = url.searchParams.get('ascending') !== 'false';
+      dateFrom = url.searchParams.get('date_from');
+      dateTo = url.searchParams.get('date_to');
+      dateColumn = url.searchParams.get('date_column');
 
       // Build filters from query params (exclude reserved keys)
-      const reserved = ['table', 'select', 'limit', 'order', 'ascending'];
+      const reserved = ['table', 'select', 'limit', 'order', 'ascending', 'date_from', 'date_to', 'date_column'];
       filters = {};
       for (const [key, value] of url.searchParams.entries()) {
         if (!reserved.includes(key)) {
@@ -68,6 +74,9 @@ serve(async (req) => {
       limit = body.limit;
       order = body.order;
       ascending = body.ascending !== false;
+      dateFrom = body.date_from || null;
+      dateTo = body.date_to || null;
+      dateColumn = body.date_column || null;
     } else {
       return new Response(
         JSON.stringify({ error: 'Method not allowed' }),
