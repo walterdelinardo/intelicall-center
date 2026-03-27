@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Settings, Building2, Clock, Phone, MapPin, Mail, Save, Loader2, Smartphone, Plus, Power, Plug, Trash2, Calendar, Pencil, Palette, Check, Globe, QrCode, Wifi, WifiOff, Activity } from "lucide-react";
+import { Settings, Building2, Clock, Phone, MapPin, Mail, Save, Loader2, Smartphone, Plus, Power, Plug, Trash2, Calendar, Pencil, Palette, Check, Globe, QrCode, Wifi, WifiOff, Activity, Upload, ImageIcon } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -383,6 +383,74 @@ const ConfiguracoesModule = () => {
                 }}
                 className="space-y-6"
               >
+                {/* Logo Upload */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <ImageIcon className="w-4 h-4 text-muted-foreground" />
+                    Logotipo da Clínica
+                  </Label>
+                  <div className="flex items-center gap-4">
+                    {clinic?.logo_url ? (
+                      <img src={clinic.logo_url} alt="Logo" className="w-20 h-20 rounded-xl object-cover border border-border" />
+                    ) : (
+                      <div className="w-20 h-20 rounded-xl border border-dashed border-border flex items-center justify-center bg-muted/30">
+                        <Building2 className="w-8 h-8 text-muted-foreground" />
+                      </div>
+                    )}
+                    <div className="flex flex-col gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => document.getElementById("logo-upload-input")?.click()}
+                      >
+                        <Upload className="w-4 h-4" />
+                        {clinic?.logo_url ? "Alterar Logo" : "Enviar Logo"}
+                      </Button>
+                      <p className="text-xs text-muted-foreground">PNG, JPG ou SVG. Recomendado: 256x256px</p>
+                    </div>
+                    <input
+                      id="logo-upload-input"
+                      type="file"
+                      accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file || !profile?.clinic_id) return;
+                        const ext = file.name.split(".").pop() || "png";
+                        const path = `${profile.clinic_id}/logo.${ext}`;
+                        toast.info("Enviando logotipo...");
+                        const { error: uploadError } = await supabase.storage
+                          .from("clinic-logos")
+                          .upload(path, file, { upsert: true });
+                        if (uploadError) {
+                          toast.error("Erro ao enviar: " + uploadError.message);
+                          return;
+                        }
+                        const { data: urlData } = supabase.storage
+                          .from("clinic-logos")
+                          .getPublicUrl(path);
+                        const logoUrl = urlData.publicUrl + "?t=" + Date.now();
+                        const { error: updateError } = await supabase
+                          .from("clinics")
+                          .update({ logo_url: logoUrl } as any)
+                          .eq("id", profile.clinic_id);
+                        if (updateError) {
+                          toast.error("Erro ao salvar URL: " + updateError.message);
+                          return;
+                        }
+                        localStorage.setItem("clinic_logo_url", logoUrl);
+                        localStorage.setItem("clinic_name", form.name);
+                        queryClient.invalidateQueries({ queryKey: ["clinic"] });
+                        queryClient.invalidateQueries({ queryKey: ["clinic-header"] });
+                        toast.success("Logotipo atualizado!");
+                        e.target.value = "";
+                      }}
+                    />
+                  </div>
+                </div>
+
                 {/* Name */}
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2">

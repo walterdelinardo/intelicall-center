@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Footprints, Eye, EyeOff } from "lucide-react";
+import { Footprints, Eye, EyeOff, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -15,6 +15,9 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { signIn } = useAuth();
+
+  const savedLogoUrl = localStorage.getItem("clinic_logo_url");
+  const savedClinicName = localStorage.getItem("clinic_name");
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,10 +41,14 @@ const Login = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-accent to-background p-4">
       <Card className="w-full max-w-md shadow-lg animate-fade-in">
         <CardHeader className="space-y-3 text-center">
-          <div className="mx-auto w-16 h-16 bg-gradient-primary rounded-2xl flex items-center justify-center shadow-card">
-            <Footprints className="w-8 h-8 text-primary-foreground" />
-          </div>
-          <CardTitle className="text-2xl font-bold">PodoClinic</CardTitle>
+          {savedLogoUrl ? (
+            <img src={savedLogoUrl} alt="Logo" className="mx-auto w-16 h-16 rounded-2xl object-cover shadow-card" />
+          ) : (
+            <div className="mx-auto w-16 h-16 bg-gradient-primary rounded-2xl flex items-center justify-center shadow-card">
+              <Footprints className="w-8 h-8 text-primary-foreground" />
+            </div>
+          )}
+          <CardTitle className="text-2xl font-bold">{savedClinicName || "PodoClinic"}</CardTitle>
           <CardDescription>Sistema de Gestão para Clínicas de Podologia</CardDescription>
         </CardHeader>
         <CardContent>

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Bell, LogOut, Building2, MessageSquare, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -31,10 +32,26 @@ const DashboardHeader = () => {
         .select("*")
         .eq("id", profile.clinic_id)
         .single();
+      // Save logo to localStorage for login page & favicon
+      if (data?.logo_url) localStorage.setItem("clinic_logo_url", data.logo_url);
+      if (data?.name) localStorage.setItem("clinic_name", data.name);
       return data;
     },
     enabled: !!profile?.clinic_id,
   });
+
+  // Dynamic favicon
+  useEffect(() => {
+    if (clinic?.logo_url) {
+      let link = document.querySelector("link[rel='icon']") as HTMLLinkElement | null;
+      if (!link) {
+        link = document.createElement("link");
+        link.rel = "icon";
+        document.head.appendChild(link);
+      }
+      link.href = clinic.logo_url;
+    }
+  }, [clinic?.logo_url]);
 
   // Agenda notifications
   const { data: notifications = [] } = useQuery({
