@@ -83,6 +83,7 @@ const TelegramNotificationsTab = () => {
           .from("telegram_notifications" as any)
           .select("*")
           .eq("clinic_id", profile.clinic_id)
+          .neq("notification_type", "financial_report")
           .order("created_at", { ascending: false })
           .limit(100),
         supabase
