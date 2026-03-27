@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Bell, LogOut, Building2, MessageSquare, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
