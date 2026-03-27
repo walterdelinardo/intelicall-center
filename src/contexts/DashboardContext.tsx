@@ -17,6 +17,9 @@ interface DashboardContextType {
   pendingConversasTab: string | null;
   openConversasTab: (tab: string) => void;
   clearPendingConversasTab: () => void;
+  pendingAgendaTab: string | null;
+  openAgendaTab: (tab: string) => void;
+  clearPendingAgendaTab: () => void;
 }
 
 const DashboardContext = createContext<DashboardContextType | null>(null);
@@ -37,6 +40,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   const [pickerContactName, setPickerContactName] = useState<string | null>(null);
   const [pendingProntuarioClientId, setPendingProntuarioClientId] = useState<string | null>(null);
   const [pendingConversasTab, setPendingConversasTab] = useState<string | null>(null);
+  const [pendingAgendaTab, setPendingAgendaTab] = useState<string | null>(null);
 
   const openChatWithPhone = useCallback((phone: string, contactName?: string) => {
     setPickerPhone(phone.replace(/\D/g, ""));
@@ -84,6 +88,15 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     setPendingConversasTab(null);
   }, []);
 
+  const openAgendaTab = useCallback((tab: string) => {
+    setPendingAgendaTab(tab);
+    setActiveModule("agenda");
+  }, []);
+
+  const clearPendingAgendaTab = useCallback(() => {
+    setPendingAgendaTab(null);
+  }, []);
+
   return (
     <DashboardContext.Provider value={{
       activeModule, setActiveModule,
@@ -92,6 +105,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
       showInboxPicker, confirmChatWithInbox, cancelInboxPicker,
       pendingProntuarioClientId, openProntuario, clearPendingProntuario,
       pendingConversasTab, openConversasTab, clearPendingConversasTab,
+      pendingAgendaTab, openAgendaTab, clearPendingAgendaTab,
     }}>
       {children}
     </DashboardContext.Provider>
