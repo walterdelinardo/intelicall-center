@@ -64,8 +64,37 @@ const ConfiguracoesModule = () => {
   const [savingInbox, setSavingInbox] = useState(false);
   const [calendarsMap, setCalendarsMap] = useState<Record<string, GoogleCalendarOption[]>>({});
   const [loadingCalendars, setLoadingCalendars] = useState<Record<string, boolean>>({});
-  const [editingLabel, setEditingLabel] = useState<string | null>(null);
-  const [editLabelValue, setEditLabelValue] = useState("");
+
+  // Fetch podólogo profiles for Google Calendar label selector
+  const { data: podologoProfiles } = useQuery({
+    queryKey: ["podologo-profiles", profile?.clinic_id],
+    queryFn: async () => {
+      if (!profile?.clinic_id) return [];
+      // Get role definitions that match "podologo" slug
+      const { data: roleDefs } = await supabase
+        .from("role_definitions")
+        .select("id")
+        .eq("clinic_id", profile.clinic_id)
+        .ilike("slug", "%podologo%");
+      if (!roleDefs || roleDefs.length === 0) return [];
+      const roleIds = roleDefs.map(r => r.id);
+      // Get user IDs with those roles
+      const { data: assignments } = await supabase
+        .from("user_role_assignments")
+        .select("user_id")
+        .in("role_definition_id", roleIds);
+      if (!assignments || assignments.length === 0) return [];
+      const userIds = [...new Set(assignments.map(a => a.user_id))];
+      // Get profiles
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", userIds)
+        .eq("is_active", true);
+      return profiles || [];
+    },
+    enabled: !!profile?.clinic_id,
+  });
   const [showGoogleConfig, setShowGoogleConfig] = useState(false);
   const [showMapsConfig, setShowMapsConfig] = useState(false);
 
@@ -897,46 +926,26 @@ const ConfiguracoesModule = () => {
                           return (
                             <TableRow key={acc.id}>
                               <TableCell>
-                                {editingLabel === acc.id ? (
-                                  <div className="flex items-center gap-1">
-                                    <Input
-                                      value={editLabelValue}
-                                      onChange={(e) => setEditLabelValue(e.target.value)}
-                                      className="h-7 text-xs w-[140px]"
-                                      autoFocus
-                                      onKeyDown={async (e) => {
-                                        if (e.key === 'Enter' && editLabelValue.trim()) {
-                                          await updateLabel(acc.id, editLabelValue.trim());
-                                          setEditingLabel(null);
-                                        }
-                                        if (e.key === 'Escape') setEditingLabel(null);
-                                      }}
-                                    />
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-7 w-7"
-                                      onClick={async () => {
-                                        if (editLabelValue.trim()) {
-                                          await updateLabel(acc.id, editLabelValue.trim());
-                                          setEditingLabel(null);
-                                        }
-                                      }}
-                                    >
-                                      <Save className="w-3 h-3" />
-                                    </Button>
-                                  </div>
-                                ) : (
-                                  <button
-                                    className="font-medium text-left hover:underline cursor-pointer"
-                                    onClick={() => {
-                                      setEditingLabel(acc.id);
-                                      setEditLabelValue(acc.label);
+                                {podologoProfiles && podologoProfiles.length > 0 ? (
+                                  <Select
+                                    value={acc.label}
+                                    onValueChange={async (value) => {
+                                      await updateLabel(acc.id, value);
                                     }}
-                                    title="Clique para editar"
                                   >
-                                    {acc.label} <Pencil className="w-3 h-3 inline ml-1 text-muted-foreground" />
-                                  </button>
+                                    <SelectTrigger className="h-8 text-xs w-[180px]">
+                                      <SelectValue placeholder="Selecionar podólogo" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {podologoProfiles.map((p) => (
+                                        <SelectItem key={p.id} value={p.full_name}>
+                                          {p.full_name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  <span className="text-sm text-muted-foreground">{acc.label}</span>
                                 )}
                               </TableCell>
                               <TableCell>
