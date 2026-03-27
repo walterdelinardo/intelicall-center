@@ -640,7 +640,9 @@ const AgendaModule = () => {
           date: eventToDelete.date,
           notes: `Motivo do cancelamento: ${cancelReason}`,
           payment_method: null,
-        });
+          google_event_id: eventToDelete.id || null,
+          calendar_label: eventToDelete.accountLabel || null,
+        } as any);
       } catch (err) {
         console.error("Error inserting cancel transaction:", err);
       }
@@ -1679,6 +1681,27 @@ const AgendaModule = () => {
                     />
                   </div>
 
+                  {/* Agenda selector */}
+                  {activeAccounts.length > 1 && (
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-1"><Globe className="w-3 h-3" /> Agenda</Label>
+                      <Select value={editForm.editAccountId} onValueChange={(v) => setEditForm({ ...editForm, editAccountId: v })} disabled={isDisabled}>
+                        <SelectTrigger><SelectValue placeholder="Selecione a agenda" /></SelectTrigger>
+                        <SelectContent>
+                          {activeAccounts.map((acc) => (
+                            <SelectItem key={acc.id} value={acc.id}>{acc.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  {activeAccounts.length === 1 && (
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-1"><Globe className="w-3 h-3" /> Agenda</Label>
+                      <Input value={activeAccounts[0].label} disabled className="bg-muted/50" />
+                    </div>
+                  )}
+
                   {/* Date/Time */}
                   <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-2">
@@ -2155,7 +2178,9 @@ function BillingDialog({ open, onOpenChange, event, clinicId }: {
         notes: form.notes || null,
         client_id: clientId,
         appointment_id: appointmentId,
-      });
+        google_event_id: event?.id || null,
+        calendar_label: event?.accountLabel || null,
+      } as any);
       if (error) throw error;
 
       // Product sale transactions + stock deduction
