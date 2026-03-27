@@ -1,44 +1,30 @@
 
 
-## Relatório de Estoque — enviar apenas itens com status Baixo
+## Adicionar cURLs GET para consulta de dados (n8n-query) nos Comandos de Integração
 
-### Alteração em `supabase/functions/telegram-webhook/index.ts`
+### O que será feito
 
-Na ação `stock_alert`:
+Adicionar uma nova seção **"Consultar Dados (GET)"** no painel de Comandos de Integração do bot, exibindo exemplos de cURL GET para as tabelas mais úteis: `stock_items`, `financial_transactions`, `clients`, `appointments` e `telegram_notifications`. Isso permite ao usuário copiar e usar no n8n para buscar dados via GET.
 
-- Remover exigência de `itemName`, `currentQty`, `minQty` — basta `clinicId`
-- Consultar `stock_items` filtrado por `clinic_id` e `is_active = true`
-- Filtrar apenas itens com **estoque baixo**: `quantity <= min_quantity`
-- Montar mensagem Markdown com cabeçalho "⚠️ Relatório de Estoque Baixo" listando cada item com: Nome, Categoria, Quantidade, Custo Unit. (R$), Vl. Venda (R$), Fornecedor e Status
-- Se não houver itens com estoque baixo, enviar mensagem informando "✅ Nenhum produto com estoque baixo"
-- Dividir em múltiplas mensagens se ultrapassar 4096 caracteres (limite do Telegram)
-- Enviar para bots com `webhook_stock_alerts = true`
-- Registrar na `telegram_notifications` com `notification_type: "stock_report"`
+### Alteração em `src/components/settings/TelegramBotsSection.tsx`
 
-### Payload do n8n
-```json
-{
-  "action": "stock_alert",
-  "clinicId": "UUID"
-}
-```
+1. Adicionar a URL base do `n8n-query`: `https://{projectId}.supabase.co/functions/v1/n8n-query`
 
-### Formato da mensagem
+2. Criar funções geradoras de cURL GET para cada tabela relevante, usando query params. Exemplos:
+   - **Estoque**: `?table=stock_items&clinic_id={clinicId}&is_active=true`
+   - **Financeiro**: `?table=financial_transactions&clinic_id={clinicId}&order=date&ascending=false&limit=50`
+   - **Clientes**: `?table=clients&clinic_id={clinicId}&limit=100`
+   - **Agendamentos**: `?table=appointments&clinic_id={clinicId}&order=date&ascending=false&limit=50`
+
+3. Adicionar uma nova seção no painel de cURL (sempre visível, como o n8n log) com título "📊 Consultar Dados via GET" e um seletor de tabela, mostrando o cURL correspondente com botão de copiar.
+
+4. O header `x-api-secret` será incluído no cURL como placeholder `<N8N_API_SECRET>` para o usuário preencher.
+
+### Formato do cURL exibido
+
 ```text
-⚠️ *Relatório de Estoque Baixo*
-
-1. *Produto X*
-   📁 Categoria: Geral
-   📊 Qtd: 2 | Mín: 5
-   💰 Custo: R$ 10,00 | Venda: R$ 25,00
-   🏭 Fornecedor: ABC Ltda
-
-2. *Produto Y*
-   📁 Categoria: Produto
-   📊 Qtd: 0 | Mín: 3
-   💰 Custo: R$ 5,00 | Venda: R$ 12,00
-   🏭 Fornecedor: —
-
-📦 Total: 2 produtos com estoque baixo
+curl -X GET \
+  "https://PROJECT.supabase.co/functions/v1/n8n-query?table=stock_items&clinic_id=UUID&is_active=true" \
+  -H "x-api-secret: <N8N_API_SECRET>"
 ```
 
