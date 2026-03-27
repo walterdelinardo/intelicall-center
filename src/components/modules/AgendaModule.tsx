@@ -579,6 +579,41 @@ const AgendaModule = () => {
     if (success) {
       const wasRescheduled = editingEvent && (editForm.date !== editingEvent.date || editForm.startTime !== editingEvent.time);
       logNotification(wasRescheduled ? "rescheduled" : "updated", title, editingEvent?.accountId, wasRescheduled ? `Reagendado para ${editForm.date} ${editForm.startTime}` : `Evento atualizado`);
+
+      // Ensure medical record exists for the client
+      if (profile?.clinic_id && editForm.clientWhatsapp) {
+        try {
+          const normalizedPhone = editForm.clientWhatsapp.replace(/\D/g, "");
+          const { data: matchedClient } = await supabase
+            .from("clients")
+            .select("id")
+            .eq("clinic_id", profile.clinic_id)
+            .or(`whatsapp.eq.${normalizedPhone},phone.eq.${normalizedPhone}`)
+            .maybeSingle();
+
+          if (matchedClient) {
+            const { data: existingRecord } = await supabase
+              .from("medical_records")
+              .select("id")
+              .eq("clinic_id", profile.clinic_id)
+              .eq("client_id", matchedClient.id)
+              .maybeSingle();
+
+            if (!existingRecord) {
+              await supabase.from("medical_records").insert({
+                clinic_id: profile.clinic_id,
+                client_id: matchedClient.id,
+                date: editForm.date,
+                chief_complaint: editForm.procedureName || '',
+              });
+              queryClient.invalidateQueries({ queryKey: ["medical-records"] });
+            }
+          }
+        } catch (err) {
+          console.error("Error ensuring medical record on edit:", err);
+        }
+      }
+
       setIsEditOpen(false);
       setEditingEvent(null);
     }
