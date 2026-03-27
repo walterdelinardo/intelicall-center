@@ -65,13 +65,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setProfile(data);
   };
 
-  const fetchRoles = async (userId: string) => {
-    const { data } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId);
-    setRoles((data || []).map((r: any) => r.role as AppRole));
-  };
 
   const fetchDynamicPermissions = async (userId: string) => {
     // Fetch user_role_assignments with role_definitions
@@ -206,7 +199,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setModulePermissions([]);
   };
 
-  const hasRole = (role: AppRole) => roles.includes(role);
+  
 
   const hasModuleAccess = (moduleKey: string, action: "read" | "edit" | "delete" = "read") => {
     if (isSuperAdmin) return true;

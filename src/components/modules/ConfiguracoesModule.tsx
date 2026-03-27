@@ -51,9 +51,9 @@ const defaultWorkingHours: WorkingHours = {
 };
 
 const ConfiguracoesModule = () => {
-  const { profile, hasRole, hasTabAccess } = useAuth();
+  const { profile, isSuperAdmin, hasTabAccess, hasModuleAccess } = useAuth();
   const queryClient = useQueryClient();
-  const isAdmin = hasRole("admin");
+  const isAdmin = isSuperAdmin || hasModuleAccess("configuracoes", "edit");
   const { inboxes, loading: inboxesLoading, createInbox, toggleInbox, deleteInbox } = useWhatsAppInboxes();
   const { accounts: googleAccounts, loading: googleLoading, initiateOAuth, toggleAccount: toggleGoogleAccount, deleteAccount: deleteGoogleAccount, fetchCalendars, updateCalendarId, updateLabel, updateColor, hasCredentials, fetchOAuthConfig } = useGoogleOAuth();
 

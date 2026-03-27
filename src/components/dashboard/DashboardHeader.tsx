@@ -8,12 +8,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
-const roleLabels: Record<string, string> = {
-  admin: "Admin",
-  recepcao: "Recepção",
-  podologo: "Podólogo",
-  financeiro: "Financeiro",
-};
 
 const notifIcons: Record<string, string> = {
   created: "🆕",
@@ -25,7 +19,7 @@ const notifIcons: Record<string, string> = {
 const DashboardHeader = () => {
   const navigate = useNavigate();
   
-  const { profile, roles, signOut } = useAuth();
+  const { profile, assignedRoles, signOut } = useAuth();
   const { setActiveModule, openConversasTab, openAgendaTab } = useDashboard();
 
   const { data: clinic } = useQuery({
@@ -138,9 +132,9 @@ const DashboardHeader = () => {
           <div className="hidden sm:flex flex-col items-end mr-1">
             <span className="text-sm font-medium">{profile?.full_name || "Usuário"}</span>
             <div className="flex gap-1">
-              {roles.map((r) => (
-                <Badge key={r} variant="outline" className="text-[10px] h-4 px-1.5">
-                  {roleLabels[r] || r}
+              {assignedRoles.map((r) => (
+                <Badge key={r.id} variant="outline" className="text-[10px] h-4 px-1.5" style={{ borderColor: r.color, color: r.color }}>
+                  {r.name}
                 </Badge>
               ))}
             </div>

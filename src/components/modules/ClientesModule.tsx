@@ -128,12 +128,21 @@ const ClientesModule = () => {
     queryKey: ["professionals-podologos", profile?.clinic_id],
     queryFn: async () => {
       if (!profile?.clinic_id) return [];
-      // Get user IDs with 'podologo' role in this clinic
+      // Get user IDs with 'podologo' role via dynamic role system
+      const { data: roleDefs } = await supabase
+        .from("role_definitions")
+        .select("id")
+        .eq("clinic_id", profile.clinic_id)
+        .ilike("slug", "%podologo%");
+      const roleDefIds = (roleDefs || []).map((r: any) => r.id);
+      if (roleDefIds.length === 0) return [];
       const { data: roleData, error: roleError } = await supabase
-        .from("user_roles").select("user_id")
-        .eq("clinic_id", profile.clinic_id).eq("role", "podologo");
+        .from("user_role_assignments")
+        .select("user_id")
+        .eq("clinic_id", profile.clinic_id)
+        .in("role_definition_id", roleDefIds);
       if (roleError) throw roleError;
-      const podologoIds = (roleData || []).map((r) => r.user_id);
+      const podologoIds = (roleData || []).map((r: any) => r.user_id);
       if (podologoIds.length === 0) return [];
       const { data, error } = await supabase
         .from("profiles").select("id, full_name")
