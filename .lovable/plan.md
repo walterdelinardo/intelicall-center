@@ -1,81 +1,61 @@
 
 
-## Sistema de Papéis Dinâmicos com Permissões por Módulo
+## Permissões por Aba dentro de cada Módulo
 
 ### Resumo
 
-Criar um sistema RBAC (Role-Based Access Control) completo e escalável com:
-- Tabela de definições de papéis customizáveis por clínica
-- Tabela de permissões granulares (ler/editar/excluir) por módulo
-- Papel **super-admin** com acesso ilimitado (hardcoded, não editável)
-- Aba "Papéis" no módulo Usuários para gerenciar tudo
-- Walter Eduardo recebe o papel super-admin
+Expandir o sistema RBAC para permitir controle granular por **aba** (sub-tab) dentro de cada módulo. Ao editar um papel, além de marcar Ler/Editar/Excluir por módulo, o admin poderá expandir cada módulo e selecionar quais abas específicas estão acessíveis.
 
-### Banco de Dados (Migrations)
-
-**1. Tabela `role_definitions`**
-| Coluna | Tipo | Descrição |
-|--------|------|-----------|
-| id | uuid PK | |
-| clinic_id | uuid | Clínica dona |
-| name | text | Nome do papel (ex: "Recepcionista") |
-| slug | text | Identificador único por clínica |
-| color | text | Cor do badge (#hex) |
-| is_system | boolean | Se é papel do sistema (super-admin) |
-| is_super_admin | boolean | Acesso total |
-| created_at | timestamptz | |
-
-**2. Tabela `role_permissions`**
-| Coluna | Tipo | Descrição |
-|--------|------|-----------|
-| id | uuid PK | |
-| role_definition_id | uuid FK | Papel |
-| module_key | text | Ex: "agenda", "financeiro", "estoque" |
-| can_read | boolean | Pode visualizar |
-| can_edit | boolean | Pode criar/editar |
-| can_delete | boolean | Pode excluir |
-
-**3. Tabela `user_role_assignments`**
-| Coluna | Tipo | Descrição |
-|--------|------|-----------|
-| id | uuid PK | |
-| user_id | uuid | |
-| role_definition_id | uuid FK | |
-| clinic_id | uuid | |
-
-**4. RLS**: Todas as tabelas com policies baseadas em `get_user_clinic_id(auth.uid())`. Apenas super-admin e admin podem gerenciar.
-
-**5. Seed**: Inserir papel "Super Admin" com `is_super_admin = true` e atribuir ao Walter Eduardo (buscar por nome na tabela profiles).
-
-### Lista de Módulos para Permissões
+### Mapeamento de Abas por Módulo
 
 ```text
-dashboard, agenda, clientes, conversas, prontuarios, 
-procedimentos, lista-espera, financeiro, estoque, 
-leads, usuarios, configuracoes
+agenda:         calendario, notificacoes
+conversas:      whatsapp, telegram
+financeiro:     daily (Caixa Diário), monthly (Caixa Mensal), commissions (Comissões)
+prontuarios:    clinical, assessments, procedures, documents, history
+usuarios:       usuarios, papeis
+configuracoes:  general, hours, integrations
 ```
+
+Módulos sem abas (dashboard, clientes, estoque, leads, procedimentos, lista-espera) ficam sem sub-items.
+
+### Banco de Dados
+
+**Adicionar coluna `allowed_tabs` à tabela `role_permissions`:**
+
+```sql
+ALTER TABLE role_permissions ADD COLUMN allowed_tabs text[] DEFAULT NULL;
+```
+
+- `NULL` ou array vazio = acesso a todas as abas (comportamento padrão, retrocompatível)
+- Array com valores = acesso apenas às abas listadas (ex: `{daily, monthly}`)
 
 ### Alterações em Código
 
-**1. `src/components/modules/UsuariosModule.tsx`**
-- Adicionar Tabs: "Usuários" (conteúdo atual) e "Papéis"
-- Aba Papéis mostra tabela com todos os role_definitions da clínica
-- Botões: Criar, Editar, Excluir papel
-- Dialog de criação/edição com: nome, slug, cor, e uma matriz de checkboxes (módulos × permissões)
-- Super-admin aparece na lista mas não pode ser editado/excluído
+**1. `src/components/modules/usuarios/RolesTab.tsx`**
+- Exportar constante `MODULE_TABS` com o mapeamento módulo → abas
 
-**2. `src/contexts/AuthContext.tsx`**
-- Buscar `user_role_assignments` + `role_definitions` + `role_permissions` do usuário
-- Expor funções: `hasModuleAccess(module, permission)` e `isSuperAdmin`
-- Super-admin retorna `true` para tudo
+**2. `src/components/modules/usuarios/RoleFormDialog.tsx`**
+- Na matriz de permissões, para módulos que têm abas, adicionar uma linha expansível (accordion/collapsible) abaixo do módulo
+- Dentro da expansão: checkboxes para cada aba do módulo
+- Estado `allowedTabs` por módulo no formulário
+- Salvar o array de abas selecionadas na coluna `allowed_tabs`
+- Se todas as abas estão marcadas, salvar `NULL` (acesso total)
 
-**3. `src/components/dashboard/AppSidebar.tsx`**
-- Substituir a lógica `canSee` hardcoded por `hasModuleAccess(moduleKey, 'read')`
-- Super-admin vê tudo
+**3. `src/contexts/AuthContext.tsx`**
+- Incluir `allowed_tabs` no fetch de permissões
+- Adicionar helper `hasTabAccess(moduleKey, tabKey)`:
+  - Super-admin → `true`
+  - `allowed_tabs` é null/vazio → `true`
+  - Caso contrário, verifica se `tabKey` está no array
+
+**4. Módulos com abas (Agenda, Conversas, Financeiro, Prontuários, Usuários, Configurações)**
+- Filtrar `TabsTrigger` com `hasTabAccess(moduleKey, tabValue)`
+- Se a aba default não está acessível, selecionar a primeira aba permitida
 
 ### Detalhes Técnicos
 
-- O sistema antigo (enum `app_role` + `user_roles`) será mantido por compatibilidade mas o novo sistema (`role_definitions` + `user_role_assignments`) será a fonte de verdade para permissões
-- A UI de atribuição de papéis na aba "Usuários" passará a usar os papéis dinâmicos da tabela `role_definitions`
-- Papéis pré-existentes (admin, recepção, podólogo, financeiro) serão criados como seed na migração para manter compatibilidade
+- A coluna `allowed_tabs` usa tipo `text[]` (array nativo do Postgres), sem necessidade de nova tabela
+- Retrocompatível: registros existentes terão `NULL`, significando acesso total
+- O types.ts será atualizado automaticamente após a migration
 
