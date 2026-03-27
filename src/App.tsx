@@ -94,7 +94,7 @@ const WelcomeScreen = ({ userName, logoUrl }: { userName: string; logoUrl: strin
             width: "600px", height: "600px",
             top: "-120px", right: "-180px",
             backgroundColor: `rgba(${c1}, 0.07)`,
-            animation: "welcomePulse 4s ease-in-out infinite",
+            animation: "bubbleDrift1 12s ease-in-out infinite",
           }}
         />
         <div
@@ -103,7 +103,7 @@ const WelcomeScreen = ({ userName, logoUrl }: { userName: string; logoUrl: strin
             width: "500px", height: "500px",
             bottom: "-100px", left: "-150px",
             backgroundColor: `rgba(${c2}, 0.05)`,
-            animation: "welcomePulse 5s ease-in-out infinite 0.5s",
+            animation: "bubbleDrift2 14s ease-in-out infinite 1s",
           }}
         />
         <div
@@ -111,25 +111,27 @@ const WelcomeScreen = ({ userName, logoUrl }: { userName: string; logoUrl: strin
           style={{
             width: "300px", height: "300px",
             top: "50%", left: "50%",
-            transform: "translate(-50%, -50%)",
             backgroundColor: `rgba(${c3}, 0.06)`,
-            animation: "welcomePulse 6s ease-in-out infinite 1s",
+            animation: "bubbleDrift3 16s ease-in-out infinite 0.5s",
           }}
         />
-        {[...Array(8)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute rounded-full"
-            style={{
-              width: `${4 + i * 2}px`,
-              height: `${4 + i * 2}px`,
-              top: `${10 + i * 11}%`,
-              left: `${8 + i * 12}%`,
-              backgroundColor: `rgba(${[c1, c2, c3][i % 3]}, ${0.12 + (i % 3) * 0.05})`,
-              animation: `welcomeFloat ${3 + i * 0.5}s ease-in-out infinite ${i * 0.3}s`,
-            }}
-          />
-        ))}
+        {[...Array(10)].map((_, i) => {
+          const size = 6 + Math.random() * 14;
+          return (
+            <div
+              key={i}
+              className="absolute rounded-full"
+              style={{
+                width: `${size}px`,
+                height: `${size}px`,
+                top: `${10 + (i * 8) % 80}%`,
+                left: `${5 + (i * 11) % 90}%`,
+                backgroundColor: `rgba(${[c1, c2, c3][i % 3]}, ${0.08 + (i % 3) * 0.04})`,
+                animation: `particleFloat${i % 3} ${6 + i * 0.8}s ease-in-out infinite ${i * 0.4}s`,
+              }}
+            />
+          );
+        })}
       </div>
 
       <div className="relative z-10 flex flex-col items-center gap-8"
@@ -166,13 +168,44 @@ const WelcomeScreen = ({ userName, logoUrl }: { userName: string; logoUrl: strin
       </div>
 
       <style>{`
-        @keyframes welcomePulse {
-          0%, 100% { transform: scale(1); opacity: 0.6; }
-          50% { transform: scale(1.08); opacity: 1; }
+        @keyframes bubbleDrift1 {
+          0%   { transform: translate(0, 0) scale(1); opacity: 0.5; }
+          25%  { transform: translate(30px, 20px) scale(1.04); opacity: 0.7; }
+          50%  { transform: translate(-15px, 40px) scale(1.08); opacity: 0.6; }
+          75%  { transform: translate(20px, -10px) scale(1.02); opacity: 0.8; }
+          100% { transform: translate(0, 0) scale(1); opacity: 0.5; }
         }
-        @keyframes welcomeFloat {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-12px); }
+        @keyframes bubbleDrift2 {
+          0%   { transform: translate(0, 0) scale(1); opacity: 0.4; }
+          30%  { transform: translate(-25px, -30px) scale(1.06); opacity: 0.6; }
+          60%  { transform: translate(20px, -15px) scale(1.03); opacity: 0.5; }
+          100% { transform: translate(0, 0) scale(1); opacity: 0.4; }
+        }
+        @keyframes bubbleDrift3 {
+          0%   { transform: translate(-50%, -50%) scale(1); opacity: 0.5; }
+          33%  { transform: translate(calc(-50% + 20px), calc(-50% - 25px)) scale(1.05); opacity: 0.7; }
+          66%  { transform: translate(calc(-50% - 15px), calc(-50% + 15px)) scale(1.02); opacity: 0.55; }
+          100% { transform: translate(-50%, -50%) scale(1); opacity: 0.5; }
+        }
+        @keyframes particleFloat0 {
+          0%   { transform: translate(0, 0) scale(1); opacity: 0.6; }
+          20%  { transform: translate(8px, -18px) scale(1.1); opacity: 0.8; }
+          50%  { transform: translate(-6px, -30px) scale(0.95); opacity: 0.5; }
+          80%  { transform: translate(10px, -12px) scale(1.05); opacity: 0.7; }
+          100% { transform: translate(0, 0) scale(1); opacity: 0.6; }
+        }
+        @keyframes particleFloat1 {
+          0%   { transform: translate(0, 0) scale(1); opacity: 0.5; }
+          30%  { transform: translate(-12px, -20px) scale(1.15); opacity: 0.7; }
+          60%  { transform: translate(6px, -35px) scale(0.9); opacity: 0.6; }
+          100% { transform: translate(0, 0) scale(1); opacity: 0.5; }
+        }
+        @keyframes particleFloat2 {
+          0%   { transform: translate(0, 0) scale(1); opacity: 0.55; }
+          25%  { transform: translate(10px, -15px) scale(1.08); opacity: 0.75; }
+          50%  { transform: translate(-8px, -28px) scale(1); opacity: 0.5; }
+          75%  { transform: translate(5px, -10px) scale(1.12); opacity: 0.65; }
+          100% { transform: translate(0, 0) scale(1); opacity: 0.55; }
         }
         @keyframes welcomeFadeUp {
           from { opacity: 0; transform: translateY(20px); }
