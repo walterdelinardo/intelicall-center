@@ -46,6 +46,7 @@ const MODULE_TABS: Record<string, { key: string; label: string }[]> = {
   configuracoes: [
     { key: "general", label: "Dados Gerais" },
     { key: "hours", label: "Horários" },
+    { key: "whatsapp", label: "WhatsApp" },
     { key: "integrations", label: "Integrações" },
   ],
 };
