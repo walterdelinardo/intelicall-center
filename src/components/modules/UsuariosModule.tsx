@@ -69,6 +69,13 @@ const UsuariosModule = () => {
     return assignment?.role_definition_id || "";
   };
 
+  // Filter out users assigned to a Super Admin role
+  const superAdminRoleIds = new Set(roleDefs.filter((r: any) => r.is_super_admin).map((r: any) => r.id));
+  const filteredUsers = users.filter((u: any) => {
+    const roleId = getUserAssignedRole(u.id);
+    return !roleId || !superAdminRoleIds.has(roleId);
+  });
+
   const assignRoleMutation = useMutation({
     mutationFn: async ({ userId, roleDefId }: { userId: string; roleDefId: string }) => {
       if (!profile?.clinic_id) throw new Error("Sem clínica");
