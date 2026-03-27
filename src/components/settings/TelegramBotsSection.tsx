@@ -479,12 +479,28 @@ const TelegramBotsSection = () => {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="relative">
-                      <pre className="bg-muted text-foreground text-xs p-3 rounded-md overflow-x-auto whitespace-pre-wrap break-all">
-                        {getQueryCurl(getTable)}
-                      </pre>
-                      <Button
-                        variant="ghost"
+                    {hasDateFilter && (
+                      <div className="flex gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">De:</Label>
+                          <Input
+                            type="date"
+                            value={getDateFrom}
+                            onChange={e => setGetDateFrom(e.target.value)}
+                            className="h-8 text-xs w-36"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Até:</Label>
+                          <Input
+                            type="date"
+                            value={getDateTo}
+                            onChange={e => setGetDateTo(e.target.value)}
+                            className="h-8 text-xs w-36"
+                          />
+                        </div>
+                      </div>
+                    )}
                         size="icon"
                         className="absolute top-1 right-1 h-7 w-7"
                         onClick={() => copyToClipboard(getQueryCurl(getTable))}
