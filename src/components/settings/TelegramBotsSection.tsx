@@ -174,6 +174,21 @@ const TelegramBotsSection = () => {
 
   const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
   const baseUrl = `https://${projectId}.supabase.co/functions/v1/telegram-webhook`;
+  const n8nQueryUrl = `https://${projectId}.supabase.co/functions/v1/n8n-query`;
+
+  const clinicId = profile?.clinic_id || "<clinic_id>";
+
+  const getTableOptions: Record<string, { label: string; params: string }> = {
+    stock_items: { label: "Estoque", params: `table=stock_items&clinic_id=${clinicId}&is_active=true` },
+    financial_transactions: { label: "Financeiro", params: `table=financial_transactions&clinic_id=${clinicId}&order=date&ascending=false&limit=50` },
+    clients: { label: "Clientes", params: `table=clients&clinic_id=${clinicId}&limit=100` },
+    appointments: { label: "Agendamentos", params: `table=appointments&clinic_id=${clinicId}&order=date&ascending=false&limit=50` },
+    telegram_notifications: { label: "Notificações Telegram", params: `table=telegram_notifications&clinic_id=${clinicId}&order=created_at&ascending=false&limit=50` },
+  };
+
+  const getQueryCurl = (table: string) => `curl -X GET \\
+  "${n8nQueryUrl}?${getTableOptions[table]?.params || ""}" \\
+  -H "x-api-secret: <N8N_API_SECRET>"`;
 
   const getFinancialCurl = () => `curl -X POST \\
   ${baseUrl} \\
