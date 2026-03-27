@@ -11,6 +11,12 @@ const ALLOWED_TABLES = [
   'whatsapp_messages',
   'whatsapp_inboxes',
   'clients',
+  'appointments',
+  'leads',
+  'stock_items',
+  'financial_transactions',
+  'telegram_bots',
+  'telegram_notifications',
 ];
 
 serve(async (req) => {
@@ -30,7 +36,44 @@ serve(async (req) => {
       );
     }
 
-    const { table, filters, select, limit } = await req.json();
+    let table: string | null = null;
+    let filters: Record<string, string> | null = null;
+    let select: string | null = null;
+    let limit: number | null = null;
+    let order: string | null = null;
+    let ascending = true;
+
+    if (req.method === 'GET') {
+      const url = new URL(req.url);
+      table = url.searchParams.get('table');
+      select = url.searchParams.get('select');
+      limit = url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : null;
+      order = url.searchParams.get('order');
+      ascending = url.searchParams.get('ascending') !== 'false';
+
+      // Build filters from query params (exclude reserved keys)
+      const reserved = ['table', 'select', 'limit', 'order', 'ascending'];
+      filters = {};
+      for (const [key, value] of url.searchParams.entries()) {
+        if (!reserved.includes(key)) {
+          filters[key] = value;
+        }
+      }
+      if (Object.keys(filters).length === 0) filters = null;
+    } else if (req.method === 'POST') {
+      const body = await req.json();
+      table = body.table;
+      filters = body.filters;
+      select = body.select;
+      limit = body.limit;
+      order = body.order;
+      ascending = body.ascending !== false;
+    } else {
+      return new Response(
+        JSON.stringify({ error: 'Method not allowed' }),
+        { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     if (!table || !ALLOWED_TABLES.includes(table)) {
       return new Response(
@@ -46,11 +89,14 @@ serve(async (req) => {
 
     let query = supabase.from(table).select(select || '*');
 
-    // Apply filters: { "clinic_id": "uuid-here", "status": "active" }
     if (filters && typeof filters === 'object') {
       for (const [key, value] of Object.entries(filters)) {
         query = query.eq(key, value);
       }
+    }
+
+    if (order) {
+      query = query.order(order, { ascending });
     }
 
     if (limit) {
