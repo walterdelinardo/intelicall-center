@@ -440,6 +440,43 @@ const TelegramBotsSection = () => {
                     </div>
                   </div>
 
+                  {/* Consultar Dados via GET — always visible */}
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold flex items-center gap-1.5">
+                      <Database className="w-3.5 h-3.5 text-cyan-500" />
+                      Consultar Dados via GET
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Use no n8n (node HTTP Request) para buscar dados do sistema. Substitua <code className="bg-muted px-1 rounded">{"<N8N_API_SECRET>"}</code> pelo secret configurado.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs text-muted-foreground whitespace-nowrap">Tabela:</Label>
+                      <Select value={getTable} onValueChange={setGetTable}>
+                        <SelectTrigger className="h-8 text-xs w-52">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(getTableOptions).map(([key, opt]) => (
+                            <SelectItem key={key} value={key}>{opt.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="relative">
+                      <pre className="bg-muted text-foreground text-xs p-3 rounded-md overflow-x-auto whitespace-pre-wrap break-all">
+                        {getQueryCurl(getTable)}
+                      </pre>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute top-1 right-1 h-7 w-7"
+                        onClick={() => copyToClipboard(getQueryCurl(getTable))}
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+
                   <Button variant="outline" size="sm" onClick={() => setCurlBotId(null)}>
                     Fechar
                   </Button>
