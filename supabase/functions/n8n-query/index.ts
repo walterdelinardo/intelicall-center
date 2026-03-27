@@ -104,6 +104,15 @@ serve(async (req) => {
       }
     }
 
+    // Date range filtering
+    const col = dateColumn || 'date';
+    if (dateFrom) {
+      query = query.gte(col, dateFrom);
+    }
+    if (dateTo) {
+      query = query.lte(col, dateTo);
+    }
+
     if (order) {
       query = query.order(order, { ascending });
     }
