@@ -34,9 +34,10 @@ const statusColors: Record<string, string> = {
 };
 
 const FinanceiroModule = () => {
-  const { profile } = useAuth();
+  const { profile, hasTabAccess } = useAuth();
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState("daily");
+  const availableTabs = ["daily", "monthly", "commissions"].filter(t => hasTabAccess("financeiro", t));
+  const [tab, setTab] = useState(availableTabs[0] || "daily");
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -396,9 +397,9 @@ const FinanceiroModule = () => {
       <Tabs value={tab} onValueChange={setTab}>
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <TabsList>
-            <TabsTrigger value="daily">Caixa Diário</TabsTrigger>
-            <TabsTrigger value="monthly">Caixa Mensal</TabsTrigger>
-            <TabsTrigger value="commissions">Comissões</TabsTrigger>
+            {hasTabAccess("financeiro", "daily") && <TabsTrigger value="daily">Caixa Diário</TabsTrigger>}
+            {hasTabAccess("financeiro", "monthly") && <TabsTrigger value="monthly">Caixa Mensal</TabsTrigger>}
+            {hasTabAccess("financeiro", "commissions") && <TabsTrigger value="commissions">Comissões</TabsTrigger>}
           </TabsList>
 
           <div className="flex gap-2 items-center">

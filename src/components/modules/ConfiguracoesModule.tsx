@@ -51,7 +51,7 @@ const defaultWorkingHours: WorkingHours = {
 };
 
 const ConfiguracoesModule = () => {
-  const { profile, hasRole } = useAuth();
+  const { profile, hasRole, hasTabAccess } = useAuth();
   const queryClient = useQueryClient();
   const isAdmin = hasRole("admin");
   const { inboxes, loading: inboxesLoading, createInbox, toggleInbox, deleteInbox } = useWhatsAppInboxes();
@@ -313,17 +313,23 @@ const ConfiguracoesModule = () => {
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="general">
+      <Tabs defaultValue={["general", "hours", "integrations"].filter(t => hasTabAccess("configuracoes", t))[0] || "general"}>
         <TabsList>
-          <TabsTrigger value="general" className="gap-2">
-            <Building2 className="w-4 h-4" /> Dados Gerais
-          </TabsTrigger>
-          <TabsTrigger value="hours" className="gap-2">
-            <Clock className="w-4 h-4" /> Horários
-          </TabsTrigger>
-          <TabsTrigger value="integrations" className="gap-2">
-            <Plug className="w-4 h-4" /> Integrações
-          </TabsTrigger>
+          {hasTabAccess("configuracoes", "general") && (
+            <TabsTrigger value="general" className="gap-2">
+              <Building2 className="w-4 h-4" /> Dados Gerais
+            </TabsTrigger>
+          )}
+          {hasTabAccess("configuracoes", "hours") && (
+            <TabsTrigger value="hours" className="gap-2">
+              <Clock className="w-4 h-4" /> Horários
+            </TabsTrigger>
+          )}
+          {hasTabAccess("configuracoes", "integrations") && (
+            <TabsTrigger value="integrations" className="gap-2">
+              <Plug className="w-4 h-4" /> Integrações
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {/* General Info Tab */}
