@@ -1,61 +1,49 @@
 
 
-## Permissões por Aba dentro de cada Módulo
+## Plano: Campo Agenda no formulário de edição + Label/EventId nas transações
 
 ### Resumo
 
-Expandir o sistema RBAC para permitir controle granular por **aba** (sub-tab) dentro de cada módulo. Ao editar um papel, além de marcar Ler/Editar/Excluir por módulo, o admin poderá expandir cada módulo e selecionar quais abas específicas estão acessíveis.
+Três ajustes:
+1. Adicionar seletor de **agenda** (conta Google Calendar) no formulário de edição de evento
+2. Adicionar colunas `google_event_id` e `calendar_label` na tabela `financial_transactions`
+3. Gravar esses dois campos em todas as transações criadas pelo faturamento
 
-### Mapeamento de Abas por Módulo
+### 1. Migração de banco de dados
 
-```text
-agenda:         calendario, notificacoes
-conversas:      whatsapp, telegram
-financeiro:     daily (Caixa Diário), monthly (Caixa Mensal), commissions (Comissões)
-prontuarios:    clinical, assessments, procedures, documents, history
-usuarios:       usuarios, papeis
-configuracoes:  general, hours, integrations
-```
-
-Módulos sem abas (dashboard, clientes, estoque, leads, procedimentos, lista-espera) ficam sem sub-items.
-
-### Banco de Dados
-
-**Adicionar coluna `allowed_tabs` à tabela `role_permissions`:**
+Adicionar duas colunas à tabela `financial_transactions`:
 
 ```sql
-ALTER TABLE role_permissions ADD COLUMN allowed_tabs text[] DEFAULT NULL;
+ALTER TABLE financial_transactions
+  ADD COLUMN google_event_id text DEFAULT NULL,
+  ADD COLUMN calendar_label text DEFAULT NULL;
 ```
 
-- `NULL` ou array vazio = acesso a todas as abas (comportamento padrão, retrocompatível)
-- Array com valores = acesso apenas às abas listadas (ex: `{daily, monthly}`)
+### 2. Formulário de edição — campo Agenda
 
-### Alterações em Código
+**Arquivo:** `src/components/modules/AgendaModule.tsx`
 
-**1. `src/components/modules/usuarios/RolesTab.tsx`**
-- Exportar constante `MODULE_TABS` com o mapeamento módulo → abas
+- Adicionar `editAccountId` ao estado `editForm` (inicializado com `evt.accountId` em `handleEditEvent`)
+- Renderizar um `Select` com as contas ativas (`activeAccounts`) entre os campos existentes (acima de Data/Hora), exibindo o label de cada conta
+- Passar o `editForm.editAccountId` para `updateGoogleEvent` no `handleSaveEdit` (campo `account_id`)
+- O campo fica desabilitado (`isDisabled`) nas mesmas condições dos outros campos
 
-**2. `src/components/modules/usuarios/RoleFormDialog.tsx`**
-- Na matriz de permissões, para módulos que têm abas, adicionar uma linha expansível (accordion/collapsible) abaixo do módulo
-- Dentro da expansão: checkboxes para cada aba do módulo
-- Estado `allowedTabs` por módulo no formulário
-- Salvar o array de abas selecionadas na coluna `allowed_tabs`
-- Se todas as abas estão marcadas, salvar `NULL` (acesso total)
+### 3. Faturamento — gravar label e event_id
 
-**3. `src/contexts/AuthContext.tsx`**
-- Incluir `allowed_tabs` no fetch de permissões
-- Adicionar helper `hasTabAccess(moduleKey, tabKey)`:
-  - Super-admin → `true`
-  - `allowed_tabs` é null/vazio → `true`
-  - Caso contrário, verifica se `tabKey` está no array
+**Arquivo:** `src/components/modules/AgendaModule.tsx` (BillingDialog / `saveMutation`)
 
-**4. Módulos com abas (Agenda, Conversas, Financeiro, Prontuários, Usuários, Configurações)**
-- Filtrar `TabsTrigger` com `hasTabAccess(moduleKey, tabValue)`
-- Se a aba default não está acessível, selecionar a primeira aba permitida
+- Ao criar transações financeiras (principal, produtos, procedimentos extras), incluir:
+  - `google_event_id: event?.id || null`
+  - `calendar_label: event?.accountLabel || null`
+- Também incluir na transação de cancelamento (`handleCancelEvent`)
+
+### 4. Cancelamento — gravar label e event_id
+
+Na função `handleCancelEvent`, ao inserir a transação de cancelamento, adicionar os dois novos campos.
 
 ### Detalhes Técnicos
 
-- A coluna `allowed_tabs` usa tipo `text[]` (array nativo do Postgres), sem necessidade de nova tabela
-- Retrocompatível: registros existentes terão `NULL`, significando acesso total
-- O types.ts será atualizado automaticamente após a migration
+- A coluna `google_event_id` já existe em `appointments` mas não em `financial_transactions` — a migração adiciona essa redundância necessária para consulta direta no módulo financeiro
+- `calendar_label` é texto livre (ex: "Agenda Principal"), derivado de `accountLabel` do `MergedEvent`
+- Retrocompatível: transações existentes terão `NULL` em ambas as colunas
 
