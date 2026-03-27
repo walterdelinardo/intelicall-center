@@ -1,30 +1,81 @@
 
 
-## Adicionar cURLs GET para consulta de dados (n8n-query) nos Comandos de Integração
+## Sistema de Papéis Dinâmicos com Permissões por Módulo
 
-### O que será feito
+### Resumo
 
-Adicionar uma nova seção **"Consultar Dados (GET)"** no painel de Comandos de Integração do bot, exibindo exemplos de cURL GET para as tabelas mais úteis: `stock_items`, `financial_transactions`, `clients`, `appointments` e `telegram_notifications`. Isso permite ao usuário copiar e usar no n8n para buscar dados via GET.
+Criar um sistema RBAC (Role-Based Access Control) completo e escalável com:
+- Tabela de definições de papéis customizáveis por clínica
+- Tabela de permissões granulares (ler/editar/excluir) por módulo
+- Papel **super-admin** com acesso ilimitado (hardcoded, não editável)
+- Aba "Papéis" no módulo Usuários para gerenciar tudo
+- Walter Eduardo recebe o papel super-admin
 
-### Alteração em `src/components/settings/TelegramBotsSection.tsx`
+### Banco de Dados (Migrations)
 
-1. Adicionar a URL base do `n8n-query`: `https://{projectId}.supabase.co/functions/v1/n8n-query`
+**1. Tabela `role_definitions`**
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| id | uuid PK | |
+| clinic_id | uuid | Clínica dona |
+| name | text | Nome do papel (ex: "Recepcionista") |
+| slug | text | Identificador único por clínica |
+| color | text | Cor do badge (#hex) |
+| is_system | boolean | Se é papel do sistema (super-admin) |
+| is_super_admin | boolean | Acesso total |
+| created_at | timestamptz | |
 
-2. Criar funções geradoras de cURL GET para cada tabela relevante, usando query params. Exemplos:
-   - **Estoque**: `?table=stock_items&clinic_id={clinicId}&is_active=true`
-   - **Financeiro**: `?table=financial_transactions&clinic_id={clinicId}&order=date&ascending=false&limit=50`
-   - **Clientes**: `?table=clients&clinic_id={clinicId}&limit=100`
-   - **Agendamentos**: `?table=appointments&clinic_id={clinicId}&order=date&ascending=false&limit=50`
+**2. Tabela `role_permissions`**
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| id | uuid PK | |
+| role_definition_id | uuid FK | Papel |
+| module_key | text | Ex: "agenda", "financeiro", "estoque" |
+| can_read | boolean | Pode visualizar |
+| can_edit | boolean | Pode criar/editar |
+| can_delete | boolean | Pode excluir |
 
-3. Adicionar uma nova seção no painel de cURL (sempre visível, como o n8n log) com título "📊 Consultar Dados via GET" e um seletor de tabela, mostrando o cURL correspondente com botão de copiar.
+**3. Tabela `user_role_assignments`**
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| id | uuid PK | |
+| user_id | uuid | |
+| role_definition_id | uuid FK | |
+| clinic_id | uuid | |
 
-4. O header `x-api-secret` será incluído no cURL como placeholder `<N8N_API_SECRET>` para o usuário preencher.
+**4. RLS**: Todas as tabelas com policies baseadas em `get_user_clinic_id(auth.uid())`. Apenas super-admin e admin podem gerenciar.
 
-### Formato do cURL exibido
+**5. Seed**: Inserir papel "Super Admin" com `is_super_admin = true` e atribuir ao Walter Eduardo (buscar por nome na tabela profiles).
+
+### Lista de Módulos para Permissões
 
 ```text
-curl -X GET \
-  "https://PROJECT.supabase.co/functions/v1/n8n-query?table=stock_items&clinic_id=UUID&is_active=true" \
-  -H "x-api-secret: <N8N_API_SECRET>"
+dashboard, agenda, clientes, conversas, prontuarios, 
+procedimentos, lista-espera, financeiro, estoque, 
+leads, usuarios, configuracoes
 ```
+
+### Alterações em Código
+
+**1. `src/components/modules/UsuariosModule.tsx`**
+- Adicionar Tabs: "Usuários" (conteúdo atual) e "Papéis"
+- Aba Papéis mostra tabela com todos os role_definitions da clínica
+- Botões: Criar, Editar, Excluir papel
+- Dialog de criação/edição com: nome, slug, cor, e uma matriz de checkboxes (módulos × permissões)
+- Super-admin aparece na lista mas não pode ser editado/excluído
+
+**2. `src/contexts/AuthContext.tsx`**
+- Buscar `user_role_assignments` + `role_definitions` + `role_permissions` do usuário
+- Expor funções: `hasModuleAccess(module, permission)` e `isSuperAdmin`
+- Super-admin retorna `true` para tudo
+
+**3. `src/components/dashboard/AppSidebar.tsx`**
+- Substituir a lógica `canSee` hardcoded por `hasModuleAccess(moduleKey, 'read')`
+- Super-admin vê tudo
+
+### Detalhes Técnicos
+
+- O sistema antigo (enum `app_role` + `user_roles`) será mantido por compatibilidade mas o novo sistema (`role_definitions` + `user_role_assignments`) será a fonte de verdade para permissões
+- A UI de atribuição de papéis na aba "Usuários" passará a usar os papéis dinâmicos da tabela `role_definitions`
+- Papéis pré-existentes (admin, recepção, podólogo, financeiro) serão criados como seed na migração para manter compatibilidade
 
