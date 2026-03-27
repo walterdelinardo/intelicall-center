@@ -396,26 +396,6 @@ const DashboardHome = () => {
         </CardContent>
       </Card>
 
-      {/* Bottom section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="shadow-card">
-          <CardHeader>
-            <CardTitle className="text-base">Agendamentos de Hoje</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground text-sm">Nenhum agendamento para hoje.</p>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-card">
-          <CardHeader>
-            <CardTitle className="text-base">Últimas Conversas</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground text-sm">Nenhuma conversa recente.</p>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 };
